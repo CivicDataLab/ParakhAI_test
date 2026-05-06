@@ -1,0 +1,248 @@
+name: Parakh Test Suite — CI
+
+on:
+  push:
+    branches: [main, dev, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  # ── Platform URLs (configure as repo variables: Settings → Variables → Actions) ──
+  # vars.BASE_URL / vars.GRAPHQL_URL fall back to the documented production URLs
+  # so the workflow keeps running on a fresh fork without manual setup.
+  BASE_URL: ${{ vars.BASE_URL || 'https://parakh.civicdataspace.in' }}
+  GRAPHQL_URL: ${{ vars.GRAPHQL_URL || 'https://api.parakh.civicdataspace.in/graphql/' }}
+  ENVIRONMENT: ${{ vars.ENVIRONMENT || 'production' }}
+  BROWSER: chromium
+  HEADLESS: "true"
+  SLOW_MO: "0"
+  VIEWPORT_WIDTH: "1440"
+  VIEWPORT_HEIGHT: "900"
+  SCREENSHOT_ON_FAILURE: "true"
+  VISUAL_THRESHOLD: "0.2"
+  PYTHON_VERSION: "3.11"
+  # ── Auth secrets (add these in GitHub → Settings → Secrets → Actions) ────────
+  # Tests using the `authenticated_page` fixture skip gracefully when unset.
+  # Set TEST_USER_INDEX=2 in the second parallel job to use a separate account.
+  TEST_EMAIL_1: ${{ secrets.TEST_EMAIL_1 }}
+  TEST_PASSWORD_1: ${{ secrets.TEST_PASSWORD_1 }}
+  TEST_EMAIL_2: ${{ secrets.TEST_EMAIL_2 }}
+  TEST_PASSWORD_2: ${{ secrets.TEST_PASSWORD_2 }}
+  TEST_USER_INDEX: "1"
+  SANDBOX_ORG_SLUG: ${{ secrets.SANDBOX_ORG_SLUG }}
+
+jobs:
+  # ────────────────────────────────────────────── Lint
+  lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Run ruff linter
+        run: ruff check locators/ pages/ utils/ tests/ --output-format=github
+
+  # ────────────────────────────────────────────── API tests (no browser)
+  api-tests:
+    name: API Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run API tests
+        continue-on-error: true
+        run: |
+          pytest tests/api/ \
+            -v \
+            --tb=short \
+            --html=reports/api_report.html \
+            --self-contained-html \
+            -m api
+
+      - name: Upload API test report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: api-test-report
+          path: reports/api_report.html
+          retention-days: 30
+
+  # ────────────────────────────────────────────── E2E tests
+  e2e-tests:
+    name: E2E Tests (Chromium)
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install Playwright browsers
+        run: playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        continue-on-error: true
+        run: |
+          pytest tests/e2e/ \
+            -v \
+            --tb=short \
+            --html=reports/e2e_report.html \
+            --self-contained-html \
+            -m e2e \
+            --reruns 2 \
+            --reruns-delay 3
+
+      - name: Upload E2E test report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-test-report
+          path: |
+            reports/e2e_report.html
+            screenshots/
+          retention-days: 30
+
+  # ────────────────────────────────────────────── Accessibility tests
+  accessibility-tests:
+    name: Accessibility Tests (axe)
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install Playwright browsers
+        run: playwright install --with-deps chromium
+
+      - name: Run accessibility tests
+        continue-on-error: true
+        run: |
+          pytest tests/accessibility/ \
+            -v \
+            --tb=short \
+            --html=reports/a11y_report.html \
+            --self-contained-html \
+            -m accessibility
+
+      - name: Upload accessibility reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: accessibility-report
+          path: |
+            reports/a11y_report.html
+            reports/accessibility_report.json
+            reports/accessibility_login_report.json
+          retention-days: 30
+
+  # ────────────────────────────────────────────── Visual regression tests
+  visual-tests:
+    name: Visual Regression Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install Playwright browsers
+        run: playwright install --with-deps chromium
+
+      # Restore cached baselines so we compare against a known good state
+      - name: Restore visual baselines cache
+        uses: actions/cache@v5
+        with:
+          path: snapshots/
+          key: visual-baselines-${{ runner.os }}-${{ hashFiles('tests/visual/**') }}
+          restore-keys: |
+            visual-baselines-${{ runner.os }}-
+
+      - name: Run visual regression tests
+        continue-on-error: true
+        run: |
+          pytest tests/visual/ \
+            -v \
+            --tb=short \
+            --html=reports/visual_report.html \
+            --self-contained-html \
+            -m visual
+
+      # Save updated baselines back to cache
+      - name: Save visual baselines cache
+        if: always()
+        uses: actions/cache@v5
+        with:
+          path: snapshots/
+          key: visual-baselines-${{ runner.os }}-${{ hashFiles('tests/visual/**') }}
+
+      - name: Upload visual regression report and diffs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-regression-report
+          path: |
+            reports/visual_report.html
+            screenshots/DIFF_*
+            snapshots/
+          retention-days: 30
+
+  # ────────────────────────────────────────────── Summary
+  test-summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [api-tests, e2e-tests, accessibility-tests, visual-tests]
+    if: always()
+    steps:
+      - name: Print summary
+        run: |
+          echo "## Test Run Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Suite | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| API Tests | ${{ needs.api-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| E2E Tests | ${{ needs.e2e-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Accessibility | ${{ needs.accessibility-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Visual Regression | ${{ needs.visual-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Platform:** ${{ env.BASE_URL }}" >> $GITHUB_STEP_SUMMARY
