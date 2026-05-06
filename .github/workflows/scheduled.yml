@@ -1,0 +1,224 @@
+name: Parakh Test Suite — Nightly Regression
+
+on:
+  schedule:
+    # Run every day at 20:30 UTC = 02:00 IST (next day) — nightly in India
+    - cron: "30 20 * * *"
+  # Allow manual trigger from the GitHub UI
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: false
+        default: "production"
+        type: choice
+        options: [production, staging]
+      run_e2e:
+        description: "Run E2E tests"
+        type: boolean
+        default: true
+      run_a11y:
+        description: "Run accessibility tests"
+        type: boolean
+        default: true
+      run_api:
+        description: "Run API tests"
+        type: boolean
+        default: true
+      run_perf:
+        description: "Run performance tests"
+        type: boolean
+        default: true
+      run_visual:
+        description: "Run visual regression tests"
+        type: boolean
+        default: true
+
+env:
+  # ── Platform URLs (configure as repo variables: Settings → Variables → Actions) ──
+  BASE_URL: ${{ vars.BASE_URL || 'https://parakh.civicdataspace.in' }}
+  GRAPHQL_URL: ${{ vars.GRAPHQL_URL || 'https://api.parakh.civicdataspace.in/graphql/' }}
+  ENVIRONMENT: ${{ vars.ENVIRONMENT || 'production' }}
+  BROWSER: chromium
+  HEADLESS: "true"
+  SLOW_MO: "0"
+  VIEWPORT_WIDTH: "1440"
+  VIEWPORT_HEIGHT: "900"
+  SCREENSHOT_ON_FAILURE: "true"
+  VISUAL_THRESHOLD: "0.2"
+  PYTHON_VERSION: "3.11"
+  # ── Auth secrets (add these in GitHub → Settings → Secrets → Actions) ────────
+  TEST_EMAIL_1: ${{ secrets.TEST_EMAIL_1 }}
+  TEST_PASSWORD_1: ${{ secrets.TEST_PASSWORD_1 }}
+  TEST_EMAIL_2: ${{ secrets.TEST_EMAIL_2 }}
+  TEST_PASSWORD_2: ${{ secrets.TEST_PASSWORD_2 }}
+  TEST_USER_INDEX: "1"
+  # Slug of the dedicated sandbox org. When set, write-marked regression tests
+  # are allowed to mutate this org. When unset, those tests skip.
+  SANDBOX_ORG_SLUG: ${{ secrets.SANDBOX_ORG_SLUG }}
+
+jobs:
+  nightly-full-suite:
+    name: Full Nightly Regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install Playwright browsers
+        run: playwright install --with-deps chromium
+
+      - name: Restore visual baselines cache
+        uses: actions/cache@v5
+        with:
+          path: snapshots/
+          key: visual-baselines-nightly-${{ runner.os }}
+          restore-keys: |
+            visual-baselines-nightly-${{ runner.os }}
+            visual-baselines-${{ runner.os }}-
+
+      # ── E2E ──────────────────────────────────────────────────────
+      - name: Run E2E tests
+        id: e2e
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_e2e }}
+        continue-on-error: true
+        run: |
+          pytest tests/e2e/ \
+            -v \
+            -n 4 \
+            --tb=short \
+            --html=reports/nightly_e2e_report.html \
+            --self-contained-html \
+            -m e2e \
+            --reruns 2 \
+            --reruns-delay 5
+
+      # ── Accessibility ─────────────────────────────────────────────
+      - name: Run accessibility tests
+        id: a11y
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_a11y }}
+        continue-on-error: true
+        run: |
+          pytest tests/accessibility/ \
+            -v \
+            --tb=short \
+            --html=reports/nightly_a11y_report.html \
+            --self-contained-html \
+            -m accessibility
+
+      # ── API ───────────────────────────────────────────────────────
+      - name: Run API tests
+        id: api
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_api }}
+        continue-on-error: true
+        run: |
+          pytest tests/api/ \
+            -v \
+            --tb=short \
+            --html=reports/nightly_api_report.html \
+            --self-contained-html \
+            -m api
+
+      # ── Performance ───────────────────────────────────────────────
+      - name: Run performance tests
+        id: perf
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_perf }}
+        continue-on-error: true
+        run: |
+          pytest tests/performance/ \
+            -v \
+            --tb=short \
+            --html=reports/nightly_perf_report.html \
+            --self-contained-html \
+            -m performance
+
+      # ── Visual ────────────────────────────────────────────────────
+      - name: Run visual regression tests
+        id: visual
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_visual }}
+        continue-on-error: true
+        run: |
+          pytest tests/visual/ \
+            -v \
+            --tb=short \
+            --html=reports/nightly_visual_report.html \
+            --self-contained-html \
+            -m visual
+
+      - name: Save visual baselines cache
+        if: always()
+        uses: actions/cache@v5
+        with:
+          path: snapshots/
+          key: visual-baselines-nightly-${{ runner.os }}
+
+      # ── Upload all artifacts ──────────────────────────────────────
+      - name: Upload all nightly reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: nightly-regression-reports-${{ github.run_number }}
+          path: |
+            reports/
+            screenshots/
+            snapshots/
+          retention-days: 30
+
+      # ── Summary notification ──────────────────────────────────────
+      - name: Print nightly summary
+        if: always()
+        run: |
+          echo "=================================================="
+          echo " NIGHTLY REGRESSION SUMMARY — $(date -u '+%Y-%m-%d %H:%M UTC')"
+          echo "=================================================="
+          echo " Platform  : ${{ env.BASE_URL }}"
+          echo " Run ID    : ${{ github.run_id }}"
+          echo " Trigger   : ${{ github.event_name }}"
+          echo "--------------------------------------------------"
+          echo " E2E Tests        : ${{ steps.e2e.outcome }}"
+          echo " Accessibility    : ${{ steps.a11y.outcome }}"
+          echo " API Tests        : ${{ steps.api.outcome }}"
+          echo " Performance      : ${{ steps.perf.outcome }}"
+          echo " Visual Regression: ${{ steps.visual.outcome }}"
+          echo "=================================================="
+          echo ""
+          echo "Reports artifact: nightly-regression-reports-${{ github.run_number }}"
+          echo ""
+          # ── Placeholder for Slack / email webhook ──────────────────
+          # Uncomment and configure to enable notifications:
+          #
+          # - name: Send Slack notification
+          #   uses: slackapi/slack-github-action@v1.26.0
+          #   with:
+          #     payload: |
+          #       {
+          #         "text": "Nightly Parakh Tests: E2E=${{ steps.e2e.outcome }} | A11y=${{ steps.a11y.outcome }} | API=${{ steps.api.outcome }} | Perf=${{ steps.perf.outcome }}"
+          #       }
+          #   env:
+          #     SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Write GitHub step summary
+        if: always()
+        run: |
+          echo "## Nightly Regression — $(date -u '+%Y-%m-%d')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Suite | Result |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| E2E Tests | ${{ steps.e2e.outcome }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Accessibility | ${{ steps.a11y.outcome }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| API Tests | ${{ steps.api.outcome }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Performance | ${{ steps.perf.outcome }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Visual Regression | ${{ steps.visual.outcome }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Platform:** ${{ env.BASE_URL }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Artifacts:** [Download reports](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
