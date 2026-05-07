@@ -118,3 +118,50 @@ class EvaluatorRolePage(BasePage):
     def click_view_assignments(self) -> None:
         self.click(self.VIEW_ASSIGNMENTS_LINK)
         self.wait_for_load("domcontentloaded")
+
+    # ── Pending invitation actions (write-side) ────────────────────────────────
+
+    def get_pending_invitation_count(self) -> int:
+        """Count rows in the Pending Invitations section."""
+        return self.page.locator(EvaluatorRoleLocators.PENDING_ROW).count()
+
+    def click_accept_first_pending(self) -> bool:
+        """Click the first pending invitation's Accept button.
+
+        Returns True if a button was clicked, False if no pending row exists.
+        """
+        rows = self.page.locator(EvaluatorRoleLocators.PENDING_ROW)
+        if rows.count() == 0:
+            return False
+        accept = rows.first.locator(EvaluatorRoleLocators.ACCEPT_BUTTON)
+        if accept.count() == 0:
+            return False
+        accept.first.click()
+        self.page.wait_for_timeout(800)
+        return True
+
+    def click_decline_first_pending(self) -> bool:
+        """Click the first pending invitation's Decline button. See click_accept."""
+        rows = self.page.locator(EvaluatorRoleLocators.PENDING_ROW)
+        if rows.count() == 0:
+            return False
+        decline = rows.first.locator(EvaluatorRoleLocators.DECLINE_BUTTON)
+        if decline.count() == 0:
+            return False
+        decline.first.click()
+        self.page.wait_for_timeout(800)
+        return True
+
+    def open_filter_tab(self, name: str) -> bool:
+        """Open the named filter tab on the assignments list. Returns True on click."""
+        sel_map = {
+            "pending": EvaluatorRoleLocators.FILTER_TAB_PENDING_LIST,
+            "accepted": EvaluatorRoleLocators.FILTER_TAB_ACCEPTED,
+            "declined": EvaluatorRoleLocators.FILTER_TAB_DECLINED,
+        }
+        sel = sel_map.get(name.lower())
+        if not sel or not self.is_visible(sel, timeout=2_000):
+            return False
+        self.click(sel)
+        self.page.wait_for_timeout(400)
+        return True

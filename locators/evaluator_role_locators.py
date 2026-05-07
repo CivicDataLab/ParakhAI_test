@@ -41,3 +41,17 @@ class EvaluatorRoleLocators:
     EVAL_FILTER_FAILED = "text=Failed"
     NO_EVALUATIONS_MESSAGE = "text=No evaluations found"
     VIEW_ASSIGNMENTS_LINK = "text=View Assignments"
+
+    # ── Pending invitation row actions (write-side regression) ────────────────
+    # TODO: verify selectors via Playwright MCP — buttons live in the row of
+    # the Pending Invitations table.
+    PENDING_ROW = (
+        "[class*='pending'] tr, "
+        "[class*='invitation'] tr, "
+        "tr:has(button:has-text('Accept'))"
+    )
+    ACCEPT_BUTTON = "button:has-text('Accept')"
+    DECLINE_BUTTON = "button:has-text('Decline')"
+    FILTER_TAB_ACCEPTED = "button:has-text('Accepted'), [role='tab']:has-text('Accepted')"
+    FILTER_TAB_DECLINED = "button:has-text('Declined'), [role='tab']:has-text('Declined')"
+    FILTER_TAB_PENDING_LIST = "button:has-text('Pending'), [role='tab']:has-text('Pending')"
