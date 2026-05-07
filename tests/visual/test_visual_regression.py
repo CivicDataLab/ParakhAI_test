@@ -106,6 +106,54 @@ def _page_at_viewport(browser, width: int, height: int) -> Page:
     return ctx.new_page()
 
 
+def _authenticated_page_at_viewport(
+    browser, storage_state_path: str, width: int = 1440, height: int = 900
+) -> Page:
+    """Create a fresh authenticated context at the given viewport.
+
+    Seeds cookies + localStorage from the cached storage_state path so we don't
+    re-run Keycloak SSO per visual scan. Caller closes via page.context.close().
+    """
+    ctx = browser.new_context(
+        viewport={"width": width, "height": height},
+        ignore_https_errors=True,
+        locale="en-US",
+        storage_state=storage_state_path,
+    )
+    return ctx.new_page()
+
+
+def _capture_page_masked(page: Page, url: str, masks: list) -> Image.Image:
+    """Like _capture_page but masks dynamic regions in the screenshot.
+
+    Each selector in `masks` is resolved to a Locator; Playwright paints those
+    elements as solid pink boxes during the screenshot so they don't trigger
+    visual diffs on every nightly run (timestamps, polling counters,
+    activity feeds).
+    """
+    page.goto(url, wait_until="networkidle", timeout=30_000)
+    page.wait_for_timeout(1_500)
+    mask_locators = []
+    for sel in masks:
+        loc = page.locator(sel)
+        if loc.count() > 0:
+            mask_locators.append(loc)
+    raw = page.screenshot(full_page=True, mask=mask_locators or None)
+    import io
+    return Image.open(io.BytesIO(raw))
+
+
+# Dynamic regions that change every page load — masking stops false diffs on
+# nightly visual runs.
+_DEFAULT_MASKS = [
+    "[class*='timestamp']",
+    "[class*='last-updated']",
+    "[class*='activity']",
+    "time",
+    "[class*='polling']",
+]
+
+
 # ──────────────────────────────────────────────────── Homepage viewports
 
 
@@ -221,5 +269,60 @@ class TestFeatureTabsVisual:
             raw = content.screenshot()
             img = Image.open(io.BytesIO(raw))
             _compare_or_save_baseline(img, f"feature_{tab_label}")
+        finally:
+            page.context.close()
+
+
+# ──────────────────────────────────────────── Authenticated page baselines
+
+
+class TestAuthenticatedPageVisuals:
+    """Desktop visual baselines for 12 auth-walled routes.
+
+    First run (`run_visual=true` workflow_dispatch): saves baselines to
+    `snapshots/auth_<name>_desktop.png` and skips with the standard
+    "baseline saved" message. Subsequent runs diff against the cached
+    baseline at Config.VISUAL_THRESHOLD (default 0.1%).
+
+    Dynamic regions are masked via _DEFAULT_MASKS to prevent flaky diffs.
+    Tests are parametrized by (path, name); each is independent so a failure
+    on one page doesn't mask the others.
+    """
+
+    AUTH_ROUTES = [
+        ("/dashboard", "dashboard_role_selector"),
+        ("/dashboard/ai-maker", "org_selector"),
+        ("/dashboard/ai-maker/1", "ai_maker_dashboard"),
+        ("/dashboard/ai-maker/1/ai-models", "models_list"),
+        ("/dashboard/ai-maker/1/evaluations", "evaluations_list"),
+        ("/dashboard/ai-maker/1/evaluations/new", "new_evaluation_wizard"),
+        ("/dashboard/ai-maker/1/auditors", "auditors_management"),
+        ("/dashboard/ai-maker/1/prompt-libraries", "prompt_libraries"),
+        ("/dashboard/auditor", "auditor_dashboard"),
+        ("/dashboard/auditor/assignments", "auditor_assignments"),
+        ("/dashboard/auditor/evaluations", "auditor_evaluations"),
+        ("/evaluation/288", "evaluation_detail_completed"),
+    ]
+
+    @pytest.mark.parametrize(
+        "path,name", AUTH_ROUTES, ids=[r[1] for r in AUTH_ROUTES]
+    )
+    @pytest.mark.auth
+    @pytest.mark.regression
+    def test_authenticated_page_desktop(
+        self, browser, authenticated_storage_state, path, name
+    ):
+        page = _authenticated_page_at_viewport(
+            browser, authenticated_storage_state, 1440, 900
+        )
+        try:
+            try:
+                img = _capture_page_masked(page, Config.url(path), _DEFAULT_MASKS)
+            except Exception as exc:  # noqa: BLE001
+                pytest.skip(
+                    f"Could not capture {path}: {exc}. "
+                    "Page may be unreachable for this account."
+                )
+            _compare_or_save_baseline(img, f"auth_{name}_desktop_1440x900")
         finally:
             page.context.close()

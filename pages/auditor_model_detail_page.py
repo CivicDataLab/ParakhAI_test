@@ -61,3 +61,15 @@ class AuditorModelDetailPage(BasePage):
     def click_start(self) -> None:
         self.click(self.START_BUTTON)
         self.wait_for_load("domcontentloaded")
+
+    def get_status_chip_text(self) -> str:
+        """Return the status chip text on the first version row, if visible."""
+        for status in ("Pending", "Accepted", "Declined", "Completed"):
+            sel = f"text={status}"
+            if self.is_visible(sel, timeout=1_000):
+                return status.upper()
+        return ""
+
+    def click_back(self) -> None:
+        self.click("button:has-text('Back'), a:has-text('Back')")
+        self.wait_for_load("domcontentloaded")
