@@ -61,18 +61,39 @@ class HomeLocators:
     )
 
     # ── Feature tabs ──────────────────────────────────────────────────────────
-    FEATURE_TABS_CONTAINER = "[role='tablist'], [class*='tab'], [class*='Tab']"
-    TAB_BUTTON = "[role='tab'], button[class*='tab'], button[class*='Tab']"
+    # The homepage renders tabs as plain <button> elements (no role="tab"),
+    # so selectors are anchored on the four known tab labels. If the labels
+    # change, update FEATURE_TAB_LABELS and the OR-chain below in lockstep.
+    FEATURE_TAB_LABELS = (
+        "Automation-assisted Evaluation Environment",
+        "Expert-led Evaluations",
+        "Sector-specific Test Cases",
+        "Evaluation History & Reports",
+    )
+    FEATURE_TABS_CONTAINER = (
+        "section:has(button:has-text(\"Automation-assisted Evaluation Environment\"))"
+    )
+    TAB_BUTTON = (
+        "button:has-text(\"Automation-assisted Evaluation Environment\"), "
+        "button:has-text(\"Expert-led Evaluations\"), "
+        "button:has-text(\"Sector-specific Test Cases\"), "
+        "button:has-text(\"Evaluation History & Reports\")"
+    )
+    # Active tab is distinguished by the design-token background class
+    # `bg-[#E8E4FF]` plus violet text `text-[#6849EE]`. Keep ARIA fallbacks
+    # in case the build adds proper a11y semantics later.
     ACTIVE_TAB = (
         "[role='tab'][aria-selected='true'], "
-        "[class*='tab'][class*='active'], "
-        "[class*='Tab'][class*='Active']"
+        "button[class*='E8E4FF'], "
+        "button[class*='6849EE']"
     )
+    # Content panel sits as a sibling of the tab-button row inside the same
+    # flex column wrapper. Anchor by the section, then pick the inner column
+    # that contains an <img> (every tab content has an illustration).
     TAB_CONTENT = (
         "[role='tabpanel'], "
-        "[class*='tab-content'], "
-        "[class*='TabContent'], "
-        "[class*='tabPanel']"
+        "section:has(button:has-text(\"Automation-assisted Evaluation Environment\")) "
+        "div.flex.flex-col.items-center:has(img)"
     )
 
     # ── Footer ────────────────────────────────────────────────────────────────
