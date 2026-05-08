@@ -178,7 +178,7 @@ class TestAutomatedModeFlow:
         assert audit_id is not None, (
             "URL must contain auditId after clicking 'Add Test Cases' (draft created)"
         )
-        assert nep.is_dataset_table_visible(), (
+        assert nep.wait_for_dataset_table(), (
             "'Select Prompt Datasets' table must be visible on the Test Cases tab "
             "in Automated mode"
         )
@@ -209,11 +209,11 @@ class TestManualModeFlow:
         # Wait for the URL to gain auditId — same race that bit smoke #3.
         nep.wait_for_audit_id_in_url()
 
-        assert nep.is_module_card_visible(), (
+        assert nep.wait_for_module_cards(min_count=1), (
             "At least one module card must be visible on the Test Cases tab in Manual mode"
         )
-        # Verify counter labels are present on the cards. Use longer timeouts —
-        # module cards hydrate slightly after the cards are placed in the DOM.
+        # Counter labels render inside the cards once they've hydrated. The
+        # wait_for_module_cards above ensures the parent containers exist.
         assert nep.is_visible(
             EvaluationsLocators.MANUAL_MODULE_COUNTER_TEST_CASES, timeout=10_000
         ), "'Test Cases' counter label must appear on module cards"

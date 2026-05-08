@@ -17,13 +17,31 @@ class EvaluationsLocators:
     EVAL_TESTS_COL = "th:text('Tests'), :text('Tests')"
     EVAL_COMPLETED_COL = "th:text('Completed'), :text('Completed')"
 
-    # Status badges
-    STATUS_DRAFT = "text=DRAFT"
-    STATUS_COMPLETED = "text=COMPLETED"
-
-    # Mode labels
-    MODE_AUTOMATED = "text=AUTOMATED"
-    MODE_MANUAL = "text=MANUAL"
+    # Status badges and mode labels live inside the evaluations table — scope
+    # the selectors to table cells so they don't match unrelated text elsewhere
+    # on the page (e.g. the Mode dropdown options literally contain "Automated"
+    # / "Manual"; the Cancel modal contains "Cancel Evaluation"). Prefer
+    # data-testid when frontend adds them.
+    STATUS_DRAFT = (
+        "[data-testid='status-draft'], "
+        "td :has-text('DRAFT'), "
+        "[role='cell'] :has-text('DRAFT')"
+    )
+    STATUS_COMPLETED = (
+        "[data-testid='status-completed'], "
+        "td :has-text('COMPLETED'), "
+        "[role='cell'] :has-text('COMPLETED')"
+    )
+    MODE_AUTOMATED = (
+        "[data-testid='mode-automated'], "
+        "td :has-text('AUTOMATED'), "
+        "[role='cell'] :has-text('AUTOMATED')"
+    )
+    MODE_MANUAL = (
+        "[data-testid='mode-manual'], "
+        "td :has-text('MANUAL'), "
+        "[role='cell'] :has-text('MANUAL')"
+    )
 
     # ── New Evaluation modal ───────────────────────────────────────────────────
     MODAL_TITLE = "[role='dialog']:has-text('Start New Evaluation'), [class*='modal']:has-text('Start New Evaluation'), [class*='Modal']:has-text('Start New Evaluation')"
@@ -39,8 +57,18 @@ class EvaluationsLocators:
     MODAL_VERSION_OPTION = "option, [role='option'], [class*='option']"
 
     # ── New Evaluation wizard ──────────────────────────────────────────────────
-    WIZARD_TAB_CONFIGURATION = "text=Evaluation Configuration"
-    WIZARD_TAB_TEST_CASES = "text=Test Cases"
+    # Scope tab selectors to <button> / [role='tab'] so they don't collide with
+    # the same text appearing in module-card counters ("0 Test Cases").
+    WIZARD_TAB_CONFIGURATION = (
+        "[data-testid='tab-configuration'], "
+        "[role='tab']:has-text('Evaluation Configuration'), "
+        "button:has-text('Evaluation Configuration')"
+    )
+    WIZARD_TAB_TEST_CASES = (
+        "[data-testid='tab-test-cases'], "
+        "[role='tab']:has-text('Test Cases'), "
+        "button:has-text('Test Cases'):not(:has-text('0 '))"
+    )
     # NOTE: The name input uses id="auditName" per spec — prefer that; class fallback kept.
     WIZARD_EVAL_NAME_INPUT = "input#auditName, input[name='evaluationName'], input[value*='Untitled'], input[class*='name']"
     WIZARD_CANCEL_EVALUATION = "text=Cancel Evaluation"
@@ -147,21 +175,22 @@ class EvaluationsLocators:
     #   3. last-resort scoped text= so we still find something on a render lag
     # Counter labels render as e.g. "0 Test Cases" / "0 Failed" / "0 Passed".
     # Use :has-text (substring) not :text-is (exact) — the leading number is
-    # part of the same text node.
+    # part of the same text node. Use case-insensitive class match (`i` flag)
+    # so we hit both camelCase (`moduleCard`) and kebab-case (`module-card`).
     MANUAL_MODULE_COUNTER_TEST_CASES = (
         "[data-testid='counter-test-cases'], "
-        "[class*='moduleCard'] :has-text('Test Cases'), "
-        "[class*='Card'] :has-text('Test Cases')"
+        "[class*='module' i][class*='card' i] :has-text('Test Cases'), "
+        "[class*='card' i] :has-text('Test Cases')"
     )
     MANUAL_MODULE_COUNTER_FAILED = (
         "[data-testid='counter-failed'], "
-        "[class*='moduleCard'] :has-text('Failed'), "
-        "[class*='Card'] :has-text('Failed')"
+        "[class*='module' i][class*='card' i] :has-text('Failed'), "
+        "[class*='card' i] :has-text('Failed')"
     )
     MANUAL_MODULE_COUNTER_PASSED = (
         "[data-testid='counter-passed'], "
-        "[class*='moduleCard'] :has-text('Passed'), "
-        "[class*='Card'] :has-text('Passed')"
+        "[class*='module' i][class*='card' i] :has-text('Passed'), "
+        "[class*='card' i] :has-text('Passed')"
     )
     # Test entry panel (shown after clicking a module card)
     MANUAL_INPUT_TEXTAREA = (

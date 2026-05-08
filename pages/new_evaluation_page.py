@@ -299,8 +299,13 @@ class NewEvaluationPage(BasePage):
     # ── Wizard — Evaluation Configuration tab ─────────────────────────────────
 
     def get_evaluation_name(self) -> str:
-        """Return the current value of the Evaluation Name input."""
+        """Return the current value of the Evaluation Name input.
+
+        Waits for the input to attach + become visible before reading. Without
+        this, callers race the SPA hydration and get an empty string.
+        """
         loc = self.page.locator(self.WIZARD_EVAL_NAME_INPUT).first
+        loc.wait_for(state="visible", timeout=self.timeout)
         return loc.input_value()
 
     def set_evaluation_name(self, name: str) -> None:
@@ -432,18 +437,29 @@ class NewEvaluationPage(BasePage):
         After clicking, the URL should gain &auditId=... if a draft is created.
         """
         self.click(self.ADD_TEST_CASES_BUTTON)
-        # In SPA, domcontentloaded fires immediately after a JS route change.
-        # Wait for auditId to appear in the URL — that indicates the draft was
-        # persisted on the server.  If auditId was already present (re-opening a
-        # draft), fall through to a short fixed wait.
+        # SPA route change — wait for auditId to appear in the URL (= draft
+        # persisted server-side). If auditId was already present (re-opening a
+        # draft), fall through.
         try:
             self.page.wait_for_url("**auditId=**", timeout=self.timeout)
         except Exception:
             self.page.wait_for_timeout(3_000)
-        # TODO: TEMP — wizard page can render blank after the auditId URL param is
-        # added (same Next.js hydration issue as the homepage and wizard open flow).
-        # Reload to force the Test Cases tab content to mount correctly.
         self.page.wait_for_timeout(1_000)
+        # Conditional reload: an older workaround forced a reload here because
+        # the Test Cases tab sometimes rendered blank after the auditId URL
+        # change. The reload itself can put the SPA back on the Configuration
+        # tab depending on routing — hurting more than it helps. Only reload
+        # if neither the dataset table nor a module card has rendered after a
+        # short wait. Verified via Playwright MCP 2026-05-08 that the happy
+        # path no longer needs a reload.
+        try:
+            self.page.locator(
+                f"{EvaluationsLocators.AUTOMATED_DATASET_TABLE}, "
+                f"{EvaluationsLocators.MANUAL_MODULE_CARD}"
+            ).first.wait_for(state="visible", timeout=4_000)
+            return
+        except Exception:
+            pass
         self.page.reload(wait_until="load", timeout=self.timeout)
         self.page.wait_for_timeout(2_000)
 
@@ -452,6 +468,22 @@ class NewEvaluationPage(BasePage):
     def is_dataset_table_visible(self) -> bool:
         """Return True if the 'Select Prompt Datasets' table is rendered."""
         return self.is_visible(EvaluationsLocators.AUTOMATED_DATASET_TABLE, timeout=5_000)
+
+    def wait_for_dataset_table(self, timeout: int = 15_000) -> bool:
+        """
+        Wait for the 'Select Prompt Datasets' table to attach + become visible
+        on the Test Cases tab (Automated mode). Returns True on success, False
+        on timeout. Use this instead of `is_dataset_table_visible()` directly
+        after `click_add_test_cases()` — the table renders after the SPA
+        post-reload hydration completes.
+        """
+        try:
+            self.page.locator(
+                EvaluationsLocators.AUTOMATED_DATASET_TABLE
+            ).first.wait_for(state="visible", timeout=timeout)
+            return True
+        except Exception:
+            return False
 
     def select_first_dataset(self) -> bool:
         """
@@ -489,6 +521,25 @@ class NewEvaluationPage(BasePage):
     def is_module_card_visible(self) -> bool:
         """Return True if at least one module card is visible."""
         return self.is_visible(EvaluationsLocators.MANUAL_MODULE_CARD, timeout=5_000)
+
+    def wait_for_module_cards(self, min_count: int = 1, timeout: int = 15_000) -> bool:
+        """
+        Wait for at least `min_count` module cards to render on the Test Cases
+        tab (Manual mode). Returns True on success, False on timeout. Use this
+        instead of `is_module_card_visible()` directly after
+        `click_add_test_cases()` — module cards hydrate after the post-reload
+        SPA settle.
+        """
+        try:
+            self.page.wait_for_function(
+                f"""() => document.querySelectorAll(
+                    "{EvaluationsLocators.MANUAL_MODULE_CARD.split(',')[0].strip()}"
+                ).length >= {min_count}""",
+                timeout=timeout,
+            )
+            return True
+        except Exception:
+            return self.get_module_card_count() >= min_count
 
     def click_first_module_card(self) -> None:
         """
@@ -567,6 +618,9 @@ class NewEvaluationPage(BasePage):
         data-testid="draft-row-link" wrapping the <tr> in an <a> for reliability.
         """
         row = self.page.locator(EvaluationsLocators.DRAFT_ROW).first
+        # Wait for the row to attach so get_attribute returns its real value
+        # rather than None from a not-yet-rendered element.
+        row.wait_for(state="visible", timeout=self.timeout)
         href = row.get_attribute("href")
         if href is not None:
             return "/evaluations/new" in href
@@ -585,6 +639,7 @@ class NewEvaluationPage(BasePage):
         NOTE: Same stabilisation note as draft_row_href_contains_new.
         """
         row = self.page.locator(EvaluationsLocators.COMPLETED_ROW).first
+        row.wait_for(state="visible", timeout=self.timeout)
         href = row.get_attribute("href")
         if href is not None:
             return "/evaluations/" in href and "new" not in href
