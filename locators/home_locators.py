@@ -29,7 +29,9 @@ class HomeLocators:
     MOBILE_NAV_ITEMS = "nav a, [role='navigation'] a"
 
     # ── Hero section ──────────────────────────────────────────────────────────
-    # Include h2 as fallback — some builds promote h2 as the visual hero heading
+    # Include h2 as fallback — some builds promote h2 as the visual hero heading.
+    # `>> nth=0` keeps strict-mode safe when the page renders multiple top-level
+    # headings (e.g. hero + section header both as h1/h2).
     HERO_HEADING = (
         "h1, "
         "h2, "
@@ -37,6 +39,7 @@ class HomeLocators:
         "[class*='hero'] h2, "
         "[class*='Hero'] h1, "
         "[class*='Hero'] h2"
+        " >> nth=0"
     )
     # Broad CTA selector — covers common label variations across builds
     GET_STARTED_BUTTON = (

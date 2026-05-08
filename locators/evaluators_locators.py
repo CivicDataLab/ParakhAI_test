@@ -8,7 +8,11 @@ class EvaluatorsLocators:
     # ── Page structure ─────────────────────────────────────────────────────────
     PAGE_HEADING = "text=Evaluators"
     PAGE_SUBHEADING = "text=Manage evaluators"
-    ADD_EVALUATOR_BUTTON = "button:text('Add Evaluator'), text=Add Evaluator"
+    ADD_EVALUATOR_BUTTON = (
+        "button:has-text('Add Evaluator'), "
+        "[role='button']:has-text('Add Evaluator'), "
+        "a:has-text('Add Evaluator')"
+    )
 
     # ── Table ──────────────────────────────────────────────────────────────────
     TABLE = "table, [class*='table'], [role='table']"
