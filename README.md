@@ -263,22 +263,53 @@ After each run, reports are written to the `reports/` directory:
 
 ## Utility Scripts
 
+All scripts share the same auth + GraphQL plumbing (`scripts/_api_client.py`): drive a headless Playwright login through Keycloak using `TEST_EMAIL_1` / `TEST_PASSWORD_1` from `.env`, read the access token from `/api/auth/session`, then call GraphQL directly via `requests`. No extra dependencies beyond what's already in `requirements.txt`. Defaults assume the dev backend; override via `BASE_URL` / `GRAPHQL_URL` env vars for other environments.
+
 ### `scripts/cleanup_drafts.py` — bulk-cancel DRAFT evaluations
 
-Smoke and regression runs leave `DRAFT` audits behind on the dev backend (one per `New Evaluation` run that didn't reach explicit cleanup). This script cancels them in bulk by calling the same `updateAudit(status: "CANCELLED")` mutation the UI's "Cancel Evaluation" button uses. The ParakhAPI has no `deleteAudit` mutation, so cancellation is the available cleanup path.
+Smoke and regression runs leave `DRAFT` audits behind. This script cancels them by calling `updateAudit(status: "CANCELLED")` (ParakhAPI has no `deleteAudit` mutation, so cancellation is the available cleanup path).
 
 ```bash
-# from the repo root with .venv active
 python scripts/cleanup_drafts.py --dry-run                  # preview matches, no writes
-python scripts/cleanup_drafts.py                            # cancel all DRAFTs in org 1 (CivicDataLab)
+python scripts/cleanup_drafts.py                            # cancel all DRAFTs in org 1
 python scripts/cleanup_drafts.py --org-id 5                 # different org
-python scripts/cleanup_drafts.py --status DRAFT,CANCELLED   # also re-cancel already-cancelled
+python scripts/cleanup_drafts.py --status DRAFT,CANCELLED   # also re-cancel
 python scripts/cleanup_drafts.py --headed                   # show the login browser window
 ```
 
-How it authenticates: drives a headless Playwright login through Keycloak using `TEST_EMAIL_1` / `TEST_PASSWORD_1` from `.env` (same flow as the `authenticated_page` fixture), reads the access token from `/api/auth/session`, then calls GraphQL directly via `requests`. No extra dependencies beyond what's already in `requirements.txt`.
+### `scripts/cleanup_all.py` — broader cleanup with age filter
 
-Defaults assume the dev backend (`https://dev.api.parakh.civicdataspace.in/graphql/`) and frontend (`https://dev.parakh.civicdataspace.in`). Override via `BASE_URL` / `GRAPHQL_URL` env vars when targeting another environment.
+Supersedes `cleanup_drafts.py` for routine use. Same default behaviour (cancel DRAFTs), plus `--include-cancelled-older-than N` to also re-cancel CANCELLED audits older than N days, and `--status` for a custom status set.
+
+```bash
+python scripts/cleanup_all.py --dry-run
+python scripts/cleanup_all.py --include-cancelled-older-than 7
+python scripts/cleanup_all.py --status DRAFT,RUNNING        # custom statuses
+```
+
+### `scripts/seed_test_data.py` — create N draft audits
+
+For repeatable demo / test-fixture state. Uses the `createBlankAudit` mutation — same as clicking "New Evaluation" in the UI without any configuration. Resulting audits appear in the list with status DRAFT.
+
+```bash
+python scripts/seed_test_data.py                             # 5 drafts in org 1
+python scripts/seed_test_data.py --count 10
+python scripts/seed_test_data.py --model-id 129              # pin to a known model
+python scripts/seed_test_data.py --name-prefix "Demo eval"
+python scripts/seed_test_data.py --dry-run
+```
+
+If `--model-id` is omitted, the first AI model returned by `aiModels()` is used.
+
+### `scripts/sandbox_reset.py` — hard-reset the sandbox org
+
+Destructive cleanup for the sandbox org used by `regression_write` tests. Cancels EVERY audit (DRAFT/PENDING/RUNNING/COMPLETED/FAILED — leaves CANCELLED alone). Refuses to run unless `SANDBOX_ORG_SLUG` is set in `.env`, so it cannot accidentally fire against production.
+
+```bash
+python scripts/sandbox_reset.py                              # interactive prompt
+python scripts/sandbox_reset.py --yes                        # non-interactive (CI)
+python scripts/sandbox_reset.py --dry-run                    # plan only
+```
 
 ---
 
