@@ -59,10 +59,11 @@ class EvaluationsLocators:
     EVAL_OBJECTIVE_TEXTAREA = "textarea, [class*='objective']"
     EVAL_OBJECTIVE_ERROR = "text=Evaluation objective is required"
 
-    # Evaluation modules (checkboxes + labels)
-    EVAL_MODULE_HALLUCINATION = "text=Hallucination and Misinformation"
-    EVAL_MODULE_BIAS = "text=Bias and Fairness"
-    EVAL_MODULE_PRIVACY = "text=Privacy and Safety"
+    # Evaluation modules (checkboxes + labels). The label text appears twice on
+    # the page (title + description), so `>> nth=0` targets the title row.
+    EVAL_MODULE_HALLUCINATION = "text=Hallucination and Misinformation >> nth=0"
+    EVAL_MODULE_BIAS = "text=Bias and Fairness >> nth=0"
+    EVAL_MODULE_PRIVACY = "text=Privacy and Safety >> nth=0"
     EVAL_MODULE_CHECKBOX = "input[type='checkbox']"
     # Sub-category multi-select dropdown that appears when a module is checked
     # NOTE: Add data-testid="module-subcategory-dropdown" for stable selection.
@@ -71,6 +72,12 @@ class EvaluationsLocators:
         "[aria-label*='subcategory'], [aria-label*='sub-category'], "
         "select:near(input[type='checkbox']:checked)"
     )
+
+    # Evaluation Scope is a native <select name="auditScope"> with options
+    # 'Healthcare', 'Agriculture', 'General'. The dropdown is required — without
+    # selecting a scope, clicking 'Add Test Cases' does not assign an auditId,
+    # so no draft is persisted. Confirmed via Playwright MCP 2026-05-07.
+    EVAL_SCOPE_DROPDOWN = "select[name='auditScope']"
 
     # Mode of evaluation
     # NOTE: The dropdown placeholder text is "Click to select from dropdown"; the
@@ -132,9 +139,30 @@ class EvaluationsLocators:
         "div:has(:text('Bias and Fairness')):has(:text('Test Cases')), "
         "div:has(:text('Privacy and Safety')):has(:text('Test Cases'))"
     )
-    MANUAL_MODULE_COUNTER_TEST_CASES = "text=Test Cases"
-    MANUAL_MODULE_COUNTER_FAILED = "text=Failed"
-    MANUAL_MODULE_COUNTER_PASSED = "text=Passed"
+    # Counter labels live inside the module-card containers. A plain
+    # `text=Failed` matches unrelated content (toasts, tab headers) and races
+    # the SPA hydration. Each selector below tries in priority order:
+    #   1. data-testid (preferred — frontend can add these later)
+    #   2. counter scoped to a module-card container with the module title
+    #   3. last-resort scoped text= so we still find something on a render lag
+    # Counter labels render as e.g. "0 Test Cases" / "0 Failed" / "0 Passed".
+    # Use :has-text (substring) not :text-is (exact) — the leading number is
+    # part of the same text node.
+    MANUAL_MODULE_COUNTER_TEST_CASES = (
+        "[data-testid='counter-test-cases'], "
+        "[class*='moduleCard'] :has-text('Test Cases'), "
+        "[class*='Card'] :has-text('Test Cases')"
+    )
+    MANUAL_MODULE_COUNTER_FAILED = (
+        "[data-testid='counter-failed'], "
+        "[class*='moduleCard'] :has-text('Failed'), "
+        "[class*='Card'] :has-text('Failed')"
+    )
+    MANUAL_MODULE_COUNTER_PASSED = (
+        "[data-testid='counter-passed'], "
+        "[class*='moduleCard'] :has-text('Passed'), "
+        "[class*='Card'] :has-text('Passed')"
+    )
     # Test entry panel (shown after clicking a module card)
     MANUAL_INPUT_TEXTAREA = (
         "textarea[placeholder*='nput'], "

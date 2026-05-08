@@ -213,9 +213,33 @@ class NewEvaluationPage(BasePage):
         """Return True if the Evaluation Configuration tab is visible (wizard is open)."""
         return self.is_visible(self.WIZARD_TAB_CONFIGURATION)
 
-    def is_on_wizard_url(self) -> bool:
-        """Return True if the current URL is the wizard URL (/evaluations/new)."""
-        return "/evaluations/new" in self.page.url
+    def is_on_wizard_url(self, timeout: int = 10_000) -> bool:
+        """
+        Return True if the current URL is the wizard URL (/evaluations/new).
+
+        Waits up to `timeout` ms for the SPA route to settle so callers don't
+        race the navigation that follows clicking 'Start' in the modal.
+        """
+        try:
+            self.page.wait_for_url("**/evaluations/new**", timeout=timeout)
+            return True
+        except Exception:
+            return "/evaluations/new" in self.page.url
+
+    def wait_for_audit_id_in_url(self, timeout: int = 15_000) -> str | None:
+        """
+        Wait for the URL to gain an `auditId` query param (i.e. the draft has
+        been persisted) and return that id. Returns None on timeout.
+
+        Use this after clicking 'Add Test Cases' in the wizard, instead of
+        reading `page.url` immediately — the URL update is async and races
+        the click. See app_bugs.md #1 for related auto-save behaviour.
+        """
+        try:
+            self.page.wait_for_url(lambda u: "auditId=" in u, timeout=timeout)
+        except Exception:
+            return None
+        return self.get_audit_id_from_url()
 
     def get_audit_id_from_url(self) -> str | None:
         """
@@ -334,7 +358,7 @@ class NewEvaluationPage(BasePage):
         label_sel = label_map.get(module.lower())
         if not label_sel:
             raise ValueError(f"Unknown module: {module!r}")
-        label_text = label_sel.split("=", 1)[1]  # "Hallucination and Misinformation"
+        label_text = label_sel.split("=", 1)[1].split(" >>")[0]  # strip nth= suffix
         # Locate the checkbox near the module label
         checkbox = self.page.locator(
             f"input[type='checkbox']:near(:text('{label_text}'))"
@@ -356,6 +380,20 @@ class NewEvaluationPage(BasePage):
     def module_subcategory_dropdown_visible(self) -> bool:
         """Return True if a sub-category dropdown is visible (module is checked)."""
         return self.is_visible(EvaluationsLocators.EVAL_MODULE_SUBCATEGORY_DROPDOWN, timeout=3_000)
+
+    def select_evaluation_scope(self, scope: str = "General") -> None:
+        """
+        Select the Evaluation Scope. Required — without it, the wizard's
+        'Add Test Cases' click does NOT persist a draft (no auditId in URL).
+        Confirmed via Playwright MCP 2026-05-07.
+
+        Args:
+            scope: "Healthcare" | "Agriculture" | "General" (default: "General")
+        """
+        sel = self.page.locator(EvaluationsLocators.EVAL_SCOPE_DROPDOWN)
+        sel.wait_for(state="visible", timeout=self.timeout)
+        sel.select_option(label=scope)
+        self.page.wait_for_timeout(300)
 
     def select_mode(self, mode: str) -> None:
         """
@@ -583,6 +621,7 @@ class NewEvaluationPage(BasePage):
         eval_type: str = "technical",
         mode: str = "automated",
         modules: list | None = None,
+        scope: str = "General",
     ) -> NewEvaluationPage:
         """
         Fill all required fields on the Evaluation Configuration tab.
@@ -594,6 +633,8 @@ class NewEvaluationPage(BasePage):
             modules:   List of module names to check before selecting mode.
                        Defaults to ["hallucination"] because the Mode dropdown
                        is disabled until at least one module is checked.
+            scope:     "Healthcare" | "Agriculture" | "General" (default).
+                       Required — without it the wizard does NOT create a draft.
 
         Returns self for fluent chaining.
         """
@@ -601,6 +642,7 @@ class NewEvaluationPage(BasePage):
             modules = ["hallucination"]
 
         self.select_evaluation_type(eval_type)
+        self.select_evaluation_scope(scope)
         self.fill_evaluation_objective(objective)
         # Check modules BEFORE selecting mode — mode dropdown starts disabled
         # and only becomes enabled after at least one module checkbox is checked.

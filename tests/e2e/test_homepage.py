@@ -82,11 +82,19 @@ class TestHomepageLoads:
             pytest.skip("Login button not visible — user may already be authenticated")
 
         home.click_login()
-        page.wait_for_load_state("domcontentloaded")
 
-        # Should land on an auth page (Keycloak or similar)
+        # Wait for the SPA → Keycloak redirect to actually settle. Reading
+        # `page.url` immediately after click can race the navigation.
+        auth_indicators = ("login", "auth", "keycloak", "sso", "signin", "sign-in")
+        try:
+            page.wait_for_url(
+                lambda u: any(ind in u.lower() for ind in auth_indicators),
+                timeout=15_000,
+            )
+        except Exception:
+            pass  # let the assertion below report the actual URL
+
         current_url = page.url.lower()
-        auth_indicators = ["login", "auth", "keycloak", "sso", "signin", "sign-in"]
         assert any(ind in current_url for ind in auth_indicators), (
             f"Expected redirect to auth page, got: {page.url}"
         )
