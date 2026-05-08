@@ -261,6 +261,27 @@ After each run, reports are written to the `reports/` directory:
 
 ---
 
+## Utility Scripts
+
+### `scripts/cleanup_drafts.py` — bulk-cancel DRAFT evaluations
+
+Smoke and regression runs leave `DRAFT` audits behind on the dev backend (one per `New Evaluation` run that didn't reach explicit cleanup). This script cancels them in bulk by calling the same `updateAudit(status: "CANCELLED")` mutation the UI's "Cancel Evaluation" button uses. The ParakhAPI has no `deleteAudit` mutation, so cancellation is the available cleanup path.
+
+```bash
+# from the repo root with .venv active
+python scripts/cleanup_drafts.py --dry-run                  # preview matches, no writes
+python scripts/cleanup_drafts.py                            # cancel all DRAFTs in org 1 (CivicDataLab)
+python scripts/cleanup_drafts.py --org-id 5                 # different org
+python scripts/cleanup_drafts.py --status DRAFT,CANCELLED   # also re-cancel already-cancelled
+python scripts/cleanup_drafts.py --headed                   # show the login browser window
+```
+
+How it authenticates: drives a headless Playwright login through Keycloak using `TEST_EMAIL_1` / `TEST_PASSWORD_1` from `.env` (same flow as the `authenticated_page` fixture), reads the access token from `/api/auth/session`, then calls GraphQL directly via `requests`. No extra dependencies beyond what's already in `requirements.txt`.
+
+Defaults assume the dev backend (`https://dev.api.parakh.civicdataspace.in/graphql/`) and frontend (`https://dev.parakh.civicdataspace.in`). Override via `BASE_URL` / `GRAPHQL_URL` env vars when targeting another environment.
+
+---
+
 ## Project Structure
 
 ```

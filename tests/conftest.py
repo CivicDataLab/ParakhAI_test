@@ -75,6 +75,12 @@ def page(browser_context: BrowserContext, request) -> Page:
     pg = browser_context.new_page()
     pg.set_default_timeout(Config.TIMEOUT)
 
+    # Auto-accept native browser dialogs (window.confirm / window.alert / prompt).
+    # The wizard's "Cancel Evaluation" button calls window.confirm — without this
+    # handler Playwright auto-DISMISSES (returns false), the cancel never fires,
+    # and any test that relies on cancellation hangs waiting for URL change.
+    pg.on("dialog", lambda dialog: dialog.accept())
+
     yield pg
 
     if Config.SCREENSHOT_ON_FAILURE and getattr(request.node, "rep_call", None) is not None:
@@ -163,6 +169,8 @@ def _make_auth_page(
     """Shared factory used by both authenticated_page fixtures."""
     pg = browser_context.new_page()
     pg.set_default_timeout(Config.TIMEOUT)
+    # Auto-accept native dialogs — see comment in `page` fixture above for why.
+    pg.on("dialog", lambda dialog: dialog.accept())
     _do_login(pg, email, password)
 
     yield pg
