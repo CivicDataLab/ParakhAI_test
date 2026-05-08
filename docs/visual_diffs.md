@@ -55,3 +55,28 @@ Re-run `pytest -m visual` once dev is stable to capture these.
 **Other skips (4) — homepage feature tabs:**
 
 `test_feature_tabs_screenshot[chromium-{0..3}-tab_*]` reported "Tab index N not available — only 0 tabs found". The tab buttons exist on the homepage (verified via Playwright MCP earlier this session: "Automation-assisted Evaluation Environment" / "Expert-led Evaluations" / etc.), but the visual test's tab-locator doesn't match them. **Not a baseline gap; needs a test fix in `tests/visual/test_visual_regression.py`.** Filed as a follow-up — not in scope for first-pass baseline capture.
+
+### Run 2026-05-08 — Phase 4 follow-up: tab fix + auth-route gap closed (env: dev)
+
+Result: 9 newly captured baselines / 0 fail.
+
+Two fixes landed:
+
+1. **Feature-tabs locator rewrite** — homepage tabs render as plain `<button>`s (no `role="tab"`); old selector matched 0 elements. Refactored to anchor on the four known labels and capture the whole `<section>` per tab (covers active-button highlight + content panel). Test now parametrizes on `(tab_label, snapshot_label)` instead of index.
+2. **`networkidle` → `load`** in `_capture_page_masked`. Auth-walled routes have background polling that prevents `networkidle` from settling — same workaround already in `HomePage.go_to_home`. Bumped post-load settle from 1.5s → 2.5s.
+
+**Newly captured (9)** — under `snapshots/`:
+
+| target | file |
+|---|---|
+| feature tab 0 (Automation-assisted) | `feature_tab_0_automation.png` |
+| feature tab 1 (Expert-led) | `feature_tab_1_expert.png` |
+| feature tab 2 (Sector-specific) | `feature_tab_2_sector.png` |
+| feature tab 3 (Eval History) | `feature_tab_3_history.png` |
+| AI Maker → models list | `auth_models_list_desktop_1440x900.png` |
+| AI Maker → evaluations list | `auth_evaluations_list_desktop_1440x900.png` |
+| AI Maker → new evaluation wizard | `auth_new_evaluation_wizard_desktop_1440x900.png` |
+| AI Maker → auditors management | `auth_auditors_management_desktop_1440x900.png` |
+| AI Maker → prompt libraries | `auth_prompt_libraries_desktop_1440x900.png` |
+
+Baselines now total **21 / 21** for the visual suite. Phase 4 baseline capture is complete; subsequent runs will pixel-diff against these and surface DIFFs to review here.

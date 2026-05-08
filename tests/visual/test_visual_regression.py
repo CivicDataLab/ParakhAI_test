@@ -130,9 +130,14 @@ def _capture_page_masked(page: Page, url: str, masks: list) -> Image.Image:
     elements as solid pink boxes during the screenshot so they don't trigger
     visual diffs on every nightly run (timestamps, polling counters,
     activity feeds).
+
+    Auth-walled routes have background polling (assignments lists, eval lists)
+    that prevent `networkidle` from ever settling — mirrors the workaround
+    already in HomePage.go_to_home. Use `load` and a longer settle delay
+    instead.
     """
-    page.goto(url, wait_until="networkidle", timeout=30_000)
-    page.wait_for_timeout(1_500)
+    page.goto(url, wait_until="load", timeout=30_000)
+    page.wait_for_timeout(2_500)
     mask_locators = []
     for sel in masks:
         loc = page.locator(sel)
@@ -234,41 +239,50 @@ class TestSectionVisual:
 
 
 class TestFeatureTabsVisual:
+    # Source of truth lives in HomeLocators.FEATURE_TAB_LABELS; mirrored here
+    # only to keep snapshot filenames pinned to short stable IDs.
+    _TAB_PARAMS = [
+        ("Automation-assisted Evaluation Environment", "tab_0_automation"),
+        ("Expert-led Evaluations", "tab_1_expert"),
+        ("Sector-specific Test Cases", "tab_2_sector"),
+        ("Evaluation History & Reports", "tab_3_history"),
+    ]
+
     @pytest.mark.parametrize(
-        "tab_index,tab_label",
-        [
-            (0, "tab_0_automation"),
-            (1, "tab_1_expert"),
-            (2, "tab_2_sector"),
-            (3, "tab_3_history"),
-        ],
+        "tab_label,snapshot_label", _TAB_PARAMS, ids=[p[1] for p in _TAB_PARAMS]
     )
-    def test_feature_tabs_screenshot(self, browser, tab_index: int, tab_label: str):
-        """Visual regression for each feature tab's content area."""
+    def test_feature_tabs_screenshot(
+        self, browser, tab_label: str, snapshot_label: str
+    ):
+        """Visual regression for each feature tab's content area.
+
+        The homepage renders tabs as plain <button>s (no role="tab"),
+        so we locate by visible label. The captured region is the whole
+        tabs <section> — captures both the active-button highlight and
+        the content panel, which both change per tab.
+        """
         page = _page_at_viewport(browser, 1440, 900)
         try:
             page.goto(Config.BASE_URL, wait_until="networkidle", timeout=30_000)
             page.wait_for_timeout(1_000)
 
-            tabs = page.locator("[role='tab'], button[class*='tab'], button[class*='Tab']")
-            if tabs.count() <= tab_index:
-                pytest.skip(
-                    f"Tab index {tab_index} not available — only {tabs.count()} tabs found"
-                )
+            tab = page.locator(f"button:has-text({tab_label!r})").first
+            if not tab.is_visible(timeout=5_000):
+                pytest.skip(f"Tab '{tab_label}' not found on homepage")
 
-            tabs.nth(tab_index).click()
+            tab.click()
             page.wait_for_timeout(600)
 
-            content = page.locator(
-                "[role='tabpanel'], [class*='tab-content'], [class*='TabContent']"
+            section = page.locator(
+                "section:has(button:has-text(\"Automation-assisted Evaluation Environment\"))"
             ).first
-            if not content.is_visible():
-                pytest.skip("Tab content panel not found after clicking")
+            if not section.is_visible():
+                pytest.skip("Tabs section not found after clicking")
 
             import io
-            raw = content.screenshot()
+            raw = section.screenshot()
             img = Image.open(io.BytesIO(raw))
-            _compare_or_save_baseline(img, f"feature_{tab_label}")
+            _compare_or_save_baseline(img, f"feature_{snapshot_label}")
         finally:
             page.context.close()
 
