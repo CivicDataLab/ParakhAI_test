@@ -39,28 +39,28 @@ class AIMakerPage(BasePage):
 
     def go_to_dashboard(self) -> "AIMakerPage":
         self.navigate(self.dashboard_url)
-        self.wait_for_load("domcontentloaded")
+        self.wait_for_app_ready()
         return self
 
     def go_to_models(self) -> None:
         self.click(self.SIDEBAR_MODELS)
-        self.wait_for_load("domcontentloaded")
+        self.wait_for_app_ready()
 
     def go_to_evaluations(self) -> None:
         self.click(self.SIDEBAR_EVALUATIONS)
-        self.wait_for_load("domcontentloaded")
+        self.wait_for_app_ready()
 
     def go_to_prompt_libraries(self) -> None:
         self.click(self.SIDEBAR_PROMPT_LIBRARIES)
-        self.wait_for_load("domcontentloaded")
+        self.wait_for_app_ready()
 
     def go_to_evaluators(self) -> None:
         self.click(self.SIDEBAR_EVALUATORS)
-        self.wait_for_load("domcontentloaded")
+        self.wait_for_app_ready()
 
     def click_switch_roles(self) -> None:
         self.click(self.SWITCH_ROLES_LINK)
-        self.wait_for_load("domcontentloaded")
+        self.wait_for_app_ready()
 
     # ── Overview stats ─────────────────────────────────────────────────────────
 

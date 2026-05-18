@@ -186,19 +186,31 @@ class BasePage:
             timeout=timeout,
         )
 
-    def wait_for_app_ready(self, timeout: int = 10_000) -> None:
-        """Wait for the 'Verifying your session…' splash to clear.
+    def wait_for_app_ready(self, timeout: int = 15_000) -> None:
+        """Wait for all auth/data loading curtains to clear after navigation.
 
-        Authenticated SPA shows a brief session-verify screen on first paint
-        of any dashboard route — selectors match 0 elements until it clears.
-        No-op if the splash never appeared (already-warm session).
+        The authenticated SPA shows up to two sequential overlays that hide
+        real page content:
+          1. 'Verifying your session…' (auth bootstrap on first paint).
+          2. A route-level data spinner: 'Loading AI models…',
+             'Loading overview…', 'Loading your assignments…', etc.
+        We loop up to 3 stages so sequential curtains both resolve. When the
+        loader is absent, state='hidden' is satisfied instantly and we return
+        early via the 200ms visibility re-probe.
         """
-        try:
-            self.page.locator("text=Verifying your session").first.wait_for(
-                state="hidden", timeout=timeout
-            )
-        except Exception:  # noqa: BLE001
-            pass
+        loader = self.page.locator(
+            "text=/^(Verifying your session|Loading )/i"
+        )
+        per_stage = max(timeout // 3, 2_000)
+        for _ in range(3):
+            try:
+                loader.first.wait_for(state="hidden", timeout=per_stage)
+            except Exception:  # noqa: BLE001
+                return
+            try:
+                loader.first.wait_for(state="visible", timeout=200)
+            except Exception:  # noqa: BLE001
+                return
 
     def select_combobox(self, trigger_selector: str, value: str) -> None:
         """Open an opub-ui Combobox and pick *value* from its options.

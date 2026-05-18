@@ -36,17 +36,9 @@ class ModelsPage(BasePage):
 
     def go_to_models_list(self) -> "ModelsPage":
         self.navigate(self.list_url)
+        # wait_for_app_ready now handles 'Verifying your session…' AND
+        # 'Loading AI models…' in one call (BasePage handles both via regex).
         self.wait_for_app_ready()
-        # The list fetches via a route-level GraphQL query and shows a
-        # 'Loading AI models...' spinner until the response arrives. View
-        # buttons render aria-disabled during this window, so any click/count
-        # before the spinner clears matches 0 (or hits a disabled button).
-        try:
-            self.page.locator("text=Loading AI models").first.wait_for(
-                state="hidden", timeout=15_000
-            )
-        except Exception:  # noqa: BLE001
-            pass
         try:
             self.page.locator(
                 f"{self.MODEL_CARD}, text=No models, text=No results"
