@@ -10,8 +10,15 @@ class ModelsLocators:
     PAGE_HEADING = "text=AI Models"
     SEARCH_INPUT = "input[placeholder*='Search'], input[placeholder*='name']"
     ADD_FILTERS_BUTTON = "text=Add Filters"
-    MODEL_CARD = "a[href*='/ai-models/'], [class*='card'] a"
-    MODEL_CARD_TITLE = "[class*='card'] a, [class*='title'] a"
+    # Cards have no stable class hook — the only 1:1 marker is the
+    # 'Text Generation' badge that appears exactly once per card. Counting
+    # this text == counting cards. The View button below is the clickable
+    # affordance for navigation.
+    MODEL_CARD = "text=Text Generation"
+    MODEL_CARD_VIEW_ACTION = (
+        "button:has-text('View'), a[href*='/ai-models/']:has-text('View')"
+    )
+    MODEL_CARD_TITLE = "[class*='card' i] a, [class*='title' i] a"
     MODEL_TYPE_BADGE = "text=Text Generation"
 
     # Model card metadata
@@ -38,18 +45,21 @@ class ModelsLocators:
     VERSION_LABEL = "text=Version"
     PRIMARY_BADGE = "text=Primary"
     START_EVALUATION_LINK = "text=Start Evaluation"
-    INVITE_AUDITORS_LINK = "text=Invite Auditors"
-    DATE_UPDATED_COL = "text=DATE UPDATED, th:text('DATE UPDATED')"
-    CAPABILITIES_COL = "text=CAPABILITIES, th:text('CAPABILITIES')"
-    LIFECYCLE_STAGE_COL = "text=LIFECYCLE STAGE, th:text('LIFECYCLE STAGE')"
+    # Platform UI uses 'Invite Evaluators' (was 'Auditors' in earlier copy).
+    INVITE_AUDITORS_LINK = "text=/Invite (Auditors|Evaluators)/i"
+    # Playwright's `text=` engine treats commas as part of the literal string,
+    # so multi-selector fallbacks must use CSS-only forms (`:has-text()`).
+    DATE_UPDATED_COL = "text=DATE UPDATED"
+    CAPABILITIES_COL = "text=CAPABILITIES"
+    LIFECYCLE_STAGE_COL = "text=LIFECYCLE STAGE"
 
     # Past evaluations table
     PAST_EVALUATIONS_HEADING = "text=Past Evaluations"
     PAST_EVAL_TABLE = "table, [class*='table'], [role='table']"
     PAST_EVAL_ROW = "tr[class*='row'], tbody tr"
-    PAST_EVAL_NAME_COL = "text=Evaluation Name, th:text('Evaluation Name')"
-    PAST_EVAL_TIME_COL = "text=Evaluation Time, th:text('Evaluation Time')"
-    PAST_EVAL_ID_COL = "text=Evaluation ID, th:text('Evaluation ID')"
-    PAST_EVAL_TYPE_COL = "text=Type, th:text('Type')"
+    PAST_EVAL_NAME_COL = "text=Evaluation Name"
+    PAST_EVAL_TIME_COL = "text=Evaluation Time"
+    PAST_EVAL_ID_COL = "text=Evaluation ID"
+    PAST_EVAL_TYPE_COL = "text=Type"
     PAGINATION = "[class*='pagination'], [class*='Pagination']"
     ROWS_PER_PAGE = "text=Rows:"
