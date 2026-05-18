@@ -27,7 +27,7 @@ class AuditorModelDetailPage(BasePage):
     def go_to_model_detail(self, model_id: int) -> "AuditorModelDetailPage":
         url = Config.url(f"/auditor/models/{model_id}")
         self.navigate(url)
-        self.wait_for_load("domcontentloaded")
+        self.wait_for_app_ready()
         return self
 
     # ── State checks ───────────────────────────────────────────────────────────
@@ -60,7 +60,7 @@ class AuditorModelDetailPage(BasePage):
 
     def click_start(self) -> None:
         self.click(self.START_BUTTON)
-        self.wait_for_load("domcontentloaded")
+        self.wait_for_app_ready()
 
     def get_status_chip_text(self) -> str:
         """Return the status chip text on the first version row, if visible."""
@@ -72,4 +72,4 @@ class AuditorModelDetailPage(BasePage):
 
     def click_back(self) -> None:
         self.click("button:has-text('Back'), a:has-text('Back')")
-        self.wait_for_load("domcontentloaded")
+        self.wait_for_app_ready()

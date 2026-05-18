@@ -9,7 +9,7 @@ from pages.auditor_model_detail_page import AuditorModelDetailPage
 from pages.base_page import BasePage
 from utils.config import Config
 
-pytestmark = [pytest.mark.e2e, pytest.mark.regression]
+pytestmark = [pytest.mark.e2e, pytest.mark.regression, pytest.mark.auth]
 
 # Correct authenticated path for the evaluator role evaluations list
 AUDITOR_EVALUATIONS_PATH = "/dashboard/auditor/evaluations"
@@ -30,7 +30,7 @@ class TestAuditorEvaluationsListPage:
     def test_filter_tabs_present(self, authenticated_page):
         base = BasePage(authenticated_page)
         base.navigate(Config.url(AUDITOR_EVALUATIONS_PATH))
-        base.wait_for_load("domcontentloaded")
+        base.wait_for_app_ready()
         filter_selectors = [
             EvaluatorRoleLocators.EVAL_FILTER_DRAFT,
             EvaluatorRoleLocators.EVAL_FILTER_PENDING,
@@ -46,7 +46,7 @@ class TestAuditorEvaluationsListPage:
     def test_empty_state_or_rows_visible(self, authenticated_page):
         base = BasePage(authenticated_page)
         base.navigate(Config.url(AUDITOR_EVALUATIONS_PATH))
-        base.wait_for_load("domcontentloaded")
+        base.wait_for_app_ready()
         has_rows = authenticated_page.locator("tbody tr").count() > 0
         has_empty = base.is_visible(EvaluatorRoleLocators.NO_EVALUATIONS_MESSAGE)
         assert has_rows or has_empty, (
