@@ -9,7 +9,15 @@ from playwright.sync_api import Page
 
 from pages.ai_maker_page import AIMakerPage
 
-pytestmark = [pytest.mark.e2e, pytest.mark.regression]
+pytestmark = [pytest.mark.e2e, pytest.mark.regression, pytest.mark.auth]
+
+
+@pytest.fixture
+def page(authenticated_page_fast):
+    """Override pytest-playwright's `page` fixture — the dashboard is
+    auth-walled; the cached storage state keeps each test under ~10s."""
+    return authenticated_page_fast
+
 
 # Direct URL for CivicdataLab AI Maker dashboard (org_id=1)
 DASHBOARD_URL = "/dashboard/ai-maker/1"

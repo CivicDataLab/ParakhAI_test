@@ -199,7 +199,9 @@ class BasePage:
         early via the 200ms visibility re-probe.
         """
         loader = self.page.locator(
-            "text=/^(Verifying your session|Loading )/i"
+            # `Loading` may appear alone (bare spinner) or as a prefix like
+            # `Loading AI models…`. Match either at element-text start.
+            "text=/^(Verifying your session|Loading)/i"
         )
         per_stage = max(timeout // 3, 2_000)
         for _ in range(3):

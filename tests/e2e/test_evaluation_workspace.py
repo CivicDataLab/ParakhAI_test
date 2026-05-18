@@ -116,7 +116,12 @@ class TestAIMakerRoleNavigation:
         )
 
     def test_org_selection_has_multiple_orgs(self, page: Page):
-        """Multiple organisations are listed on the org-selection screen."""
+        """At least one organisation is listed on the org-selection screen.
+
+        Counting org cards via a class hook is fragile (the cards have no
+        stable wrapper class). Asserting CivicdataLab is visible is the same
+        property — the known org we can rely on.
+        """
         ws = WorkspacePage(page)
         ws.go_to_workspace()
 
@@ -124,9 +129,9 @@ class TestAIMakerRoleNavigation:
             pytest.skip("AI Maker card not visible")
 
         ws.select_ai_maker()
-        page.wait_for_load_state("domcontentloaded")
-        count = ws.get_org_card_count()
-        assert count >= 1, f"Expected at least 1 org card, found {count}"
+        assert ws.is_visible(ws.ORG_CIVICDATALAB_CARD), (
+            "Expected at least CivicdataLab to be listed on the org-selection screen"
+        )
 
     def test_selecting_civicdatalab_navigates_to_dashboard(self, page: Page):
         """Selecting CivicdataLab routes to the AI Maker dashboard (org_id=1)."""
@@ -164,11 +169,6 @@ class TestEvaluatorRoleNavigation:
             f"Expected evaluator dashboard URL, got: {page.url}"
         )
 
-    @pytest.mark.xfail(
-        reason="App bug #7 — Switch Roles renders the role-selection content "
-        "but does not update the browser URL. See docs/app_bugs.md.",
-        strict=True,
-    )
     def test_switch_roles_returns_to_role_selection(self, page: Page):
         """Clicking 'Switch Roles' from AI Maker dashboard returns to /dashboard."""
         ws = WorkspacePage(page)
@@ -178,20 +178,23 @@ class TestEvaluatorRoleNavigation:
             pytest.skip("AI Maker card not visible")
 
         ws.select_ai_maker()
-        page.wait_for_load_state("domcontentloaded")
-
         if not ws.is_visible(ws.ORG_CIVICDATALAB_CARD, timeout=5_000):
             pytest.skip("CivicdataLab not visible")
 
         ws.select_civicdatalab()
-        page.wait_for_load_state("domcontentloaded")
 
         switch_roles = page.locator("text=Switch Roles")
         if not switch_roles.is_visible():
             pytest.skip("Switch Roles link not found on dashboard")
 
         switch_roles.click()
-        page.wait_for_load_state("domcontentloaded")
+        # SPA navigation uses history.pushState — wait_for_load_state alone
+        # returns instantly because no full document reload occurs. Wait for
+        # the URL itself to update before asserting.
+        try:
+            page.wait_for_url("**/dashboard", timeout=5_000)
+        except Exception:  # noqa: BLE001
+            pass
         assert page.url.rstrip("/").endswith("/dashboard"), (
             f"Switch Roles should return to /dashboard, got: {page.url}"
         )
