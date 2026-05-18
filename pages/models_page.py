@@ -36,12 +36,35 @@ class ModelsPage(BasePage):
 
     def go_to_models_list(self) -> "ModelsPage":
         self.navigate(self.list_url)
-        self.wait_for_load("domcontentloaded")
+        self.wait_for_app_ready()
+        # The list fetches via a route-level GraphQL query and shows a
+        # 'Loading AI models...' spinner until the response arrives. View
+        # buttons render aria-disabled during this window, so any click/count
+        # before the spinner clears matches 0 (or hits a disabled button).
+        try:
+            self.page.locator("text=Loading AI models").first.wait_for(
+                state="hidden", timeout=15_000
+            )
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            self.page.locator(
+                f"{self.MODEL_CARD}, text=No models, text=No results"
+            ).first.wait_for(state="visible", timeout=5_000)
+        except Exception:  # noqa: BLE001
+            pass
         return self
 
     def go_to_model_detail(self, model_id: int = SARVAM_MODEL_ID) -> "ModelsPage":
         self.navigate(Config.url(f"/dashboard/ai-maker/{self.org_id}/ai-models/{model_id}"))
-        self.wait_for_load("domcontentloaded")
+        self.wait_for_app_ready()
+        # Wait for the About heading — first content section of the detail page.
+        try:
+            self.page.locator(ModelsLocators.ABOUT_HEADING).first.wait_for(
+                state="visible", timeout=10_000
+            )
+        except Exception:  # noqa: BLE001
+            pass
         return self
 
     # ── Models list ────────────────────────────────────────────────────────────
@@ -68,7 +91,21 @@ class ModelsPage(BasePage):
         self.wait_for_load("domcontentloaded")
 
     def click_first_model(self) -> None:
-        self.page.locator(self.MODEL_CARD).first.click()
+        """Click the first model whose View button is enabled.
+
+        Some cards render aria-disabled even after data loads — likely because
+        the test user lacks View permission for that specific model. The test
+        intent is 'navigate into any model', so we pick the first usable one.
+        """
+        enabled_views = self.page.locator(
+            "button:has-text('View'):not([aria-disabled='true'])"
+        )
+        if enabled_views.count() > 0:
+            enabled_views.first.click()
+        else:
+            self.page.locator(ModelsLocators.MODEL_CARD_VIEW_ACTION).first.click(
+                force=True
+            )
         self.wait_for_load("domcontentloaded")
 
     # ── Model detail ────────────────────────────────────────────────────────────

@@ -186,6 +186,20 @@ class BasePage:
             timeout=timeout,
         )
 
+    def wait_for_app_ready(self, timeout: int = 10_000) -> None:
+        """Wait for the 'Verifying your session…' splash to clear.
+
+        Authenticated SPA shows a brief session-verify screen on first paint
+        of any dashboard route — selectors match 0 elements until it clears.
+        No-op if the splash never appeared (already-warm session).
+        """
+        try:
+            self.page.locator("text=Verifying your session").first.wait_for(
+                state="hidden", timeout=timeout
+            )
+        except Exception:  # noqa: BLE001
+            pass
+
     def select_combobox(self, trigger_selector: str, value: str) -> None:
         """Open an opub-ui Combobox and pick *value* from its options.
 
