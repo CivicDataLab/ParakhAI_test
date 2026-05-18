@@ -10,7 +10,14 @@ from playwright.sync_api import Page
 from locators.prompt_libraries_locators import PromptLibrariesLocators
 from pages.prompt_libraries_page import PromptLibrariesPage
 
-pytestmark = [pytest.mark.e2e, pytest.mark.regression]
+pytestmark = [pytest.mark.e2e, pytest.mark.regression, pytest.mark.auth]
+
+
+@pytest.fixture
+def page(authenticated_page_fast):
+    """Override pytest-playwright's `page` fixture — /prompt-libraries is
+    auth-walled; use the cached storage state."""
+    return authenticated_page_fast
 
 KNOWN_LIBRARIES = [
     (PromptLibrariesLocators.LIBRARY_KCC_ENGLISH, "KCC English Queries"),
@@ -44,6 +51,12 @@ class TestPromptLibrariesPageLoads:
         pl.go_to_prompt_libraries()
         assert pl.is_visible(pl.SEARCH_INPUT), "Search input must be visible"
 
+    @pytest.mark.xfail(
+        reason="'Add Filters' control was removed from the prompt libraries "
+        "UI in 2026-05 (same as the models list — only the search input "
+        "remains). Remove this xfail if the control is reintroduced.",
+        strict=True,
+    )
     def test_add_filters_button_is_visible(self, page: Page):
         pl = PromptLibrariesPage(page)
         pl.go_to_prompt_libraries()
