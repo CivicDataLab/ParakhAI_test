@@ -33,6 +33,9 @@ class AIMakerLocators:
 
     # ── Models section on home ─────────────────────────────────────────────────
     MODELS_SECTION_HEADING = "text=Models"
-    ADD_NEW_MODEL_BUTTON = "text=Add A New Model, button:text('Add A New Model')"
+    # Playwright's `text=` engine treats commas as literal text; the original
+    # `"text=Add A New Model, button:text('Add A New Model')"` searched for
+    # that whole joined string and matched 0 elements.
+    ADD_NEW_MODEL_BUTTON = "button:has-text('Add A New Model'), a:has-text('Add A New Model')"
     MODEL_CARD = "[class*='card'], [class*='Card']"
     MODEL_TYPE_BADGE = "text=Text Generation"

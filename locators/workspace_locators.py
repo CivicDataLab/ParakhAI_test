@@ -24,7 +24,9 @@ class WorkspaceLocators:
     # ── Org selection (AI Maker → Select Organisation) ─────────────────────────
     ORG_SELECTION_HEADING = "text=Select Organization"
     ORG_CIVICDATALAB_CARD = "text=CivicdataLab"
-    ORG_CARD = "[class*='card'], [class*='Card']"
+    # Each org card is a link into that org's AI Maker dashboard. Anchoring
+    # on the href is more stable than guessing at the wrapper class name.
+    ORG_CARD = "a[href*='/dashboard/ai-maker/']"
 
     # ── Sidebar (shared) ───────────────────────────────────────────────────────
     SIDEBAR_HOME = "nav a:text('Home'), [class*='sidebar'] a:text('Home')"
