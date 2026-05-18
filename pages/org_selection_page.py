@@ -25,7 +25,7 @@ class OrgSelectionPage(BasePage):
 
     def go_to_org_selection(self) -> "OrgSelectionPage":
         self.navigate(self.org_selection_url)
-        self.wait_for_load("domcontentloaded")
+        self.wait_for_app_ready()
         return self
 
     # ── State checks ───────────────────────────────────────────────────────────
@@ -47,12 +47,12 @@ class OrgSelectionPage(BasePage):
 
     def select_org_by_name(self, name: str) -> None:
         self.click(f"text={name}")
-        self.wait_for_load("domcontentloaded")
+        self.wait_for_app_ready()
 
     def select_org_by_index(self, index: int) -> str:
         """Click the org card at *index* and return its name."""
         card = self.page.locator(self.ORG_CARD).nth(index)
         name = card.inner_text().strip()
         card.click()
-        self.wait_for_load("domcontentloaded")
+        self.wait_for_app_ready()
         return name

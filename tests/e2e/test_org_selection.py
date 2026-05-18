@@ -7,7 +7,7 @@ import pytest
 from pages.ai_maker_page import AIMakerPage
 from pages.org_selection_page import OrgSelectionPage
 
-pytestmark = [pytest.mark.e2e, pytest.mark.smoke, pytest.mark.regression]
+pytestmark = [pytest.mark.e2e, pytest.mark.smoke, pytest.mark.regression, pytest.mark.auth]
 
 CIVICDATALAB_ORG_NAME = "CivicdataLab"
 
