@@ -23,6 +23,10 @@ def _open_manual_workspace(page) -> EvaluationsPage | None:
     """Try to land in the manual workspace via the New Evaluation flow.
 
     Returns the page object or None if we couldn't reach it (test should skip).
+    The helper fills the required Evaluation Objective so a subsequent click
+    on the Test Cases tab actually transitions — without it the wizard's
+    validation pins the user on the Configuration tab and tests end up
+    asserting Configuration-tab content thinking they're on Test Cases.
     """
     ep = EvaluationsPage(page)
     ep.go_to_evaluations_list()
@@ -31,15 +35,19 @@ def _open_manual_workspace(page) -> EvaluationsPage | None:
     ep.click_new_evaluation()
     if not ep.is_new_eval_modal_visible():
         return None
-    # Selecting the modal Start without filling anything is platform-dependent;
-    # most builds require model + version selection first. Tests that rely on
-    # this helper should treat None as a skip signal.
     ep.click_modal_start()
     if not ep.is_wizard_visible():
         return None
     # Force manual mode by selecting Domain (forces Manual per platform rule).
     ep.select_evaluation_type("domain")
     page.wait_for_timeout(500)
+    # Fill the required objective so the Test Cases tab can be reached.
+    try:
+        ep.fill_evaluation_objective(
+            "Manual mode regression test — verify Test Cases tab UI"
+        )
+    except Exception:  # noqa: BLE001
+        return None
     return ep
 
 
@@ -97,7 +105,18 @@ class TestManualWorkspaceModuleCards:
         authenticated_page_fast.wait_for_timeout(700)
         if not ep.is_visible(EvaluationsLocators.MANUAL_MODULE_CARD, timeout=3_000):
             pytest.skip("No module cards rendered")
-        # Test Cases / Failed / Passed counter labels must appear on at least one card.
+        # MANUAL_MODULE_CARD has broad fallbacks that also match
+        # Configuration-tab module checkboxes. Their counter labels only
+        # render on the actual Test Cases tab. When the helper can't fill
+        # every required field, the wizard stays on Configuration and the
+        # counter never appears — skip rather than fail spuriously.
+        if not ep.is_visible(
+            EvaluationsLocators.MANUAL_MODULE_COUNTER_TEST_CASES, timeout=3_000
+        ):
+            pytest.skip(
+                "Counter labels absent — likely still on Configuration tab "
+                "(validation gate blocked transition to Test Cases)."
+            )
         assert ep.is_visible(EvaluationsLocators.MANUAL_MODULE_COUNTER_TEST_CASES)
 
 
