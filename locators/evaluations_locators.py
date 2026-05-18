@@ -64,10 +64,13 @@ class EvaluationsLocators:
         "[role='tab']:has-text('Evaluation Configuration'), "
         "button:has-text('Evaluation Configuration')"
     )
+    # `:not(:has-text('0 '))` was meant to exclude the counter, but the
+    # "Add Test Cases" action button also matches `button:has-text('Test Cases')`.
+    # Scope the fallback to the auditConfigTab class to disambiguate.
     WIZARD_TAB_TEST_CASES = (
         "[data-testid='tab-test-cases'], "
         "[role='tab']:has-text('Test Cases'), "
-        "button:has-text('Test Cases'):not(:has-text('0 '))"
+        "button[class*='auditConfigTab']:has-text('Test Cases')"
     )
     # NOTE: The name input uses id="auditName" per spec — prefer that; class fallback kept.
     WIZARD_EVAL_NAME_INPUT = "input#auditName, input[name='evaluationName'], input[value*='Untitled'], input[class*='name']"
