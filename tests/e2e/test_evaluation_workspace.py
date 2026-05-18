@@ -9,7 +9,14 @@ from playwright.sync_api import Page
 
 from pages.workspace_page import WorkspacePage
 
-pytestmark = [pytest.mark.e2e, pytest.mark.regression]
+pytestmark = [pytest.mark.e2e, pytest.mark.regression, pytest.mark.auth]
+
+
+@pytest.fixture
+def page(authenticated_page_fast):
+    """Override pytest-playwright's `page` so every test uses the cached auth
+    session. /dashboard role selection requires login."""
+    return authenticated_page_fast
 
 
 class TestRoleSelectionPage:
@@ -157,6 +164,11 @@ class TestEvaluatorRoleNavigation:
             f"Expected evaluator dashboard URL, got: {page.url}"
         )
 
+    @pytest.mark.xfail(
+        reason="App bug #7 — Switch Roles renders the role-selection content "
+        "but does not update the browser URL. See docs/app_bugs.md.",
+        strict=True,
+    )
     def test_switch_roles_returns_to_role_selection(self, page: Page):
         """Clicking 'Switch Roles' from AI Maker dashboard returns to /dashboard."""
         ws = WorkspacePage(page)
