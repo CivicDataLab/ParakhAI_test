@@ -252,10 +252,12 @@ class EvaluationsLocators:
     RISK_MEDIUM = "text=MEDIUM RISK"
     RISK_HIGH = "text=HIGH RISK"
 
-    # Module-wise results tabs
-    MODULE_TAB_HALLUCINATION = "text=Hallucination and MisInformation"
-    MODULE_TAB_BIAS = "text=Bias and Fairness"
-    MODULE_TAB_PRIVACY = "text=Privacy and Safety"
+    # Module-wise results tabs. Module names also appear in the data display
+    # panel, so a plain `text=` match resolves to 2 elements and trips strict
+    # mode — scope to role=tab.
+    MODULE_TAB_HALLUCINATION = "[role='tab']:has-text('Hallucination and MisInformation')"
+    MODULE_TAB_BIAS = "[role='tab']:has-text('Bias and Fairness')"
+    MODULE_TAB_PRIVACY = "[role='tab']:has-text('Privacy and Safety')"
 
     # Sample issues accordion
     SAMPLE_ISSUES_HEADING = "text=Sample Issues"

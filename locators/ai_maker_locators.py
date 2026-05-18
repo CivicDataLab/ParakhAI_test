@@ -6,21 +6,16 @@ Base URL: /dashboard/ai-maker/{org_id}
 
 class AIMakerLocators:
     # ── Sidebar navigation ─────────────────────────────────────────────────────
-    SIDEBAR_HOME = "nav a:text('Home'), [class*='sidebar'] a:text('Home'), li a:text('Home')"
-    SIDEBAR_MODELS = "nav a:text('Models'), [class*='sidebar'] a:text('Models'), li a:text('Models')"
-    SIDEBAR_EVALUATIONS = (
-        "nav a:text('Evaluations'), "
-        "[class*='sidebar'] a:text('Evaluations'), "
-        "li a:text('Evaluations')"
-    )
+    # Previous `[class*='sidebar']` filter was case-sensitive and missed the
+    # actual PascalCase `Sidebar__...` CSS-modules class. Plain link/button
+    # text match is robust against the wrapper class name.
+    SIDEBAR_HOME = "a:has-text('Home'), button:has-text('Home')"
+    SIDEBAR_MODELS = "a:has-text('Models'), button:has-text('Models')"
+    SIDEBAR_EVALUATIONS = "a:has-text('Evaluations'), button:has-text('Evaluations')"
     SIDEBAR_PROMPT_LIBRARIES = (
-        "nav a:text('Prompt Libraries'), "
-        "[class*='sidebar'] a:text('Prompt Libraries')"
+        "a:has-text('Prompt Libraries'), button:has-text('Prompt Libraries')"
     )
-    SIDEBAR_EVALUATORS = (
-        "nav a:text('Evaluators'), "
-        "[class*='sidebar'] a:text('Evaluators')"
-    )
+    SIDEBAR_EVALUATORS = "a:has-text('Evaluators'), button:has-text('Evaluators')"
 
     # ── Org identity (left panel) ──────────────────────────────────────────────
     ORG_LOGO = "img[alt*='CivicData'], img[alt*='civic'], [class*='logo']"

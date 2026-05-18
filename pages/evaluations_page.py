@@ -12,7 +12,10 @@ from pages.base_page import BasePage
 from utils.config import Config
 
 CIVICDATALAB_ORG_ID = 1
-SAMPLE_COMPLETED_EVAL_ID = 288  # 269/315 passed evaluation
+# A known-COMPLETED eval used by several tests to assert Summary/Risk/Modules
+# sections. This drifts over time as old evals are cancelled or new ones run.
+# Last verified: 2026-05-18 — ID 500 (Anthropic Claude 3.5 Haiku, COMPLETED).
+SAMPLE_COMPLETED_EVAL_ID = 500
 
 
 class EvaluationsPage(BasePage):
@@ -45,12 +48,12 @@ class EvaluationsPage(BasePage):
 
     def go_to_evaluations_list(self) -> "EvaluationsPage":
         self.navigate(self.list_url)
-        self.wait_for_load("domcontentloaded")
+        self.wait_for_app_ready()
         return self
 
     def go_to_evaluation_detail(self, eval_id: int = SAMPLE_COMPLETED_EVAL_ID) -> "EvaluationsPage":
         self.navigate(Config.url(f"/dashboard/ai-maker/{self.org_id}/evaluations/{eval_id}"))
-        self.wait_for_load("domcontentloaded")
+        self.wait_for_app_ready()
         return self
 
     # ── Evaluations list ───────────────────────────────────────────────────────
@@ -70,7 +73,7 @@ class EvaluationsPage(BasePage):
     def click_evaluation_row(self, row_index: int = 0) -> None:
         rows = self.page.locator(EvaluationsLocators.EVAL_TABLE_ROW)
         rows.nth(row_index).click()
-        self.wait_for_load("domcontentloaded")
+        self.wait_for_app_ready()
 
     def click_new_evaluation(self) -> None:
         self.click(self.NEW_EVALUATION_BUTTON)
@@ -83,7 +86,7 @@ class EvaluationsPage(BasePage):
 
     def click_modal_start(self) -> None:
         self.click(self.MODAL_START_BUTTON)
-        self.wait_for_load("domcontentloaded")
+        self.wait_for_app_ready()
 
     def click_modal_cancel(self) -> None:
         self.click(self.MODAL_CANCEL_BUTTON)
@@ -117,7 +120,7 @@ class EvaluationsPage(BasePage):
 
     def cancel_evaluation(self) -> None:
         self.click(self.WIZARD_CANCEL_EVALUATION)
-        self.wait_for_load("domcontentloaded")
+        self.wait_for_app_ready()
 
     # ── Evaluation detail ──────────────────────────────────────────────────────
 
@@ -155,5 +158,7 @@ class EvaluationsPage(BasePage):
         return self.is_visible(self.DOWNLOAD_REPORT_BUTTON)
 
     def click_back_to_list(self) -> None:
-        self.click(EvaluationsLocators.BACK_TO_LIST_BUTTON)
-        self.wait_for_load("domcontentloaded")
+        # The page renders mobile + desktop variants for both the <a> and the
+        # <button> form — strict-mode click fails on 4 matches. Use .first.
+        self.page.locator(EvaluationsLocators.BACK_TO_LIST_BUTTON).first.click()
+        self.wait_for_app_ready()

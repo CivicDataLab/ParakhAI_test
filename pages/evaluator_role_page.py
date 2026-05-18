@@ -42,30 +42,30 @@ class EvaluatorRolePage(BasePage):
 
     def go_to_evaluator_home(self) -> "EvaluatorRolePage":
         self.navigate(self.home_url)
-        self.wait_for_load("domcontentloaded")
+        self.wait_for_app_ready()
         return self
 
     def go_to_assignments(self) -> "EvaluatorRolePage":
         self.navigate(self.assignments_url)
-        self.wait_for_load("domcontentloaded")
+        self.wait_for_app_ready()
         return self
 
     def go_to_evaluations(self) -> "EvaluatorRolePage":
         self.navigate(self.evaluations_url)
-        self.wait_for_load("domcontentloaded")
+        self.wait_for_app_ready()
         return self
 
     def click_assigned_models(self) -> None:
         self.click(self.SIDEBAR_ASSIGNED_MODELS)
-        self.wait_for_load("domcontentloaded")
+        self.wait_for_app_ready()
 
     def click_evaluations(self) -> None:
         self.click(self.SIDEBAR_EVALUATIONS)
-        self.wait_for_load("domcontentloaded")
+        self.wait_for_app_ready()
 
     def click_switch_roles(self) -> None:
         self.click(self.SWITCH_ROLES_LINK)
-        self.wait_for_load("domcontentloaded")
+        self.wait_for_app_ready()
 
     # ── Home dashboard ─────────────────────────────────────────────────────────
 
@@ -117,7 +117,7 @@ class EvaluatorRolePage(BasePage):
 
     def click_view_assignments(self) -> None:
         self.click(self.VIEW_ASSIGNMENTS_LINK)
-        self.wait_for_load("domcontentloaded")
+        self.wait_for_app_ready()
 
     # ── Pending invitation actions (write-side) ────────────────────────────────
 

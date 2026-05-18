@@ -28,7 +28,7 @@ class WorkspacePage(BasePage):
     def go_to_workspace(self) -> "WorkspacePage":
         """Navigate to the role-selection dashboard page."""
         self.navigate(Config.url("/dashboard"))
-        self.wait_for_load("domcontentloaded")
+        self.wait_for_app_ready()
         return self
 
     # ── Role selection ─────────────────────────────────────────────────────────
@@ -39,12 +39,12 @@ class WorkspacePage(BasePage):
     def select_ai_maker(self) -> None:
         """Click the AI Maker role card."""
         self.click(self.AI_MAKER_CARD)
-        self.wait_for_load("domcontentloaded")
+        self.wait_for_app_ready()
 
     def select_evaluator(self) -> None:
         """Click the Evaluator role card."""
         self.click(self.EVALUATOR_CARD)
-        self.wait_for_load("domcontentloaded")
+        self.wait_for_app_ready()
 
     # ── Org selection ──────────────────────────────────────────────────────────
 
@@ -54,7 +54,7 @@ class WorkspacePage(BasePage):
     def select_civicdatalab(self) -> None:
         """Select the CivicdataLab organisation."""
         self.click(self.ORG_CIVICDATALAB_CARD)
-        self.wait_for_load("domcontentloaded")
+        self.wait_for_app_ready()
 
     def get_org_card_count(self) -> int:
         return self.page.locator(WorkspaceLocators.ORG_CARD).count()
@@ -63,7 +63,7 @@ class WorkspacePage(BasePage):
 
     def click_evaluation_workspace_nav(self) -> None:
         self.click(self.NAV_EVALUATION_WORKSPACE)
-        self.wait_for_load("domcontentloaded")
+        self.wait_for_app_ready()
 
     def is_parakh_logo_visible(self) -> bool:
         return self.is_visible(WorkspaceLocators.PARAKH_LOGO)
