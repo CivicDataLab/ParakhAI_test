@@ -381,16 +381,28 @@ def authenticated_page_fast(
     context.close()
 
 
-# ── Authenticated GraphQL client (cookie-seeded, supports POST) ───────────────
+# ── Authenticated GraphQL client (bearer-token, supports POST) ────────────────
 
 
 @pytest.fixture(scope="session")
-def authenticated_graphql_client(authenticated_storage_state: str):
-    """Session-scoped GraphQL client authenticated with the cached storage state.
+def authenticated_graphql_client():
+    """Session-scoped GraphQL client authenticated with a Keycloak bearer token.
 
-    Reads cookies and any access token from the storage_state JSON, builds a
-    requests.Session with appropriate headers, and exposes a callable that
-    supports both GET (queries) and POST (mutations).
+    Acquires the token via `scripts/_api_client.get_access_token()` — the same
+    path that proved to work in `completed_eval_id`. The previous version of
+    this fixture tried to scrape a JWT out of the cached storage_state's
+    localStorage, but NextAuth doesn't store the access token there → the
+    session silently authenticated as anonymous and every org-scoped query
+    returned empty data. See lessons.md (2026-05-20, "P2 #13").
+
+    Exposes a callable that supports both GET (queries) and POST (mutations)
+    and returns the full GraphQL payload (``{"data": ..., "errors": ...}``)
+    so existing assertions on `result["data"]` / `result["errors"]` keep
+    working.
+
+    Skips the dependent test if a token can't be acquired (e.g. credentials
+    missing, dev env down) — matches the behaviour of every other
+    auth-dependent fixture in this file.
 
     Usage::
         def test_something(authenticated_graphql_client):
@@ -398,33 +410,24 @@ def authenticated_graphql_client(authenticated_storage_state: str):
             data = authenticated_graphql_client(MUTATION, variables={...}, method="POST")
     """
     import json as _json
-    from pathlib import Path
 
-    state = _json.loads(Path(authenticated_storage_state).read_text())
+    from scripts._api_client import get_access_token
+
+    try:
+        token = get_access_token(headless=True)
+    except Exception as exc:  # noqa: BLE001 — surface as a skip, not an error
+        pytest.skip(f"Could not acquire access token for authenticated GraphQL client: {exc}")
+
+    org_id = str(getattr(Config, "CIVICDATALAB_ORG_ID", 1))
 
     session = requests.Session()
-    session.headers.update({"Accept": "application/json"})
-
-    # Seed cookies from the storage_state.
-    for c in state.get("cookies", []):
-        session.cookies.set(
-            c["name"],
-            c["value"],
-            domain=c.get("domain"),
-            path=c.get("path", "/"),
-        )
-
-    # Try to extract a bearer token from any localStorage entries that look like
-    # NextAuth or Keycloak tokens. The frontend stores `accessToken` in the
-    # session object.
-    for origin in state.get("origins", []):
-        for entry in origin.get("localStorage", []):
-            name = entry.get("name", "")
-            value = entry.get("value", "")
-            if "token" in name.lower() and value and value.count(".") == 2:
-                # JWT shape — use it as the bearer token.
-                session.headers["Authorization"] = f"Bearer {value}"
-                break
+    session.headers.update(
+        {
+            "Accept": "application/json",
+            "Authorization": f"Bearer {token}",
+            "organization": org_id,
+        }
+    )
 
     def _call(query: str, variables=None, method: str = "GET") -> dict:
         body = {"query": query}
@@ -450,6 +453,71 @@ def authenticated_graphql_client(authenticated_storage_state: str):
 
     yield _call
     session.close()
+
+
+# ── Data discovery helpers ────────────────────────────────────────────────────
+
+
+@pytest.fixture(scope="session")
+def completed_eval_id(request) -> int:
+    """ID of an existing COMPLETED evaluation, discovered via GraphQL.
+
+    Replaces the brittle `COMPLETED_EVAL_ID = 288` constant pattern that drifts
+    every time the linked eval is cancelled or removed (lessons.md 2026-05-18,
+    "Fixed-ID test fixtures drift"). The fixture queries `audits(status:
+    COMPLETED)` once per session and returns the first ID. Skips dependent
+    tests cleanly when no COMPLETED eval exists on the current environment.
+
+    Uses `scripts/_api_client` rather than `authenticated_graphql_client`
+    because the latter extracts a JWT from localStorage — which NextAuth on
+    this app does not populate. The script helper fetches the token from
+    `/api/auth/session` (the working path) and adds the required
+    `organization` header. See lessons.md 2026-05-20.
+    """
+    from scripts._api_client import get_access_token, graphql
+
+    org_id = str(getattr(Config, "CIVICDATALAB_ORG_ID", 1))
+
+    try:
+        token = get_access_token(headless=True)
+    except Exception as exc:  # noqa: BLE001 — surface as a skip, not an error
+        pytest.skip(f"Could not acquire access token for COMPLETED eval lookup: {exc}")
+
+    list_q = """
+        query Audits($status: String) {
+          audits(status: $status) { id status }
+        }
+    """
+    detail_q = """
+        query Audit($auditId: ID!) {
+          audit(auditId: $auditId) {
+            id totalTests progressPercentage completedAt
+          }
+        }
+    """
+    audits = (graphql(token, org_id, list_q, variables={"status": "COMPLETED"}).get("audits") or [])
+    if not audits:
+        pytest.skip("No COMPLETED evaluation found on this environment")
+
+    # The list endpoint stamps `status=COMPLETED` even for evals that never
+    # actually finished (progressPercentage=0, no test data). The detail page
+    # for those renders as a DRAFT — wrong shape for the Summary/Risk/Modules
+    # assertions. Walk the list newest-first and pick the first one with
+    # progress=100 + totalTests>0 + completedAt set.
+    for a in audits:
+        d = graphql(token, org_id, detail_q, variables={"auditId": a["id"]}).get("audit") or {}
+        if (
+            d.get("progressPercentage") == 100
+            and (d.get("totalTests") or 0) > 0
+            and d.get("completedAt")
+        ):
+            return int(d["id"])
+
+    pytest.skip(
+        "No COMPLETED evaluation with run results found on this environment "
+        "(all candidates are 0% progress). Trigger a real run via the wizard "
+        "or scripts/seed_test_data.py."
+    )
 
 
 # ── Cleanup helpers for write-side tests ──────────────────────────────────────

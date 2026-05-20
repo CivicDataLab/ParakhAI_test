@@ -82,11 +82,18 @@ class TestModelsListPage:
 
     @pytest.mark.parametrize("model_name", KNOWN_MODELS)
     def test_known_model_is_visible(self, authenticated_page_fast: Page, model_name: str):
-        """Each known CivicdataLab model appears in the list."""
+        """Each known CivicdataLab model appears in the list.
+
+        Uses search to narrow the list because newer models (e.g. GPT-5 Mini)
+        live on page 2 of the default grid. The list page lacks a pagination
+        helper, but the search input already exists and is the user-facing
+        way to find a specific model.
+        """
         mp = ModelsPage(authenticated_page_fast)
         mp.go_to_models_list()
+        mp.search_model(model_name)
         assert mp.is_visible(f"text={model_name}"), (
-            f"Model '{model_name}' must be visible in the list"
+            f"Model '{model_name}' must be visible in the list after searching"
         )
 
     def test_search_filters_models_by_name(self, authenticated_page_fast: Page):
