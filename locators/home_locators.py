@@ -80,12 +80,16 @@ class HomeLocators:
         "button:has-text(\"Evaluation History & Reports\")"
     )
     # Active tab is distinguished by the design-token background class
-    # `bg-[#E8E4FF]` plus violet text `text-[#6849EE]`. Keep ARIA fallbacks
-    # in case the build adds proper a11y semantics later.
+    # `bg-[#E8E4FF]` (lavender). The previous selector also included
+    # `[class*='6849EE']` (violet text), but that overmatches: the homepage's
+    # "Get Started" CTAs include `hover:bg-[#6849EE]` in their static class
+    # list, so the substring matches even though it only activates on hover.
+    # `get_active_tab_text()` was returning "Get Started" instead of the
+    # active tab label. Stick to the unique lavender-background signature.
+    # ARIA fallback kept in case the build adds proper a11y semantics later.
     ACTIVE_TAB = (
         "[role='tab'][aria-selected='true'], "
-        "button[class*='E8E4FF'], "
-        "button[class*='6849EE']"
+        "button[class*='E8E4FF']"
     )
     # Content panel sits as a sibling of the tab-button row inside the same
     # flex column wrapper. Anchor by the section, then pick the inner column
