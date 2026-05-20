@@ -13,13 +13,16 @@ CIVICDATALAB_ORG_ID = 1
 
 
 class EvaluatorsPage(BasePage):
-    """Evaluators management page — list, add, and remove evaluators."""
+    """Evaluators management page — list, add, and remove evaluators.
+
+    The page renders evaluators as a card grid (one card per evaluator). Tests
+    anchor on the per-card "Remove" action, which is unique per card.
+    """
 
     PAGE_HEADING = EvaluatorsLocators.PAGE_HEADING
     PAGE_SUBHEADING = EvaluatorsLocators.PAGE_SUBHEADING
     ADD_EVALUATOR_BUTTON = EvaluatorsLocators.ADD_EVALUATOR_BUTTON
-    TABLE = EvaluatorsLocators.TABLE
-    TABLE_ROW = EvaluatorsLocators.TABLE_ROW
+    EVALUATOR_CARD = EvaluatorsLocators.EVALUATOR_CARD
     REMOVE_BUTTON = EvaluatorsLocators.REMOVE_BUTTON
 
     def __init__(self, page: Page, org_id: int = CIVICDATALAB_ORG_ID) -> None:
@@ -38,11 +41,23 @@ class EvaluatorsPage(BasePage):
     def is_subheading_visible(self) -> bool:
         return self.is_visible(self.PAGE_SUBHEADING)
 
-    def is_table_visible(self) -> bool:
-        return self.is_visible(self.TABLE)
+    def is_card_grid_visible(self) -> bool:
+        """True when at least one evaluator card is rendered. Uses the BasePage
+        is_visible helper which wraps wait_for(state="visible", timeout=…) so
+        the data-spinner curtain doesn't race us to zero."""
+        return self.is_visible(self.REMOVE_BUTTON)
 
-    def get_evaluator_row_count(self) -> int:
-        return self.page.locator(self.TABLE_ROW).count()
+    def get_evaluator_card_count(self) -> int:
+        """Count of evaluator cards (one Remove action per card).
+
+        `Locator.count()` is synchronous — it returns whatever is on the page
+        right now. The data-spinner curtain on this route can race a fresh
+        navigation to zero. Wait for the first Remove action to become visible
+        (BasePage helper wraps wait_for) before counting; if it never appears,
+        callers see 0 and surface the real-bug assertion."""
+        if not self.is_visible(self.REMOVE_BUTTON):
+            return 0
+        return self.page.locator(self.REMOVE_BUTTON).count()
 
     def is_add_evaluator_button_visible(self) -> bool:
         return self.is_visible(self.ADD_EVALUATOR_BUTTON)
@@ -50,14 +65,5 @@ class EvaluatorsPage(BasePage):
     def is_evaluator_present(self, evaluator_selector: str) -> bool:
         return self.is_visible(evaluator_selector)
 
-    def are_column_headers_visible(self) -> bool:
-        return all([
-            self.is_visible(EvaluatorsLocators.TABLE_HEADER_USERNAME),
-            self.is_visible(EvaluatorsLocators.TABLE_HEADER_EMAIL),
-            self.is_visible(EvaluatorsLocators.TABLE_HEADER_NAME),
-            self.is_visible(EvaluatorsLocators.TABLE_HEADER_JOINED),
-            self.is_visible(EvaluatorsLocators.TABLE_HEADER_ACTIONS),
-        ])
-
     def get_remove_button_count(self) -> int:
-        return self.page.locator(self.REMOVE_BUTTON).count()
+        return self.get_evaluator_card_count()
