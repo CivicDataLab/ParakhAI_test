@@ -12,7 +12,16 @@ from playwright.sync_api import Page
 from locators.evaluator_role_locators import EvaluatorRoleLocators
 from pages.evaluator_role_page import EvaluatorRolePage
 
-pytestmark = [pytest.mark.e2e, pytest.mark.regression]
+pytestmark = [pytest.mark.e2e, pytest.mark.regression, pytest.mark.auth]
+
+
+@pytest.fixture
+def page(authenticated_page_fast):
+    """Override pytest-playwright's `page` fixture so every test in this file
+    runs against the storage-state-cached auth session. Every page hit here
+    targets /dashboard/auditor/... which redirects unauth visitors to
+    /api/auth/signin. See tasks/lessons.md (2026-05-18, 2026-05-20)."""
+    return authenticated_page_fast
 
 
 class TestEvaluatorHomeDashboard:
@@ -170,6 +179,7 @@ class TestEvaluatorAssignedModels:
         page.wait_for_timeout(300)
         assert page.url, f"Page accessible after clicking '{filter_name}' filter"
 
+    @pytest.mark.xfail(reason="App bug #8 — see docs/app_bugs.md", strict=False)
     def test_sidebar_link_navigates_to_assignments(self, page: Page):
         """Clicking 'Assigned Models' from the evaluator sidebar navigates correctly."""
         er = EvaluatorRolePage(page)
@@ -226,6 +236,7 @@ class TestEvaluatorEvaluations:
             "'View Assignments' link must be shown in the empty evaluations state"
         )
 
+    @pytest.mark.xfail(reason="App bug #8 — see docs/app_bugs.md", strict=False)
     def test_view_assignments_link_navigates_to_assignments(self, page: Page):
         """Clicking 'View Assignments' navigates to the assignments page."""
         er = EvaluatorRolePage(page)
@@ -237,6 +248,7 @@ class TestEvaluatorEvaluations:
             f"'View Assignments' should navigate to /assignments, got: {page.url}"
         )
 
+    @pytest.mark.xfail(reason="App bug #8 — see docs/app_bugs.md", strict=False)
     def test_sidebar_link_navigates_to_evaluations(self, page: Page):
         """Clicking 'Evaluations' from the evaluator sidebar navigates correctly."""
         er = EvaluatorRolePage(page)

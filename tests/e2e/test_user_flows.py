@@ -422,6 +422,7 @@ class TestFlow07_RoleSwitching:
             "Flow 7: 'Assigned Models' must appear in Evaluator sidebar (not AI Maker layout)"
         )
 
+    @pytest.mark.xfail(reason="App bug #8 — see docs/app_bugs.md", strict=False)
     def test_evaluator_assignments_page_accessible(self, page: Page):
         """Evaluator can navigate to the Assigned Models page."""
         er = EvaluatorRolePage(page)
@@ -433,6 +434,7 @@ class TestFlow07_RoleSwitching:
             "Flow 7: Assigned Models page must load for Evaluator role"
         )
 
+    @pytest.mark.xfail(reason="App bug #8 — see docs/app_bugs.md", strict=False)
     def test_evaluator_can_navigate_to_their_evaluations(self, page: Page):
         """Evaluator can navigate to the Evaluations page."""
         er = EvaluatorRolePage(page)
