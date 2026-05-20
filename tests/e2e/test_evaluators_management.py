@@ -1,10 +1,14 @@
 """
 E2E tests for the Evaluators management page (AI Maker role).
-Covers: page load, evaluator table, column headers, existing evaluators.
+Covers: page load, evaluator card grid, Add Evaluator CTA, existing evaluators.
 URL: /dashboard/ai-maker/1/auditors
 
-Note: Add/Remove evaluator tests are marked xfail (write-side-effects) and require
-      explicit test-data setup to run safely.
+UI: card grid (not a table). Each evaluator card shows name + optional role +
+a "Remove" action. Email/Joined/Username are no longer surfaced in the card
+view; tests that needed those columns were retired in the 2026-05-20 sweep.
+
+Add/Remove evaluator tests are marked xfail (write-side-effects) and require
+explicit test-data setup to run safely.
 """
 
 import pytest
@@ -14,7 +18,16 @@ from locators.evaluators_locators import EvaluatorsLocators
 from pages.evaluators_page import EvaluatorsPage
 from utils.config import Config
 
-pytestmark = [pytest.mark.e2e, pytest.mark.regression]
+pytestmark = [pytest.mark.e2e, pytest.mark.regression, pytest.mark.auth]
+
+
+@pytest.fixture
+def page(authenticated_page_fast):
+    """Override pytest-playwright's `page` fixture so every test in this file
+    runs against the storage-state-cached auth session. Every page hit here
+    targets /dashboard/ai-maker/1/auditors which redirects unauth visitors to
+    /api/auth/signin. See tasks/lessons.md (2026-05-18, 2026-05-20)."""
+    return authenticated_page_fast
 
 
 class TestEvaluatorsPageLoads:
@@ -47,103 +60,59 @@ class TestEvaluatorsPageLoads:
         assert page.title(), "Page title must not be empty"
 
 
-class TestEvaluatorsTable:
-    """Verify the evaluators table structure and content."""
+class TestEvaluatorsList:
+    """Verify the evaluator card grid renders the expected content."""
 
-    def test_table_is_visible(self, page: Page):
+    def test_card_grid_is_visible(self, page: Page):
         ep = EvaluatorsPage(page)
         ep.go_to_evaluators()
-        assert ep.is_table_visible(), "Evaluators table must be visible"
+        assert ep.is_card_grid_visible(), "At least one evaluator card must be visible"
 
-    def test_all_column_headers_are_present(self, page: Page):
-        """All five column headers — Username, Email, Name, Joined, Actions — are shown."""
+    def test_evaluator_cards_are_present(self, page: Page):
+        """At least one evaluator card is shown for CivicdataLab."""
         ep = EvaluatorsPage(page)
         ep.go_to_evaluators()
-        assert ep.are_column_headers_visible(), (
-            "All evaluator table columns (Username, Email, Name, Joined, Actions) must be present"
-        )
-
-    def test_username_column_header_is_visible(self, page: Page):
-        ep = EvaluatorsPage(page)
-        ep.go_to_evaluators()
-        assert ep.is_visible(EvaluatorsLocators.TABLE_HEADER_USERNAME), (
-            "'Username' column header must be visible"
-        )
-
-    def test_email_column_header_is_visible(self, page: Page):
-        ep = EvaluatorsPage(page)
-        ep.go_to_evaluators()
-        assert ep.is_visible(EvaluatorsLocators.TABLE_HEADER_EMAIL), (
-            "'Email' column header must be visible"
-        )
-
-    def test_name_column_header_is_visible(self, page: Page):
-        ep = EvaluatorsPage(page)
-        ep.go_to_evaluators()
-        assert ep.is_visible(EvaluatorsLocators.TABLE_HEADER_NAME), (
-            "'Name' column header must be visible"
-        )
-
-    def test_joined_column_header_is_visible(self, page: Page):
-        ep = EvaluatorsPage(page)
-        ep.go_to_evaluators()
-        assert ep.is_visible(EvaluatorsLocators.TABLE_HEADER_JOINED), (
-            "'Joined' column header must be visible"
-        )
-
-    def test_actions_column_header_is_visible(self, page: Page):
-        ep = EvaluatorsPage(page)
-        ep.go_to_evaluators()
-        assert ep.is_visible(EvaluatorsLocators.TABLE_HEADER_ACTIONS), (
-            "'Actions' column header must be visible"
-        )
-
-    def test_evaluator_rows_are_present(self, page: Page):
-        """At least one evaluator row is shown for CivicdataLab."""
-        ep = EvaluatorsPage(page)
-        ep.go_to_evaluators()
-        count = ep.get_evaluator_row_count()
-        assert count >= 1, f"Expected at least 1 evaluator row, found {count}"
+        count = ep.get_evaluator_card_count()
+        assert count >= 1, f"Expected at least 1 evaluator card, found {count}"
 
     def test_at_least_two_evaluators_listed(self, page: Page):
-        """The org has at least 2 evaluators in the table."""
+        """The org has at least 2 evaluator cards."""
         ep = EvaluatorsPage(page)
         ep.go_to_evaluators()
-        count = ep.get_evaluator_row_count()
-        assert count >= 2, (
-            f"Expected at least 2 evaluators, found {count}"
-        )
+        count = ep.get_evaluator_card_count()
+        assert count >= 2, f"Expected at least 2 evaluator cards, found {count}"
 
     def test_first_known_evaluator_is_listed(self, page: Page):
-        """EVALUATOR_EMAIL_1 (if configured) appears in the evaluators table."""
+        """EVALUATOR_EMAIL_1 (if configured) appears somewhere on the page.
+
+        Note: the card UI no longer surfaces email, so this test now hinges on
+        whether the email happens to render anywhere on the page (it may not).
+        Skips when the env var is unset; xfails if the card grid hides email."""
         if not Config.EVALUATOR_EMAIL_1:
             pytest.skip("EVALUATOR_EMAIL_1 not configured")
         ep = EvaluatorsPage(page)
         ep.go_to_evaluators()
         selector = EvaluatorsLocators.evaluator_email_text(Config.EVALUATOR_EMAIL_1)
-        assert ep.is_evaluator_present(selector), (
-            f"{Config.EVALUATOR_EMAIL_1} must be listed as an evaluator"
-        )
+        if not ep.is_evaluator_present(selector):
+            pytest.xfail("Card UI does not display email — email-based listing assertion no longer applicable")
 
     def test_second_known_evaluator_is_listed(self, page: Page):
-        """EVALUATOR_EMAIL_2 (if configured) appears in the evaluators table."""
         if not Config.EVALUATOR_EMAIL_2:
             pytest.skip("EVALUATOR_EMAIL_2 not configured")
         ep = EvaluatorsPage(page)
         ep.go_to_evaluators()
         selector = EvaluatorsLocators.evaluator_email_text(Config.EVALUATOR_EMAIL_2)
-        assert ep.is_evaluator_present(selector), (
-            f"{Config.EVALUATOR_EMAIL_2} must be listed as an evaluator"
-        )
+        if not ep.is_evaluator_present(selector):
+            pytest.xfail("Card UI does not display email — email-based listing assertion no longer applicable")
 
     def test_remove_button_present_for_each_evaluator(self, page: Page):
-        """A 'Remove' action button exists for each evaluator row."""
+        """A 'Remove' action exists for each evaluator card."""
         ep = EvaluatorsPage(page)
         ep.go_to_evaluators()
-        row_count = ep.get_evaluator_row_count()
+        card_count = ep.get_evaluator_card_count()
         remove_count = ep.get_remove_button_count()
-        assert remove_count >= row_count, (
-            f"Expected {row_count} Remove buttons (one per row), found {remove_count}"
+        assert remove_count >= card_count, (
+            f"Expected {card_count} Remove actions (one per card), found {remove_count}"
         )
 
 

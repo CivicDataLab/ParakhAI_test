@@ -1,6 +1,12 @@
 """
 Locators for the Evaluators management page (AI Maker role).
 URL: /dashboard/ai-maker/{org_id}/auditors
+
+UI is a card grid (not a table). Each evaluator card carries:
+  - avatar
+  - display name
+  - optional role label
+  - a "Remove" button
 """
 
 
@@ -14,26 +20,27 @@ class EvaluatorsLocators:
         "a:has-text('Add Evaluator')"
     )
 
-    # ── Table ──────────────────────────────────────────────────────────────────
-    TABLE = "table, [class*='table'], [role='table']"
-    TABLE_HEADER_USERNAME = "th:text('Username'), text=Username"
-    TABLE_HEADER_EMAIL = "th:text('Email'), text=Email"
-    TABLE_HEADER_NAME = "th:text('Name'), text=Name"
-    TABLE_HEADER_JOINED = "th:text('Joined'), text=Joined"
-    TABLE_HEADER_ACTIONS = "th:text('Actions'), text=Actions"
-
-    TABLE_ROW = "tbody tr, [class*='row']"
-    EVALUATOR_USERNAME = "td:nth-child(2), [class*='username']"
-    EVALUATOR_EMAIL = "td:nth-child(3), [class*='email']"
-    EVALUATOR_NAME = "td:nth-child(4), [class*='name']"
-    EVALUATOR_JOINED = "td:nth-child(5), [class*='joined']"
-    REMOVE_BUTTON = "text=Remove, button:text('Remove')"
-    REMOVE_ICON = "[class*='delete'], [class*='trash'], svg[class*='delete']"
+    # ── Card grid ──────────────────────────────────────────────────────────────
+    # Anchor on the per-card Remove action: unique per card and stable across
+    # the opub-ui card variants. The action is rendered as plain text + icon,
+    # not always wrapped in a <button>/<a> — so use the bare `text=` engine and
+    # let it find the leaf element regardless of wrapper.
+    REMOVE_BUTTON = "text=Remove"
+    EVALUATOR_CARD = (
+        "[class*='card' i]:has(:text('Remove')), "
+        "[class*='Card']:has(:text('Remove'))"
+    )
 
     # ── Helper for data-driven evaluator assertions ────────────────────────────
     @staticmethod
+    def evaluator_name_text(name: str) -> str:
+        """Build a Playwright text selector for an evaluator card's display name."""
+        return f"text={name}"
+
+    @staticmethod
     def evaluator_email_text(email: str) -> str:
-        """Build a Playwright text selector for an evaluator's email cell."""
+        """Email is not surfaced in the card view; selector exists for write-side
+        tests that inspect the Add Evaluator dialog."""
         return f"text={email}"
 
     # ── Add Evaluator dialog (write-side regression) ──────────────────────────

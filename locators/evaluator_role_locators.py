@@ -6,7 +6,10 @@ Base URL: /dashboard/auditor
 
 class EvaluatorRoleLocators:
     # ── Sidebar ────────────────────────────────────────────────────────────────
-    SIDEBAR_HOME = "nav a:text('Home'), li a:text('Home')"
+    # Drop `nav`/`li` parent gates — the sidebar wrapper is a CSS-modules
+    # `<div class="Sidebar__root__xxx">`, not a semantic <nav>/<li>. The text
+    # marker alone is reliable enough. See tasks/lessons.md (2026-05-18).
+    SIDEBAR_HOME = "a:has-text('Home')"
     SIDEBAR_ASSIGNED_MODELS = "text=Assigned Models"
     SIDEBAR_EVALUATIONS = "text=Evaluations"
     SIDEBAR_SWITCH_ROLES = "text=Switch Roles"
@@ -24,7 +27,12 @@ class EvaluatorRoleLocators:
 
     # ── Assigned Models (My Assignments) ──────────────────────────────────────
     ASSIGNMENTS_PAGE_HEADING = "text=My Assignments"
-    FILTER_ALL = "button:text('All'), [class*='filter']:text('All')"
+    # `:text()` is case-sensitive strict-substring on the text engine and
+    # misses the styled tab button. `[class*='filter']` is CSS-modules
+    # case-sensitive too. Drop both parent gates and use `:has-text()` on the
+    # button — substring is fine because the only short-"All" button on the
+    # page is the filter tab.
+    FILTER_ALL = "button:has-text('All'), [role='tab']:has-text('All')"
     FILTER_PENDING = "text=Pending"
     FILTER_ACCEPTED = "text=Accepted"
     FILTER_IN_PROGRESS = "text=In Progress"
