@@ -13,15 +13,25 @@ from utils.config import Config
 # ─────────────────────────────────────────────────────────────── Screenshots
 
 
+_FS_ILLEGAL = ' /:<>|*?"\\\r\n'
+_FS_TRANSLATION = str.maketrans({c: "_" for c in _FS_ILLEGAL})
+
+
 def take_screenshot(page: Page, name: str) -> Path:
     """
     Save a PNG screenshot to the screenshots directory.
 
     Returns the Path of the saved file.
+
+    The name is sanitized to strip every character that GitHub's
+    actions/upload-artifact rejects (colon, pipe, wildcard, etc.) so a
+    parametrize ID like `Meta: Llama 3.1 70B Instruct` doesn't break the
+    e2e-tests job's artifact-upload step. Reference:
+    https://github.com/actions/upload-artifact#zipped-artifact-downloads
     """
     Config.ensure_dirs()
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    safe_name = name.replace(" ", "_").replace("/", "_")
+    safe_name = name.translate(_FS_TRANSLATION)
     filename = Config.SCREENSHOTS_DIR / f"{timestamp}_{safe_name}.png"
     page.screenshot(path=str(filename), full_page=True)
     return filename
