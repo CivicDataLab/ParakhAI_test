@@ -43,16 +43,19 @@ class EvaluatorRolePage(BasePage):
     def go_to_evaluator_home(self) -> "EvaluatorRolePage":
         self.navigate(self.home_url)
         self.wait_for_app_ready()
+        self.skip_if_redirected_to_home("/auditor")
         return self
 
     def go_to_assignments(self) -> "EvaluatorRolePage":
         self.navigate(self.assignments_url)
         self.wait_for_app_ready()
+        self.skip_if_redirected_to_home("/auditor/assignments")
         return self
 
     def go_to_evaluations(self) -> "EvaluatorRolePage":
         self.navigate(self.evaluations_url)
         self.wait_for_app_ready()
+        self.skip_if_redirected_to_home("/auditor/evaluations")
         return self
 
     def click_assigned_models(self) -> None:

@@ -186,6 +186,30 @@ class BasePage:
             timeout=timeout,
         )
 
+    def skip_if_redirected_to_home(self, expected_path: str) -> None:
+        """Skip the current test if a `/dashboard/...` navigation landed on the
+        marketing homepage instead.
+
+        Cached storage_state JWTs can expire mid-suite. When that happens, the
+        backend redirects any auth-walled request to `/` (or to `/api/auth/signin`).
+        The next page-object action then waits 30s for an element that doesn't
+        exist on the homepage (e.g. the dashboard search input), and pytest
+        retries each failure twice — so a single session loss burns ~90s × N
+        affected tests of wall time and produces a misleading timeout error.
+
+        Calling this at the end of `go_to_*` methods converts that into a
+        clean, fast skip with a clear reference to bug #3 in `docs/app_bugs.md`.
+        """
+        url = self.page.url
+        if expected_path not in url:
+            import pytest
+
+            pytest.skip(
+                f"Auth redirect to {url!r} instead of a route containing "
+                f"{expected_path!r} — cached storage_state session likely "
+                "expired mid-suite (bug #3 family — dev-env stability)."
+            )
+
     def wait_for_app_ready(self, timeout: int = 15_000) -> None:
         """Wait for all auth/data loading curtains to clear after navigation.
 

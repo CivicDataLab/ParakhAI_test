@@ -115,5 +115,9 @@ class EvaluationDetailPage(BasePage):
         self.click(tab_selector)
 
     def click_back_to_list(self) -> None:
-        self.click(self.BACK_TO_LIST)
+        # The page renders mobile + desktop variants of both the <a> and the
+        # <button> form — strict-mode click on `BasePage.click()` fails with
+        # "resolved to 2 elements". Matches the .first pattern used in
+        # `pages/evaluations_page.py:click_back_to_list`.
+        self.page.locator(self.BACK_TO_LIST).first.click()
         self.wait_for_load("domcontentloaded")

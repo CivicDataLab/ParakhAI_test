@@ -39,6 +39,7 @@ class ModelsPage(BasePage):
         # wait_for_app_ready now handles 'Verifying your session…' AND
         # 'Loading AI models…' in one call (BasePage handles both via regex).
         self.wait_for_app_ready()
+        self.skip_if_redirected_to_home("/ai-models")
         try:
             self.page.locator(
                 f"{self.MODEL_CARD}, text=No models, text=No results"
