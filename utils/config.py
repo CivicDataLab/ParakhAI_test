@@ -1,6 +1,6 @@
 """
 Environment configuration loader for the Parakh test framework.
-Supports local, staging, and production environments via .env or shell vars.
+Supports development, staging, and production environments via .env or shell vars.
 
 Priority (highest → lowest):
   1. Shell / CI environment variables
@@ -22,8 +22,8 @@ class Config:
     """Central config object — read once at import time, referenced everywhere."""
 
     # ── URLs ──────────────────────────────────────────────────────────────────
-    BASE_URL: str = os.getenv("BASE_URL", "https://parakh.civicdataspace.in")
-    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "production").lower()
+    BASE_URL: str = os.getenv("BASE_URL", "https://dev.parakh.civicdataspace.in")
+    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development").lower()
     # Keycloak SSO base URL (may differ from the app URL)
     KEYCLOAK_URL: str = os.getenv("KEYCLOAK_URL", "")
     # GraphQL API endpoint (defaults to BASE_URL/graphql if not set)
