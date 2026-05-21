@@ -10,9 +10,9 @@ on:
       environment:
         description: "Target environment"
         required: false
-        default: "production"
+        default: "development"
         type: choice
-        options: [production, staging]
+        options: [development, staging, production]
       run_e2e:
         description: "Run E2E tests"
         type: boolean
@@ -36,9 +36,11 @@ on:
 
 env:
   # ── Platform URLs (configure as repo variables: Settings → Variables → Actions) ──
-  BASE_URL: ${{ vars.BASE_URL || 'https://parakh.civicdataspace.in' }}
-  GRAPHQL_URL: ${{ vars.GRAPHQL_URL || 'https://api.parakh.civicdataspace.in/graphql/' }}
-  ENVIRONMENT: ${{ vars.ENVIRONMENT || 'production' }}
+  # Default targets the dev environment; override via vars.BASE_URL /
+  # vars.GRAPHQL_URL / vars.ENVIRONMENT to point at staging or prod.
+  BASE_URL: ${{ vars.BASE_URL || 'https://dev.parakh.civicdataspace.in' }}
+  GRAPHQL_URL: ${{ vars.GRAPHQL_URL || 'https://dev.api.parakh.civicdataspace.in/graphql/' }}
+  ENVIRONMENT: ${{ vars.ENVIRONMENT || 'development' }}
   BROWSER: chromium
   HEADLESS: "true"
   SLOW_MO: "0"

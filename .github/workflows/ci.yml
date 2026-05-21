@@ -9,11 +9,11 @@ on:
 
 env:
   # ── Platform URLs (configure as repo variables: Settings → Variables → Actions) ──
-  # vars.BASE_URL / vars.GRAPHQL_URL fall back to the documented production URLs
-  # so the workflow keeps running on a fresh fork without manual setup.
-  BASE_URL: ${{ vars.BASE_URL || 'https://parakh.civicdataspace.in' }}
-  GRAPHQL_URL: ${{ vars.GRAPHQL_URL || 'https://api.parakh.civicdataspace.in/graphql/' }}
-  ENVIRONMENT: ${{ vars.ENVIRONMENT || 'production' }}
+  # Default targets the dev environment; override via vars.BASE_URL /
+  # vars.GRAPHQL_URL / vars.ENVIRONMENT to point at staging or prod.
+  BASE_URL: ${{ vars.BASE_URL || 'https://dev.parakh.civicdataspace.in' }}
+  GRAPHQL_URL: ${{ vars.GRAPHQL_URL || 'https://dev.api.parakh.civicdataspace.in/graphql/' }}
+  ENVIRONMENT: ${{ vars.ENVIRONMENT || 'development' }}
   BROWSER: chromium
   HEADLESS: "true"
   SLOW_MO: "0"
