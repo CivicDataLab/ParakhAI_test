@@ -17,12 +17,14 @@ Usage:
 
 from __future__ import annotations
 
+import asyncio
 import os
+import threading
 from pathlib import Path
 
 import requests
 from dotenv import load_dotenv
-from playwright.sync_api import sync_playwright
+from playwright.async_api import async_playwright
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(REPO_ROOT / ".env")
@@ -42,27 +44,27 @@ def _require_creds() -> None:
         )
 
 
-def get_access_token(headless: bool = True) -> str:
+async def aget_access_token(headless: bool = True) -> str:
     """Log in via the UI and return the Keycloak access token from NextAuth session."""
     _require_creds()
-    with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=headless)
-        context = browser.new_context()
-        page = context.new_page()
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=headless)
+        context = await browser.new_context()
+        page = await context.new_page()
 
-        page.goto(BASE_URL, wait_until="domcontentloaded")
-        page.get_by_role("button", name="LOGIN / SIGN UP").click()
-        page.wait_for_url("**/openid-connect/auth*", timeout=15_000)
-        page.get_by_role("textbox", name="Email").fill(EMAIL)
-        page.get_by_role("textbox", name="Password").fill(PASSWORD)
-        page.get_by_role("button", name="Sign In").click()
-        page.wait_for_url(f"{BASE_URL}/**", timeout=20_000)
-        page.reload(wait_until="domcontentloaded")
+        await page.goto(BASE_URL, wait_until="domcontentloaded")
+        await page.get_by_role("button", name="LOGIN / SIGN UP").click()
+        await page.wait_for_url("**/openid-connect/auth*", timeout=15_000)
+        await page.get_by_role("textbox", name="Email").fill(EMAIL)
+        await page.get_by_role("textbox", name="Password").fill(PASSWORD)
+        await page.get_by_role("button", name="Sign In").click()
+        await page.wait_for_url(f"{BASE_URL}/**", timeout=20_000)
+        await page.reload(wait_until="domcontentloaded")
 
-        session = page.evaluate(
+        session = await page.evaluate(
             "async () => fetch('/api/auth/session').then(r => r.json())"
         )
-        browser.close()
+        await browser.close()
 
         token = session.get("access_token")
         if not token:
@@ -70,6 +72,38 @@ def get_access_token(headless: bool = True) -> str:
                 f"No access_token in session payload: keys={list(session)}"
             )
         return token
+
+
+def get_access_token(headless: bool = True) -> str:
+    """Sync wrapper around `aget_access_token`.
+
+    Detects whether the calling thread already has a running asyncio loop
+    (true for pytest fixtures under pytest-asyncio). When it does, the async
+    work runs in a worker thread with its own loop — this avoids the
+    "Sync API inside asyncio loop" error that Playwright's sync API raises
+    in that situation. Standalone scripts hit the no-loop path and just use
+    asyncio.run directly.
+    """
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(aget_access_token(headless))
+
+    result: dict[str, str] = {}
+    error: dict[str, BaseException] = {}
+
+    def _worker() -> None:
+        try:
+            result["token"] = asyncio.run(aget_access_token(headless))
+        except BaseException as exc:  # noqa: BLE001 — propagate to caller
+            error["exc"] = exc
+
+    thread = threading.Thread(target=_worker, daemon=True)
+    thread.start()
+    thread.join()
+    if "exc" in error:
+        raise error["exc"]
+    return result["token"]
 
 
 def graphql(token: str, org_id: str, query: str, variables: dict | None = None) -> dict:
