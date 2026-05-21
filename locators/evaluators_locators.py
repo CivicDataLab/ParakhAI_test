@@ -26,10 +26,14 @@ class EvaluatorsLocators:
     # not always wrapped in a <button>/<a> — so use the bare `text=` engine and
     # let it find the leaf element regardless of wrapper.
     REMOVE_BUTTON = "text=Remove"
+    REMOVE_ICON = "[aria-label='Remove'], button[title='Remove']"
     EVALUATOR_CARD = (
         "[class*='card' i]:has(:text('Remove')), "
         "[class*='Card']:has(:text('Remove'))"
     )
+    # The Remove-button test enumerates evaluator entries; UI is a card grid,
+    # so TABLE_ROW maps to EVALUATOR_CARD.
+    TABLE_ROW = EVALUATOR_CARD
 
     # ── Helper for data-driven evaluator assertions ────────────────────────────
     @staticmethod

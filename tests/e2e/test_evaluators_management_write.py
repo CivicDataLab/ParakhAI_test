@@ -43,9 +43,12 @@ class TestAddEvaluatorDialog:
         if not ep.is_visible(EvaluatorsLocators.ADD_DIALOG, timeout=5_000):
             pytest.skip("Dialog did not appear — UI may differ on this build")
         ep.confirm_modal(accept=False)
-        # After cancel, dialog should close.
-        assert not ep.is_visible(EvaluatorsLocators.ADD_DIALOG, timeout=2_000), (
-            "Dialog must close after Cancel"
+        # After cancel, dialog should close. wait_for_element with state="hidden"
+        # raises if the dialog is still visible after the timeout — that's the
+        # assertion. `is_visible` would return True as soon as the dialog is
+        # detected during the timeout window, which is misleading here.
+        ep.wait_for_element(
+            EvaluatorsLocators.ADD_DIALOG, state="hidden", timeout=5_000
         )
 
 

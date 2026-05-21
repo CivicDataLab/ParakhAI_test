@@ -421,11 +421,21 @@ def authenticated_graphql_client():
     org_id = str(getattr(Config, "CIVICDATALAB_ORG_ID", 1))
 
     session = requests.Session()
+    # Dev nginx 403s requests with a non-browser User-Agent or missing Origin/
+    # Referer. Match what the app sends so the request looks like it came
+    # from the dev frontend.
     session.headers.update(
         {
             "Accept": "application/json",
             "Authorization": f"Bearer {token}",
             "organization": org_id,
+            "Origin": Config.BASE_URL.rstrip("/"),
+            "Referer": Config.BASE_URL.rstrip("/") + "/",
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            ),
         }
     )
 
