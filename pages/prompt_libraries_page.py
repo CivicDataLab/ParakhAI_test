@@ -31,6 +31,7 @@ class PromptLibrariesPage(BasePage):
     def go_to_prompt_libraries(self) -> "PromptLibrariesPage":
         self.navigate(self.url)
         self.wait_for_app_ready()
+        self.skip_if_redirected_to_home("/prompt-libraries")
         return self
 
     def is_page_loaded(self) -> bool:
