@@ -87,11 +87,15 @@ jobs:
           path: reports/api_report.html
           retention-days: 30
 
-  # ────────────────────────────────────────────── E2E tests
+  # ────────────────────────────────────────────── E2E tests (3-shard matrix)
   e2e-tests:
-    name: E2E Tests (Chromium)
+    name: E2E Tests (shard ${{ matrix.shard }}/${{ strategy.job-total }})
     runs-on: ubuntu-latest
     needs: lint
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@v6
 
@@ -107,25 +111,31 @@ jobs:
       - name: Install Playwright browsers
         run: playwright install --with-deps chromium
 
-      - name: Run E2E tests
+      - name: Run E2E tests (shard ${{ matrix.shard }}/3)
         continue-on-error: true
         run: |
           pytest tests/e2e/ \
+            -n 2 \
             -v \
             --tb=short \
-            --html=reports/e2e_report.html \
+            --json-report \
+            --json-report-file=reports/e2e_shard_${{ matrix.shard }}.json \
+            --html=reports/e2e_report_shard_${{ matrix.shard }}.html \
             --self-contained-html \
             -m e2e \
             --reruns 2 \
-            --reruns-delay 3
+            --reruns-delay 3 \
+            --splits 3 \
+            --group ${{ matrix.shard }}
 
-      - name: Upload E2E test report
+      - name: Upload E2E shard report
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: e2e-test-report
+          name: e2e-shard-${{ matrix.shard }}
           path: |
-            reports/e2e_report.html
+            reports/e2e_report_shard_${{ matrix.shard }}.html
+            reports/e2e_shard_${{ matrix.shard }}.json
             screenshots/
           retention-days: 30
 
@@ -235,9 +245,38 @@ jobs:
     needs: [api-tests, e2e-tests, accessibility-tests, visual-tests]
     if: always()
     steps:
-      - name: Print summary
+      - uses: actions/checkout@v6
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install report dependencies
+        run: pip install pytest-json-report
+
+      - name: Download E2E shard reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: e2e-shard-*
+          path: shard-artifacts/
+          merge-multiple: false
+
+      - name: Merge shard JSON reports
         run: |
-          echo "## Test Run Summary" >> $GITHUB_STEP_SUMMARY
+          python scripts/merge_test_reports.py \
+            shard-artifacts/e2e-shard-1/reports/e2e_shard_1.json \
+            shard-artifacts/e2e-shard-2/reports/e2e_shard_2.json \
+            shard-artifacts/e2e-shard-3/reports/e2e_shard_3.json \
+            --output reports/e2e_combined.json \
+            --markdown reports/e2e_summary.md
+
+      - name: Post E2E summary to job summary
+        run: cat reports/e2e_summary.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Print suite status table
+        run: |
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Suite | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
@@ -247,3 +286,13 @@ jobs:
           echo "| Visual Regression | ${{ needs.visual-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Platform:** ${{ env.BASE_URL }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload combined E2E report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-combined-report
+          path: |
+            reports/e2e_combined.json
+            reports/e2e_summary.md
+          retention-days: 30
