@@ -223,8 +223,8 @@ class TestGraphQL:
         }
     """
     QUERY_AUDITOR_ASSIGNMENTS = """
-        query AuditorAssignments($organizationId: ID!, $status: String) {
-          auditorAssignments(organizationId: $organizationId, status: $status) {
+        query AuditorAssignments($status: String) {
+          auditorAssignments(status: $status) {
             id status auditorEmail modelId modelName
           }
         }

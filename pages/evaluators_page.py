@@ -33,6 +33,8 @@ class EvaluatorsPage(BasePage):
     def go_to_evaluators(self) -> "EvaluatorsPage":
         self.navigate(self.url)
         self.wait_for_load("domcontentloaded")
+        self.wait_for_app_ready()
+        self.skip_if_redirected_to_home(f"/dashboard/ai-maker/{self.org_id}/auditors")
         return self
 
     def is_page_loaded(self) -> bool:
