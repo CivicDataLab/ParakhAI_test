@@ -48,22 +48,22 @@ class TestAuditorModelDetailContent:
 
     def test_assigned_versions_heading_or_empty_state(self, authenticated_page_fast):
         p = _go(authenticated_page_fast)
-        # Either the section heading is visible OR the empty-state copy is.
-        if not (
-            p.is_assigned_versions_section_visible()
-            or p.is_visible(p.NO_ASSIGNED_VERSIONS, timeout=2_000)
-        ):
+        if p.is_model_not_found():
             pytest.skip(
-                "Neither 'Assigned Versions' heading nor empty-state visible — "
-                "page may render differently for this account or model id"
+                f"Test account is not assigned to model {DEFAULT_MODEL_ID} as auditor — "
+                "assign the account or pick an assigned model id"
             )
         assert (
             p.is_assigned_versions_section_visible()
             or p.is_visible(p.NO_ASSIGNED_VERSIONS)
-        )
+        ), "Auditor page must show either the 'Assigned Versions' heading or the empty-state copy"
 
     def test_status_chip_renders_when_versions_present(self, authenticated_page_fast):
         p = _go(authenticated_page_fast)
+        if p.is_model_not_found():
+            pytest.skip(
+                f"Test account is not assigned to model {DEFAULT_MODEL_ID} as auditor"
+            )
         if p.get_version_row_count() == 0:
             pytest.skip("No assigned versions to inspect")
         chip = p.get_status_chip_text()

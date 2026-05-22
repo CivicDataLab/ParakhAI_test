@@ -1,6 +1,6 @@
 """
 Page object for the auditor model detail page.
-URL: /auditor/models/{model_id}
+URL: /dashboard/auditor/models/{model_id}
 """
 
 
@@ -21,19 +21,24 @@ class AuditorModelDetailPage(BasePage):
     DECLINE_BUTTON = AuditorModelDetailLocators.DECLINE_BUTTON
     START_BUTTON = AuditorModelDetailLocators.START_BUTTON
     NO_ASSIGNED_VERSIONS = AuditorModelDetailLocators.NO_ASSIGNED_VERSIONS
+    MODEL_NOT_FOUND = AuditorModelDetailLocators.MODEL_NOT_FOUND
 
     # ── Navigation ─────────────────────────────────────────────────────────────
 
     def go_to_model_detail(self, model_id: int) -> "AuditorModelDetailPage":
-        url = Config.url(f"/auditor/models/{model_id}")
+        url = Config.url(f"/dashboard/auditor/models/{model_id}")
         self.navigate(url)
         self.wait_for_app_ready()
+        self.skip_if_redirected_to_home(f"/auditor/models/{model_id}")
         return self
 
     # ── State checks ───────────────────────────────────────────────────────────
 
     def is_page_loaded(self) -> bool:
         return self.is_visible(self.MODEL_TITLE)
+
+    def is_model_not_found(self) -> bool:
+        return self.is_visible(self.MODEL_NOT_FOUND, timeout=2_000)
 
     def is_assigned_versions_section_visible(self) -> bool:
         return self.is_visible(self.ASSIGNED_VERSIONS_HEADING)
