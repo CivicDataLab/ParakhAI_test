@@ -74,7 +74,6 @@ class TestLoginValidation:
             pytest.skip("Sign-in button not visible — cannot test empty submission")
 
         login.submit_empty_form()
-        page.wait_for_timeout(1_500)
 
         # Keycloak silently rejects empty submissions — user remains on the login page.
         # Accept: inline error, HTML5 required attrs, or staying on the login/auth URL.
@@ -100,7 +99,6 @@ class TestLoginValidation:
             pytest.skip("Login form fields not available")
 
         login.login(DUMMY_EMAIL, DUMMY_PASSWORD)
-        page.wait_for_timeout(2_000)
 
         assert login.has_error(), (
             "Invalid credentials should produce an error message from the auth server"
@@ -122,8 +120,6 @@ class TestAuthRedirects:
         """Accessing /dashboard without authentication should redirect to login."""
         dashboard = DashboardPage(page)
         dashboard.go_to_dashboard()
-        page.wait_for_load_state("domcontentloaded")
-        page.wait_for_timeout(1_500)
 
         # Either redirected to login or shows an auth barrier
         redirected = dashboard.was_redirected_to_login()
@@ -151,7 +147,6 @@ class TestSuccessfulLogin:
         """A logged-in user should be able to access the dashboard without redirect."""
         dashboard = DashboardPage(authenticated_page)
         dashboard.go_to_dashboard()
-        authenticated_page.wait_for_timeout(1_500)
 
         assert not dashboard.was_redirected_to_login(), (
             "Authenticated user should reach the dashboard without being sent back to login"
@@ -167,7 +162,6 @@ class TestPostLoginState:
         """The dashboard should render a visible heading for authenticated users."""
         dashboard = DashboardPage(authenticated_page)
         dashboard.go_to_dashboard()
-        authenticated_page.wait_for_timeout(1_500)
 
         heading = dashboard.get_heading_text()
         assert heading, "Dashboard heading should be non-empty for authenticated users"
@@ -176,7 +170,6 @@ class TestPostLoginState:
         """The user menu (avatar/profile) should be visible after login."""
         dashboard = DashboardPage(authenticated_page)
         dashboard.go_to_dashboard()
-        authenticated_page.wait_for_timeout(1_500)
 
         assert dashboard.is_authenticated(), (
             "User menu should be visible on dashboard after successful login"
@@ -186,7 +179,6 @@ class TestPostLoginState:
         """An authenticated user accessing /dashboard should NOT be redirected to login."""
         dashboard = DashboardPage(authenticated_page)
         dashboard.go_to_dashboard()
-        authenticated_page.wait_for_timeout(1_500)
 
         assert not dashboard.was_redirected_to_login(), (
             "Authenticated user should not be redirected to the login page from /dashboard"
@@ -199,10 +191,16 @@ class TestLogout:
         """Signing out should return the user to the login page."""
         dashboard = DashboardPage(authenticated_page)
         dashboard.go_to_dashboard()
-        authenticated_page.wait_for_timeout(1_500)
 
         dashboard.sign_out()
-        authenticated_page.wait_for_timeout(2_000)
+        # Sign-out either bounces to Keycloak or back to home — wait for either.
+        try:
+            authenticated_page.wait_for_url(
+                lambda url: "dashboard" not in url.lower(),
+                timeout=10_000,
+            )
+        except Exception:  # noqa: BLE001
+            pass  # fall through to the multi-signal assertion below
 
         redirected_to_login = dashboard.was_redirected_to_login()
         on_auth_url = any(
