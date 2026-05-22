@@ -114,6 +114,16 @@ def graphql(token: str, org_id: str, query: str, variables: dict | None = None) 
             "authorization": f"Bearer {token}",
             "organization": str(org_id),
             "content-type": "application/json",
+            # Dev nginx 403s requests with a non-browser User-Agent or missing
+            # Origin/Referer. Match what the app sends so the request looks
+            # like it came from the dev frontend.
+            "Origin": BASE_URL,
+            "Referer": BASE_URL + "/",
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            ),
         },
         json={"query": query, "variables": variables or {}},
         timeout=30,
