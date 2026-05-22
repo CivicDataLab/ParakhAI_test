@@ -28,6 +28,7 @@ class DashboardPage(BasePage):
     def go_to_dashboard(self) -> "DashboardPage":
         self.navigate(Config.url("dashboard"))
         self.wait_for_load("domcontentloaded")
+        self.wait_for_app_ready()
         return self
 
     # ── State checks ──────────────────────────────────────────────────────────
