@@ -6,17 +6,12 @@ Tests tab switching, content visibility, and ARIA states.
 import pytest
 from playwright.sync_api import Page
 
+from locators.home_locators import HomeLocators
 from pages.home_page import HomePage
 
 pytestmark = [pytest.mark.e2e, pytest.mark.regression]
 
-# Expected tab labels (adjust if the UI copy changes)
-EXPECTED_TABS = [
-    "Automation Assisted",
-    "Expert Led",
-    "Sector Specific",
-    "Evaluation History",
-]
+EXPECTED_TABS = HomeLocators.FEATURE_TAB_LABELS
 
 
 def _get_home_with_tabs(page: Page) -> HomePage:
@@ -42,7 +37,7 @@ class TestFeatureTabs:
             pytest.skip("No active tab found — tabs may not exist on this build")
 
         active_text = home.get_active_tab_text().lower()
-        assert "automation" in active_text or active_text, (
+        assert "automation" in active_text, (
             f"Expected 'Automation Assisted' to be the default tab, got: '{active_text}'"
         )
 
@@ -54,7 +49,7 @@ class TestFeatureTabs:
         if not any("expert" in t.lower() for t in tab_names):
             pytest.skip("'Expert Led' tab not found on this build")
 
-        home.click_feature_tab("Expert Led")
+        home.click_feature_tab("Expert-led Evaluations")
         active = home.get_active_tab_text().lower()
         assert "expert" in active, (
             f"Expected 'Expert Led' to become active, got: '{active}'"
@@ -68,7 +63,7 @@ class TestFeatureTabs:
         if not any("sector" in t.lower() for t in tab_names):
             pytest.skip("'Sector Specific' tab not found on this build")
 
-        home.click_feature_tab("Sector Specific")
+        home.click_feature_tab("Sector-specific Test Cases")
         active = home.get_active_tab_text().lower()
         assert "sector" in active, (
             f"Expected 'Sector Specific' to become active, got: '{active}'"
@@ -82,7 +77,7 @@ class TestFeatureTabs:
         if not any("history" in t.lower() for t in tab_names):
             pytest.skip("'Evaluation History' tab not found on this build")
 
-        home.click_feature_tab("Evaluation History")
+        home.click_feature_tab("Evaluation History & Reports")
         active = home.get_active_tab_text().lower()
         assert "history" in active, (
             f"Expected 'Evaluation History' to become active, got: '{active}'"
