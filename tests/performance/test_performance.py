@@ -26,6 +26,10 @@ BUDGET = {
     "dom_content_loaded_ms": 3_000,
     "lcp_candidate_s": 3.0,
     "mobile_load_s": 8.0,  # 3G-equivalent throttling
+    # Authenticated SPA routes have two loading curtains (see lessons.md) so
+    # budgets are deliberately wider than the public homepage.
+    "auth_page_load_s": 12.0,
+    "auth_dom_content_loaded_ms": 6_000,
 }
 
 
@@ -199,6 +203,65 @@ class TestMobilePerformance:
             )
         finally:
             context.close()
+
+
+# ──────────────────────────────────────────────────── Authenticated route budgets
+
+
+class TestAuthenticatedPerformance:
+    """Load-time budgets for auth-walled SPA routes.
+
+    Uses `authenticated_page_fast` (cached storage state) so the login
+    round-trip is not included in the measured load time. Each test navigates
+    directly to the target route and waits for `wait_for_app_ready()`.
+    """
+
+    def test_dashboard_load_time(self, authenticated_page_fast):
+        """AI Maker dashboard must load within the authenticated-route budget."""
+        from pages.dashboard_page import DashboardPage
+
+        dash = DashboardPage(authenticated_page_fast)
+        start_ms = authenticated_page_fast.evaluate("performance.now()")
+        dash.go_to_dashboard()
+        end_ms = authenticated_page_fast.evaluate("performance.now()")
+        elapsed_s = (end_ms - start_ms) / 1000.0
+
+        metrics = get_performance_metrics(authenticated_page_fast)
+        save_json_report(
+            {"label": "dashboard", "url": authenticated_page_fast.url, "elapsed_s": elapsed_s, **metrics},
+            "performance_metrics_auth.json",
+        )
+
+        assert elapsed_s < BUDGET["auth_page_load_s"], (
+            f"Dashboard load time {elapsed_s:.2f}s exceeds budget of {BUDGET['auth_page_load_s']}s"
+        )
+
+    def test_evaluations_list_load_time(self, authenticated_page_fast):
+        """Evaluations list page must load within the authenticated-route budget."""
+        from pages.new_evaluation_page import NewEvaluationPage
+
+        nep = NewEvaluationPage(authenticated_page_fast)
+        start_ms = authenticated_page_fast.evaluate("performance.now()")
+        nep.go_to_evaluations_list()
+        end_ms = authenticated_page_fast.evaluate("performance.now()")
+        elapsed_s = (end_ms - start_ms) / 1000.0
+
+        assert elapsed_s < BUDGET["auth_page_load_s"], (
+            f"Evaluations list load time {elapsed_s:.2f}s exceeds budget of {BUDGET['auth_page_load_s']}s"
+        )
+
+    def test_dashboard_dom_content_loaded(self, authenticated_page_fast):
+        """DOMContentLoaded on the dashboard must fire within the auth budget."""
+        from pages.dashboard_page import DashboardPage
+
+        dash = DashboardPage(authenticated_page_fast)
+        dash.go_to_dashboard()
+        metrics = get_performance_metrics(authenticated_page_fast)
+        dcl = metrics.get("dom_content_loaded_ms", 0)
+        assert dcl < BUDGET["auth_dom_content_loaded_ms"], (
+            f"Dashboard DOMContentLoaded {dcl:.0f}ms exceeds budget of "
+            f"{BUDGET['auth_dom_content_loaded_ms']}ms"
+        )
 
 
 # ──────────────────────────────────────────────────── Full metrics report
