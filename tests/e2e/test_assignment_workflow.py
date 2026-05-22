@@ -131,7 +131,7 @@ class TestAssignmentStatusMutationDirect:
         # Look up a pending assignment in the sandbox org.
         result = authenticated_graphql_client(
             TestGraphQL.QUERY_AUDITOR_ASSIGNMENTS,
-            variables={"organizationId": sandbox_org, "status": TestSandbox.ASSIGNMENT_STATUS_PENDING},
+            variables={"status": TestSandbox.ASSIGNMENT_STATUS_PENDING},
             method="GET",
         )
         if result.get("errors"):
