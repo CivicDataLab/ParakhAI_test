@@ -8,11 +8,11 @@ Production-ready Python + Playwright test automation framework for the **[Parakh
 
 | Layer | Tool | Coverage |
 |---|---|---|
-| E2E UI | Playwright + pytest | Homepage, navigation, auth, feature tabs, AI models, evaluations list, New Evaluation wizard (Draft & Auto-Save — Automated and Manual modes) |
-| Accessibility | axe-playwright-python (WCAG 2.1 AA) | Axe scans, alt text, ARIA, keyboard |
+| E2E UI | Playwright + pytest | Auth, homepage, navigation, feature tabs, AI models, evaluations list + detail, New Evaluation wizard (draft, automated & manual modes, cancel paths), evaluators management, evaluator role, auditor flows, prompt libraries, mobile viewport |
+| Accessibility | axe-playwright-python (WCAG 2.1 AA) | Axe scans, alt text, ARIA, keyboard, skip links, social-icon labels |
 | Visual Regression | Pillow pixel-diff | Desktop / tablet / mobile viewports |
-| API / HTTP | requests | Status codes, headers, response time |
-| Performance | CDP + Navigation Timing API | Load time, TTFB, LCP, mobile 3G |
+| API / HTTP | requests | Status codes, headers, response time, GraphQL contracts |
+| Performance | CDP + Navigation Timing API | Load time, TTFB, LCP, mobile 3G, authenticated-route budgets |
 
 ---
 
@@ -21,7 +21,7 @@ Production-ready Python + Playwright test automation framework for the **[Parakh
 - **Python 3.11+**
 - **pip** (or `pipx`)
 - **Node.js 18+** (required by Playwright browser installer)
-- Internet access to `parakh.civicdataspace.in`
+- Internet access to `dev.parakh.civicdataspace.in`
 
 ---
 
@@ -30,7 +30,7 @@ Production-ready Python + Playwright test automation framework for the **[Parakh
 ```bash
 # 1. Clone the repo
 git clone <repo-url>
-cd parakh-test-framework
+cd ParakhAI_test
 
 # 2. Create and activate a virtual environment
 python -m venv .venv
@@ -42,93 +42,85 @@ pip install -r requirements.txt
 # 4. Install Playwright browser binaries
 playwright install --with-deps chromium
 
-# 5. Configure environment (optional — defaults point to production)
+# 5. Configure environment
 cp .env.example .env
-# Edit .env as needed
+# Fill in TEST_EMAIL_1, TEST_PASSWORD_1 at minimum
 ```
 
 ---
 
 ## Running Tests
 
-### Run all tests
+### All tests
 ```bash
 pytest
 ```
 
-### Run a specific suite
+### By suite
 ```bash
-pytest tests/e2e/          -m e2e           # E2E only
-pytest tests/accessibility/ -m accessibility  # Accessibility only
-pytest tests/visual/        -m visual         # Visual regression only
-pytest tests/api/           -m api            # API tests only (no browser)
-pytest tests/performance/   -m performance    # Performance tests only
+pytest tests/e2e/           -m e2e           # E2E browser tests
+pytest tests/accessibility/ -m accessibility  # WCAG / axe-core
+pytest tests/visual/        -m visual         # screenshot regression
+pytest tests/api/           -m api            # HTTP-layer (no browser)
+pytest tests/performance/   -m performance    # load & timing metrics
 ```
 
-### Run a single test file
+### By marker
+```bash
+pytest -m smoke -v           # fast CI sanity subset
+pytest -m auth -v            # authenticated tests only (needs TEST_EMAIL_1)
+pytest -m mobile -v          # mobile-viewport tests (390px)
+pytest -m regression_write   # write-side tests (needs SANDBOX_ORG_SLUG)
+```
+
+### Single file / test
 ```bash
 pytest tests/e2e/test_homepage.py -v
+pytest tests/e2e/test_homepage.py::TestClass::test_name -v
 ```
 
-### Run a single test by name
+### Parallel execution
 ```bash
-pytest tests/e2e/test_homepage.py::TestHomepageLoads::test_homepage_loads_successfully -v
+pytest -n 2 tests/e2e/      # 2 workers (recommended for browser tests)
+pytest -n auto tests/api/   # auto-detect workers (good for API tests)
 ```
 
-### Run smoke tests (fast CI subset)
+### Sharded execution (mirrors CI)
 ```bash
-pytest -m smoke -v
+pytest tests/e2e/ --splits 3 --group 1   # shard 1 of 3
+pytest tests/e2e/ --splits 3 --group 2   # shard 2 of 3
+pytest tests/e2e/ --splits 3 --group 3   # shard 3 of 3
 ```
 
-### Run authenticated tests only
-```bash
-# Requires TEST_EMAIL_1 and TEST_PASSWORD_1 to be set in .env
-pytest -m auth -v
-```
-
-### Run New Evaluation smoke / regression tests
-```bash
-pytest tests/e2e/test_new_evaluation_smoke.py -v       # smoke (9 tests)
-pytest tests/e2e/test_new_evaluation_regression.py -v  # regression (12 tests)
-```
-
-### Run in parallel (8 workers)
-```bash
-pytest -n 8 -m "api or e2e"
-```
-
-### Run with visible browser (debugging)
+### Debug with visible browser
 ```bash
 HEADLESS=false SLOW_MO=500 pytest tests/e2e/ -v
 ```
 
-### Run against a different environment
+### Against a different environment
 ```bash
-BASE_URL=https://staging.parakh.civicdataspace.in pytest tests/api/ -v
+BASE_URL=https://staging.parakh.civicdataspace.in pytest -m api -v
 ```
 
 ---
 
 ## Visual Regression Workflow
 
-### First run — save baselines
+### Save baselines (first run)
 ```bash
 pytest tests/visual/ -v
-# Tests will SKIP with "Baseline saved — re-run to compare"
+# Tests skip with "Baseline saved — re-run to compare"
 ```
 
-### Subsequent runs — compare against baselines
+### Compare against baselines
 ```bash
 pytest tests/visual/ -v
-# Tests will FAIL if pixel diff > VISUAL_THRESHOLD (default 0.1%)
+# Tests fail if pixel diff > VISUAL_THRESHOLD (default 0.2%)
 ```
 
-### Update baselines after intentional UI changes
+### Update a baseline after intentional UI change
 ```bash
-# Delete the specific snapshot(s) you want to update
 rm snapshots/homepage_desktop_1440x900.png
-
-# Re-run to save the new baseline
 pytest tests/visual/test_visual_regression.py::TestHomepageVisual::test_homepage_desktop_screenshot -v
 ```
 
@@ -138,24 +130,23 @@ pytest tests/visual/test_visual_regression.py::TestHomepageVisual::test_homepage
 
 | Variable | Default | Description |
 |---|---|---|
-| `BASE_URL` | `https://parakh.civicdataspace.in` | Target platform URL |
-| `ENVIRONMENT` | `production` | `local` / `staging` / `production` |
-| `KEYCLOAK_URL` | _(same origin)_ | SSO provider URL if on a different domain |
+| `BASE_URL` | `https://dev.parakh.civicdataspace.in` | Target platform URL |
+| `GRAPHQL_URL` | `https://dev.api.parakh.civicdataspace.in/graphql/` | GraphQL endpoint |
+| `ENVIRONMENT` | `development` | `local` / `development` / `staging` / `production` |
 | `BROWSER` | `chromium` | `chromium` / `firefox` / `webkit` |
 | `HEADLESS` | `true` | `false` to watch the browser |
-| `SLOW_MO` | `0` | Milliseconds between each action |
+| `SLOW_MO` | `0` | Milliseconds between each Playwright action |
 | `TIMEOUT` | `30000` | Default Playwright timeout (ms) |
 | `VIEWPORT_WIDTH` | `1440` | Browser viewport width (px) |
 | `VIEWPORT_HEIGHT` | `900` | Browser viewport height (px) |
-| `SCREENSHOT_ON_FAILURE` | `true` | Auto-screenshot on failure |
-| `VISUAL_THRESHOLD` | `0.1` | Max pixel-diff % for visual tests |
-| `TEST_EMAIL_1` | — | Primary test account email (`authenticated_page`) |
+| `SCREENSHOT_ON_FAILURE` | `true` | Auto-screenshot on test failure |
+| `VISUAL_THRESHOLD` | `0.2` | Max pixel-diff % for visual tests |
+| `TEST_EMAIL_1` | — | Primary test account email |
 | `TEST_PASSWORD_1` | — | Primary test account password |
-| `TEST_EMAIL_2` | — | Secondary test account email (`authenticated_page_u2`) |
-| `TEST_PASSWORD_2` | — | Secondary test account password |
+| `TEST_EMAIL_2` | — | Secondary account for multi-user tests (`authenticated_page_u2`) |
+| `TEST_PASSWORD_2` | — | Secondary account password |
 | `TEST_USER_INDEX` | `1` | Active user slot — `1` or `2` |
-| `RETRY_COUNT` | `2` | Number of automatic retries for flaky tests |
-| `RETRY_DELAY` | `2.0` | Seconds between retries |
+| `SANDBOX_ORG_SLUG` | — | Org slug for write-side tests; unset = all `regression_write` tests skip |
 
 ---
 
@@ -168,11 +159,12 @@ pytest tests/visual/test_visual_regression.py::TestHomepageVisual::test_homepage
 | `@pytest.mark.visual` | Screenshot regression tests |
 | `@pytest.mark.api` | HTTP-layer tests (no browser) |
 | `@pytest.mark.performance` | Load/timing metric tests |
-| `@pytest.mark.smoke` | Fast sanity subset (for PR checks) |
+| `@pytest.mark.mobile` | Mobile-viewport tests (390×844) |
+| `@pytest.mark.smoke` | Fast sanity subset for PR checks |
 | `@pytest.mark.regression` | Full regression suite |
-| `@pytest.mark.regression_write` | Mutating regression tests — auto-skip unless `SANDBOX_ORG_SLUG` is set |
-| `@pytest.mark.auth` | Tests that require an authenticated session (`TEST_EMAIL_1` must be set in `.env`) |
-| `@pytest.mark.skip_on_ci` | Tests excluded from CI (e.g. locally-dependent flows) |
+| `@pytest.mark.regression_write` | Mutating tests — auto-skip unless `SANDBOX_ORG_SLUG` is set |
+| `@pytest.mark.auth` | Tests requiring an authenticated session (`TEST_EMAIL_1` must be set) |
+| `@pytest.mark.skip_on_ci` | Tests excluded from CI environments |
 
 ---
 
@@ -183,25 +175,35 @@ Push / PR to main or dev
         │
         ▼
    ┌─────────┐
-   │  lint   │  (ruff)
+   │  lint   │  ruff check
    └────┬────┘
         │
-   ┌────┴──────────────────────────────┐
-   │         (parallel jobs)           │
-   ├──────────┬──────────┬─────────────┤
-   │ api-tests│ e2e-tests│  a11y-tests │
-   └──────────┴────┬─────┴─────────────┘
-                   │   visual-tests
-                   │
-              ┌────▼────┐
-              │ summary │  (GitHub Step Summary)
-              └─────────┘
+   ┌────┴──────────────────────────────────────────┐
+   │              (parallel jobs)                  │
+   ├──────────┬──────────────────────┬─────────────┤
+   │ api-tests│ e2e-tests (3 shards) │  a11y-tests │
+   │          │  shard 1 | 2 | 3     │             │
+   │          │  -n 2 per shard      │             │
+   └──────────┴──────────────────────┴─────────────┘
+              visual-tests (separate job)
+                        │
+              ┌─────────▼──────────┐
+              │    test-summary    │
+              │ downloads shards   │
+              │ merge_test_reports │
+              │ → GitHub Step      │
+              │   Summary          │
+              └────────────────────┘
 
-Nightly (02:00 UTC cron):
-  → Full suite: e2e + a11y + api + performance + visual
-  → Artifacts retained 30 days
-  → Slack/email webhook placeholder in scheduled.yml
+Artifacts retained 30 days:
+  e2e-shard-{1,2,3}        per-shard HTML + JSON reports + screenshots
+  e2e-combined-report       merged JSON + Markdown summary
+  api-test-report           API HTML report
+  accessibility-report      axe JSON + HTML
+  visual-regression-report  diff images + HTML
 ```
+
+Triggers: `push` to `main` / `dev` / `develop`, `pull_request` to `main`, `workflow_dispatch`.
 
 ---
 
@@ -209,53 +211,64 @@ Nightly (02:00 UTC cron):
 
 1. **Choose the right folder**: `tests/e2e/`, `tests/api/`, etc.
 2. **Name the file** `test_<feature>.py`
-3. **Add the marker** at the top: `pytestmark = [pytest.mark.e2e]`
-4. **Use Page Objects** from `pages/` — create a new one in `pages/` if needed
+3. **Add the marker** at module level: `pytestmark = [pytest.mark.e2e]`
+4. **Use Page Objects** from `pages/` — create a new one extending `BasePage` if needed, with selectors in a matching `locators/<feature>_locators.py`
 5. **Run locally** before pushing:
    ```bash
-   pytest tests/e2e/test_my_feature.py -v
+   pytest tests/e2e/test_my_feature.py -v --reruns 0
    ```
 
-### Page Object example
+### Page Object pattern
 ```python
 # pages/my_feature_page.py
 from pages.base_page import BasePage
+from locators.my_feature_locators import MyFeatureLocators
 
 class MyFeaturePage(BasePage):
-    HEADING = "h1.feature-title"
+    HEADING = MyFeatureLocators.HEADING
 
-    def get_title(self) -> str:
-        return self.get_text(self.HEADING)
+    def go_to_my_feature(self) -> "MyFeaturePage":
+        self.navigate(self.config.url("/my-feature"))
+        self.wait_for_load("domcontentloaded")
+        self.wait_for_app_ready()
+        self.skip_if_redirected_to_home("/my-feature")
+        return self
 ```
 
-### Test example
+### Test pattern
 ```python
 # tests/e2e/test_my_feature.py
 import pytest
 from playwright.sync_api import Page
 from pages.my_feature_page import MyFeaturePage
 
-pytestmark = [pytest.mark.e2e]
+pytestmark = [pytest.mark.e2e, pytest.mark.regression, pytest.mark.auth]
 
-def test_feature_heading(page: Page):
-    feature = MyFeaturePage(page)
-    feature.navigate_to_path("/my-feature")
-    assert "Expected" in feature.get_title()
+def test_heading_visible(authenticated_page_fast: Page):
+    page = MyFeaturePage(authenticated_page_fast)
+    page.go_to_my_feature()
+    assert page.is_visible(page.HEADING)
 ```
 
 ---
 
 ## Reports
 
-After each run, reports are written to the `reports/` directory:
+After each run, reports are written to `reports/`:
 
 | File | Contents |
 |---|---|
-| `reports/report.html` | Default HTML report (all suites) |
-| `reports/e2e_report.html` | E2E-specific HTML report |
+| `reports/report.html` | Default HTML report (full run) |
+| `reports/report.json` | pytest-json-report output |
+| `reports/TEST_REPORT.md` | Markdown summary |
+| `reports/e2e_report_shard_N.html` | Per-shard HTML (CI only) |
+| `reports/e2e_shard_N.json` | Per-shard JSON (CI only) |
+| `reports/e2e_combined.json` | Merged shard JSON (CI test-summary job) |
+| `reports/e2e_summary.md` | Merged Markdown posted to GitHub Step Summary |
 | `reports/a11y_report.html` | Accessibility HTML report |
 | `reports/accessibility_report.json` | Structured axe violations JSON |
-| `reports/performance_metrics.json` | Page timing metrics JSON |
+| `reports/performance_metrics.json` | Public-page timing metrics |
+| `reports/performance_metrics_auth.json` | Authenticated-route timing metrics |
 | `screenshots/FAIL_*.png` | Failure screenshots |
 | `screenshots/DIFF_*.png` | Visual regression diff images |
 
@@ -263,118 +276,143 @@ After each run, reports are written to the `reports/` directory:
 
 ## Utility Scripts
 
-All scripts share the same auth + GraphQL plumbing (`scripts/_api_client.py`): drive a headless Playwright login through Keycloak using `TEST_EMAIL_1` / `TEST_PASSWORD_1` from `.env`, read the access token from `/api/auth/session`, then call GraphQL directly via `requests`. No extra dependencies beyond what's already in `requirements.txt`. Defaults assume the dev backend; override via `BASE_URL` / `GRAPHQL_URL` env vars for other environments.
+All scripts share auth + GraphQL plumbing in `scripts/_api_client.py`: headless Playwright login through Keycloak using `TEST_EMAIL_1` / `TEST_PASSWORD_1`, access token from `/api/auth/session`, then GraphQL via `requests`. Defaults target the dev backend; override via `BASE_URL` / `GRAPHQL_URL`.
 
 ### `scripts/cleanup_drafts.py` — bulk-cancel DRAFT evaluations
-
-Smoke and regression runs leave `DRAFT` audits behind. This script cancels them by calling `updateAudit(status: "CANCELLED")` (ParakhAPI has no `deleteAudit` mutation, so cancellation is the available cleanup path).
-
 ```bash
-python scripts/cleanup_drafts.py --dry-run                  # preview matches, no writes
-python scripts/cleanup_drafts.py                            # cancel all DRAFTs in org 1
-python scripts/cleanup_drafts.py --org-id 5                 # different org
-python scripts/cleanup_drafts.py --status DRAFT,CANCELLED   # also re-cancel
-python scripts/cleanup_drafts.py --headed                   # show the login browser window
+python scripts/cleanup_drafts.py --dry-run
+python scripts/cleanup_drafts.py
+python scripts/cleanup_drafts.py --org-id 5
 ```
 
 ### `scripts/cleanup_all.py` — broader cleanup with age filter
-
-Supersedes `cleanup_drafts.py` for routine use. Same default behaviour (cancel DRAFTs), plus `--include-cancelled-older-than N` to also re-cancel CANCELLED audits older than N days, and `--status` for a custom status set.
-
 ```bash
 python scripts/cleanup_all.py --dry-run
 python scripts/cleanup_all.py --include-cancelled-older-than 7
-python scripts/cleanup_all.py --status DRAFT,RUNNING        # custom statuses
+python scripts/cleanup_all.py --status DRAFT,RUNNING
 ```
 
 ### `scripts/seed_test_data.py` — create N draft audits
-
-For repeatable demo / test-fixture state. Uses the `createBlankAudit` mutation — same as clicking "New Evaluation" in the UI without any configuration. Resulting audits appear in the list with status DRAFT.
-
 ```bash
-python scripts/seed_test_data.py                             # 5 drafts in org 1
+python scripts/seed_test_data.py                        # 5 drafts in org 1
 python scripts/seed_test_data.py --count 10
-python scripts/seed_test_data.py --model-id 129              # pin to a known model
-python scripts/seed_test_data.py --name-prefix "Demo eval"
+python scripts/seed_test_data.py --model-id 129
 python scripts/seed_test_data.py --dry-run
 ```
 
-If `--model-id` is omitted, the first AI model returned by `aiModels()` is used.
-
 ### `scripts/sandbox_reset.py` — hard-reset the sandbox org
-
-Destructive cleanup for the sandbox org used by `regression_write` tests. Cancels EVERY audit (DRAFT/PENDING/RUNNING/COMPLETED/FAILED — leaves CANCELLED alone). Refuses to run unless `SANDBOX_ORG_SLUG` is set in `.env`, so it cannot accidentally fire against production.
-
 ```bash
-python scripts/sandbox_reset.py                              # interactive prompt
-python scripts/sandbox_reset.py --yes                        # non-interactive (CI)
-python scripts/sandbox_reset.py --dry-run                    # plan only
+python scripts/sandbox_reset.py --dry-run
+python scripts/sandbox_reset.py --yes      # non-interactive (CI)
 ```
+Requires `SANDBOX_ORG_SLUG` in `.env` — refuses to run otherwise.
+
+### `scripts/merge_test_reports.py` — merge CI shard reports
+```bash
+python scripts/merge_test_reports.py \
+    reports/e2e_shard_1.json \
+    reports/e2e_shard_2.json \
+    reports/e2e_shard_3.json \
+    --output reports/e2e_combined.json \
+    --markdown reports/e2e_summary.md
+```
+Used by the `test-summary` CI job to unify per-shard results into a single Markdown summary posted to GitHub Step Summary.
+
+---
+
+## Sandbox org for write-side tests
+
+Tests marked `@pytest.mark.regression_write` mutate platform state (creating evaluations, adding evaluators, etc.) and only run against a dedicated sandbox organisation. Set `SANDBOX_ORG_SLUG` in `.env` (or as a GitHub Actions secret) to enable them. The autouse `forbid_outside_sandbox` fixture in `tests/conftest.py` skips every `regression_write` test when it is unset.
 
 ---
 
 ## Project Structure
 
 ```
-parakh-test-framework/
+ParakhAI_test/
 ├── .github/workflows/
-│   ├── ci.yml               # PR + push pipeline
-│   └── scheduled.yml        # Nightly regression (02:00 UTC)
+│   ├── ci.yml                   # PR + push pipeline (lint → parallel suites → summary)
+│   └── scheduled.yml            # Nightly regression (02:00 UTC)
 ├── tests/
-│   ├── e2e/                          # Browser UI tests
+│   ├── e2e/                     # Browser UI tests (~310 tests)
 │   │   ├── test_auth.py
 │   │   ├── test_homepage.py
 │   │   ├── test_navigation.py
+│   │   ├── test_feature_tabs.py
 │   │   ├── test_models.py
-│   │   ├── test_evaluations.py       # Evaluations list + detail
-│   │   ├── test_new_evaluation_smoke.py      # New Evaluation smoke (9 tests)
-│   │   └── test_new_evaluation_regression.py # New Evaluation regression (12 tests)
-│   ├── accessibility/       # WCAG / axe-core tests
-│   ├── visual/              # Screenshot regression
-│   ├── api/                 # HTTP-layer tests
-│   │   ├── test_graphql.py                  # Anonymous-allowed GraphQL queries
-│   │   └── test_graphql_authenticated.py    # Authenticated GraphQL contract tests
-│   ├── performance/         # Load & timing tests
-│   └── conftest.py          # Shared fixtures (page, authenticated_page, api_client, …)
-├── pages/                   # Page Object Models
-│   ├── base_page.py             # Base class — all pages inherit from this
+│   │   ├── test_evaluations.py
+│   │   ├── test_evaluation_detail.py
+│   │   ├── test_new_evaluation_smoke.py
+│   │   ├── test_new_evaluation_regression.py
+│   │   ├── test_new_evaluation_full_flow.py
+│   │   ├── test_new_evaluation_cancel.py
+│   │   ├── test_evaluation_workspace.py
+│   │   ├── test_evaluation_workspace_manual.py
+│   │   ├── test_evaluators_management.py
+│   │   ├── test_evaluators_management_write.py
+│   │   ├── test_evaluator_role.py
+│   │   ├── test_assignment_workflow.py
+│   │   ├── test_multi_user_assignment.py
+│   │   ├── test_auditor_evaluations.py
+│   │   ├── test_auditor_model_detail.py
+│   │   ├── test_ai_maker_dashboard.py
+│   │   ├── test_org_selection.py
+│   │   ├── test_prompt_libraries.py
+│   │   ├── test_user_flows.py
+│   │   └── test_mobile.py
+│   ├── accessibility/           # WCAG / axe-core tests
+│   ├── visual/                  # Screenshot regression
+│   ├── api/                     # HTTP-layer tests
+│   │   ├── test_graphql.py
+│   │   └── test_graphql_authenticated.py
+│   ├── performance/             # Load & timing tests
+│   ├── data/
+│   │   └── test_data.py         # GraphQL queries/mutations + sandbox constants
+│   └── conftest.py              # All shared fixtures
+├── pages/                       # Page Object Models
+│   ├── base_page.py             # Base — all pages inherit from here
 │   ├── home_page.py
 │   ├── login_page.py
 │   ├── dashboard_page.py
-│   ├── workspace_page.py        # Role / org selection
-│   ├── ai_maker_page.py         # AI Maker dashboard (stats, sidebar)
-│   ├── evaluations_page.py      # Evaluations list + detail report
-│   ├── new_evaluation_page.py   # New Evaluation wizard — Draft & Auto-Save flow
-│   ├── models_page.py           # AI Models list + detail
-│   ├── evaluators_page.py       # Evaluators management
-│   ├── evaluator_role_page.py   # Evaluator-role specific flows
-│   └── prompt_libraries_page.py # Prompt library features
+│   ├── ai_maker_dashboard_page.py
+│   ├── models_page.py
+│   ├── evaluations_page.py
+│   ├── evaluation_detail_page.py
+│   ├── new_evaluation_page.py
+│   ├── evaluation_workspace_page.py
+│   ├── evaluators_page.py
+│   ├── evaluator_role_page.py
+│   ├── auditor_model_detail_page.py
+│   ├── org_selection_page.py
+│   └── prompt_libraries_page.py
+├── locators/                    # Raw CSS/text selectors (one file per page)
+├── scripts/
+│   ├── _api_client.py           # Shared auth + GraphQL helpers
+│   ├── cleanup_drafts.py
+│   ├── cleanup_all.py
+│   ├── seed_test_data.py
+│   ├── sandbox_reset.py
+│   └── merge_test_reports.py   # Merges CI shard JSONs → combined report
 ├── utils/
-│   ├── config.py            # Environment config
-│   ├── helpers.py           # Utility functions
-│   ├── reporters.py         # JSON / summary reporting
-│   └── test_data_factory.py # Deterministic-prefix factories for write-side tests
-├── reports/                 # Generated HTML + JSON reports
-├── screenshots/             # Failure + diff screenshots
-├── snapshots/               # Visual regression baselines
+│   ├── config.py
+│   ├── helpers.py
+│   ├── reporters.py
+│   └── test_data_factory.py
+├── docs/
+│   ├── app_bugs.md              # Known platform bugs; all xfails link here
+│   ├── a11y_findings.md
+│   └── visual_diffs.md
+├── snapshots/                   # Visual regression baselines
+├── reports/                     # Generated reports (gitignored)
+├── screenshots/                 # Failure + diff screenshots (gitignored)
 ├── pytest.ini
-├── pyproject.toml
 ├── requirements.txt
 ├── .env.example
+├── CLAUDE.md
 ├── CONTRIBUTING.md
 ├── SECURITY.md
-├── LICENSE
 └── README.md
 ```
-
-## Sandbox org for write-side tests
-
-Tests marked `@pytest.mark.regression_write` mutate platform state (creating
-evaluations, adding evaluators, etc.) and are **only allowed to run against a
-dedicated sandbox organization**. Set `SANDBOX_ORG_SLUG` in `.env` (or as a
-GitHub Actions secret) to enable them. When unset, the autouse
-`forbid_outside_sandbox` fixture in `tests/conftest.py` skips every
-`regression_write` test so production data is never touched accidentally.
 
 ---
 
