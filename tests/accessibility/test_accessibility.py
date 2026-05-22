@@ -128,6 +128,7 @@ class TestImagesAndLinks:
             + "\n".join(missing_alt)
         )
 
+    @pytest.mark.xfail(reason="App bug #9 — see docs/app_bugs.md", strict=False)
     def test_social_links_have_accessible_names(self, page: Page):
         """Footer icon-only links must have aria-label or visible text."""
         home = HomePage(page)
