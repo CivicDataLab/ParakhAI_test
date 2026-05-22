@@ -118,9 +118,11 @@ class HomePage(BasePage):
         self.click(selector)
 
     def get_active_tab_text(self) -> str:
+        self.wait_for_element(self.ACTIVE_TAB)
         return self.get_text(self.ACTIVE_TAB)
 
     def get_all_tab_names(self) -> list[str]:
+        self.wait_for_element(self.FEATURE_TABS_CONTAINER)
         tabs = self.page.locator(self.TAB_BUTTON)
         return [tabs.nth(i).inner_text().strip() for i in range(tabs.count())]
 
