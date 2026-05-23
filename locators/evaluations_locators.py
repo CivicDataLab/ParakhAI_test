@@ -48,7 +48,11 @@ class EvaluationsLocators:
     MODAL_MODEL_DROPDOWN = "select, [class*='select'], [role='combobox']"
     MODAL_VERSION_DROPDOWN = "select, [class*='select'], [role='combobox']"
     MODAL_START_BUTTON = "button:has-text('Start')"
-    MODAL_CANCEL_BUTTON = "button:has-text('Cancel')"
+    MODAL_CANCEL_BUTTON = (
+        "[role='dialog'] button:has-text('Cancel'), "
+        "[class*='modal'] button:has-text('Cancel'), "
+        "[class*='Modal'] button:has-text('Cancel')"
+    )
 
     # Modal dropdown option lists — at least one <option> or listbox item must be present
     # NOTE: If dropdowns are custom (React-Select / Radix), add data-testid="model-option"
@@ -74,7 +78,12 @@ class EvaluationsLocators:
     )
     # NOTE: The name input uses id="auditName" per spec — prefer that; class fallback kept.
     WIZARD_EVAL_NAME_INPUT = "input#auditName, input[name='evaluationName'], input[value*='Untitled'], input[class*='name']"
-    WIZARD_CANCEL_EVALUATION = "text=Cancel Evaluation"
+    WIZARD_CANCEL_EVALUATION = (
+        "button:has-text('Cancel Evaluation'), "
+        "a:has-text('Cancel Evaluation'), "
+        "button:has-text('Discard'), "
+        "text=Cancel Evaluation"
+    )
     # NOTE: Add data-testid="auto-save-indicator" to the header indicator for stability.
     WIZARD_AUTO_SAVED = "text=Auto-saved"
 

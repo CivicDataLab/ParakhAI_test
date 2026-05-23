@@ -76,7 +76,9 @@ class EvaluationsPage(BasePage):
         self.wait_for_app_ready()
 
     def click_new_evaluation(self) -> None:
-        self.click(self.NEW_EVALUATION_BUTTON)
+        loc = self.page.locator(self.NEW_EVALUATION_BUTTON).first
+        loc.wait_for(state="visible", timeout=self.timeout)
+        loc.click()
         self.page.wait_for_timeout(500)
 
     # ── New Evaluation modal ───────────────────────────────────────────────────

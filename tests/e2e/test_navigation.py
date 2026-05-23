@@ -54,7 +54,11 @@ class TestDesktopNavigation:
         home.scroll_to_bottom()
         page.wait_for_timeout(300)
 
-        header = page.locator("header, nav").first
+        header = page.locator("header")
+        try:
+            header.wait_for(state="visible", timeout=5_000)
+        except Exception:
+            pass
         assert header.is_visible(), "Header should remain visible after scrolling (sticky)"
 
 

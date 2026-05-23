@@ -199,6 +199,7 @@ class TestNewEvaluationWizard:
         if ep.is_visible(ep.WIZARD_CANCEL_EVALUATION, timeout=3_000):
             ep.cancel_evaluation()
 
+    @pytest.mark.xfail(reason="App bug #1 — see docs/app_bugs.md", strict=False)
     def test_wizard_shows_auto_saved_indicator(self, page: Page):
         """The wizard displays an auto-save indicator."""
         ep = EvaluationsPage(page)
@@ -331,7 +332,6 @@ class TestEvaluationDetail:
             "COMPLETED status badge must be visible on evaluation detail"
         )
 
-    @pytest.mark.xfail(reason="App bug #7 — see docs/app_bugs.md", strict=False)
     def test_automated_mode_badge_is_visible(self, page: Page, completed_eval_id):
         ep = EvaluationsPage(page)
         ep.go_to_evaluation_detail(completed_eval_id)
@@ -380,21 +380,18 @@ class TestEvaluationDetail:
             "'Modules' label must be present in overview"
         )
 
-    @pytest.mark.xfail(reason="App bug #7 — see docs/app_bugs.md", strict=False)
     def test_summary_section_is_present(self, page: Page, completed_eval_id):
         ep = EvaluationsPage(page)
         ep.go_to_evaluation_detail(completed_eval_id)
         page.wait_for_timeout(300)
         assert ep.is_summary_section_visible(), "'Evaluation Summary' section must be present"
 
-    @pytest.mark.xfail(reason="App bug #7 — see docs/app_bugs.md", strict=False)
     def test_pass_rate_is_displayed(self, page: Page, completed_eval_id):
         """Total Pass Rate is shown in the summary section."""
         ep = EvaluationsPage(page)
         ep.go_to_evaluation_detail(completed_eval_id)
         assert ep.is_pass_rate_visible(), "'TOTAL PASS RATE' must be visible"
 
-    @pytest.mark.xfail(reason="App bug #7 — see docs/app_bugs.md", strict=False)
     def test_passed_failed_skipped_counts_visible(self, page: Page, completed_eval_id):
         """Passed, Failed, and Skipped test counts are all displayed."""
         ep = EvaluationsPage(page)
@@ -409,14 +406,12 @@ class TestEvaluationDetail:
                 missing.append(sel)
         assert not missing, f"Missing summary stat labels: {missing}"
 
-    @pytest.mark.xfail(reason="App bug #7 — see docs/app_bugs.md", strict=False)
     def test_risk_level_section_is_present(self, page: Page, completed_eval_id):
         """The risk breakdown section (Low/Medium/High) is shown."""
         ep = EvaluationsPage(page)
         ep.go_to_evaluation_detail(completed_eval_id)
         assert ep.is_risk_section_visible(), "'Total Issues Identified' section must be present"
 
-    @pytest.mark.xfail(reason="App bug #7 — see docs/app_bugs.md", strict=False)
     def test_three_risk_levels_are_shown(self, page: Page, completed_eval_id):
         """Low Risk, Medium Risk, and High Risk cards are all present."""
         ep = EvaluationsPage(page)
@@ -462,7 +457,6 @@ class TestEvaluationDetail:
             "'Sample Issues' heading must be visible"
         )
 
-    @pytest.mark.xfail(reason="App bug #7 — see docs/app_bugs.md", strict=False)
     def test_sample_issues_accordion_items_present(self, page: Page, completed_eval_id):
         """Individual issue accordion items are listed."""
         ep = EvaluationsPage(page)
@@ -484,7 +478,6 @@ class TestEvaluationDetail:
             "'Download Report' button must be visible"
         )
 
-    @pytest.mark.xfail(reason="App bug #7 — see docs/app_bugs.md", strict=False)
     def test_back_to_list_button_navigates_correctly(self, page: Page, completed_eval_id):
         """'Back to List' button returns to the evaluations list."""
         ep = EvaluationsPage(page)

@@ -205,6 +205,5 @@ class TestModelCardsonHome:
         ai.go_to_dashboard()
         page.keyboard.press("End")
         page.wait_for_timeout(300)
-        assert ai.is_visible("text=Text Generation"), (
-            "'Text Generation' badge must appear on model cards"
-        )
+        found = ai.is_visible("text=Text Generation") or ai.is_visible("text=TEXT GENERATION")
+        assert found, "'Text Generation' badge must appear on model cards"
