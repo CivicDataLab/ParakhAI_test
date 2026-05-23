@@ -107,7 +107,9 @@ class NewEvaluationPage(BasePage):
 
     def click_new_evaluation(self) -> NewEvaluationPage:
         """Click the 'New Evaluation' button to open the modal."""
-        self.click(self.NEW_EVALUATION_BUTTON)
+        loc = self.page.locator(self.NEW_EVALUATION_BUTTON).first
+        loc.wait_for(state="visible", timeout=self.timeout)
+        loc.click()
         self.page.wait_for_timeout(500)
         return self
 
@@ -205,7 +207,9 @@ class NewEvaluationPage(BasePage):
 
     def click_modal_cancel(self) -> None:
         """Click 'Cancel' in the modal."""
-        self.click(self.MODAL_CANCEL_BUTTON)
+        loc = self.page.locator(self.MODAL_CANCEL_BUTTON).first
+        loc.wait_for(state="visible", timeout=self.timeout)
+        loc.click()
 
     # ── Wizard — general ──────────────────────────────────────────────────────
 
@@ -261,7 +265,9 @@ class NewEvaluationPage(BasePage):
 
     def cancel_evaluation(self) -> None:
         """Click 'Cancel Evaluation ✕' and wait to return to the list."""
-        self.click(self.WIZARD_CANCEL_EVALUATION)
+        loc = self.page.locator(self.WIZARD_CANCEL_EVALUATION).first
+        loc.wait_for(state="visible", timeout=self.timeout)
+        loc.click()
         # The app may show a confirmation modal before navigating away.
         # Try the most common confirm/yes button patterns within 3 s.
         for confirm_sel in (
@@ -317,6 +323,9 @@ class NewEvaluationPage(BasePage):
         may need a click-to-edit interaction; adjust if needed.
         """
         self.type_text(self.WIZARD_EVAL_NAME_INPUT, name)
+
+    def type_evaluation_name(self, name: str) -> None:
+        self.set_evaluation_name(name)
 
     def select_evaluation_type(self, eval_type: str) -> None:
         """

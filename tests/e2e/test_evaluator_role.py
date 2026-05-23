@@ -179,7 +179,6 @@ class TestEvaluatorAssignedModels:
         page.wait_for_timeout(300)
         assert page.url, f"Page accessible after clicking '{filter_name}' filter"
 
-    @pytest.mark.xfail(reason="App bug #8 — see docs/app_bugs.md", strict=False)
     def test_sidebar_link_navigates_to_assignments(self, page: Page):
         """Clicking 'Assigned Models' from the evaluator sidebar navigates correctly."""
         er = EvaluatorRolePage(page)
@@ -248,7 +247,6 @@ class TestEvaluatorEvaluations:
             f"'View Assignments' should navigate to /assignments, got: {page.url}"
         )
 
-    @pytest.mark.xfail(reason="App bug #8 — see docs/app_bugs.md", strict=False)
     def test_sidebar_link_navigates_to_evaluations(self, page: Page):
         """Clicking 'Evaluations' from the evaluator sidebar navigates correctly."""
         er = EvaluatorRolePage(page)

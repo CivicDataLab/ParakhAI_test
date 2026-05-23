@@ -129,7 +129,6 @@ class TestAddEvaluatorButton:
         is_disabled = btn.get_attribute("disabled")
         assert is_disabled is None, "'Add Evaluator' button must not be disabled"
 
-    @pytest.mark.xfail(reason="Add Evaluator opens a form/modal — needs test-data setup")
     def test_add_evaluator_opens_invite_form(self, page: Page):
         """Clicking 'Add Evaluator' opens an invite form or modal."""
         ep = EvaluatorsPage(page)

@@ -23,7 +23,6 @@ class TestOrgSelectionPageLoad:
             f"Unexpected URL after navigating to org selection: {url}"
         )
 
-    @pytest.mark.xfail(reason="May redirect directly if user has only one org")
     def test_org_card_or_redirect_visible(self, authenticated_page):
         page = OrgSelectionPage(authenticated_page)
         page.go_to_org_selection()
