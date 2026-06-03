@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import re
 
-import pytest
 from playwright.sync_api import Page
 
 from locators.evaluations_locators import EvaluationsLocators
@@ -671,12 +670,14 @@ class NewEvaluationPage(BasePage):
         """
         self.go_to_evaluations_list()
         self.click_new_evaluation()
-        if not self.is_modal_visible():
-            pytest.skip("'Start New Evaluation' modal did not appear")
+        assert self.is_modal_visible(), (
+            "'Start New Evaluation' modal did not appear — platform may be unavailable or slow"
+        )
         self.select_first_model_and_version()
         self.click_modal_start()
-        if not self.is_wizard_visible():
-            pytest.skip("Evaluation wizard did not load after clicking Start")
+        assert self.is_wizard_visible(), (
+            "Evaluation wizard did not load after clicking Start"
+        )
         return self
 
     def fill_configuration_tab(

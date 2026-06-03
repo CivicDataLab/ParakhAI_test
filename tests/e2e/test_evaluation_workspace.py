@@ -92,9 +92,9 @@ class TestAIMakerRoleNavigation:
         ws = WorkspacePage(page)
         ws.go_to_workspace()
 
-        if not ws.is_visible(ws.AI_MAKER_CARD, timeout=5_000):
-            pytest.skip("AI Maker card not found — user may not be authenticated")
-
+        assert ws.is_visible(ws.AI_MAKER_CARD, timeout=5_000), (
+            "AI Maker card not visible — user may not be authenticated or platform is slow"
+        )
         ws.select_ai_maker()
         assert ws.is_org_selection_visible() or "/ai-maker" in page.url, (
             "Selecting AI Maker should navigate to org selection or AI Maker route"
@@ -105,9 +105,9 @@ class TestAIMakerRoleNavigation:
         ws = WorkspacePage(page)
         ws.go_to_workspace()
 
-        if not ws.is_visible(ws.AI_MAKER_CARD, timeout=5_000):
-            pytest.skip("AI Maker card not visible")
-
+        assert ws.is_visible(ws.AI_MAKER_CARD, timeout=5_000), (
+            "AI Maker card not visible"
+        )
         ws.select_ai_maker()
         page.wait_for_load_state("domcontentloaded")
 
@@ -125,9 +125,9 @@ class TestAIMakerRoleNavigation:
         ws = WorkspacePage(page)
         ws.go_to_workspace()
 
-        if not ws.is_visible(ws.AI_MAKER_CARD, timeout=5_000):
-            pytest.skip("AI Maker card not visible")
-
+        assert ws.is_visible(ws.AI_MAKER_CARD, timeout=5_000), (
+            "AI Maker card not visible"
+        )
         ws.select_ai_maker()
         assert ws.is_visible(ws.ORG_CIVICDATALAB_CARD), (
             "Expected at least CivicdataLab to be listed on the org-selection screen"
@@ -138,14 +138,15 @@ class TestAIMakerRoleNavigation:
         ws = WorkspacePage(page)
         ws.go_to_workspace()
 
-        if not ws.is_visible(ws.AI_MAKER_CARD, timeout=5_000):
-            pytest.skip("AI Maker card not visible")
-
+        assert ws.is_visible(ws.AI_MAKER_CARD, timeout=5_000), (
+            "AI Maker card not visible"
+        )
         ws.select_ai_maker()
         page.wait_for_load_state("domcontentloaded")
 
-        if not ws.is_visible(ws.ORG_CIVICDATALAB_CARD, timeout=5_000):
-            pytest.skip("CivicdataLab org not visible")
+        assert ws.is_visible(ws.ORG_CIVICDATALAB_CARD, timeout=5_000), (
+            "CivicdataLab org card not visible after selecting AI Maker"
+        )
 
         ws.select_civicdatalab()
         assert "/ai-maker/1" in page.url or "civicdatalab" in page.url.lower(), (
@@ -161,8 +162,9 @@ class TestEvaluatorRoleNavigation:
         ws = WorkspacePage(page)
         ws.go_to_workspace()
 
-        if not ws.is_visible(ws.EVALUATOR_CARD, timeout=5_000):
-            pytest.skip("Evaluator card not visible — user may not be authenticated")
+        assert ws.is_visible(ws.EVALUATOR_CARD, timeout=5_000), (
+            "Evaluator card not visible — user may not be authenticated or platform is slow"
+        )
 
         ws.select_evaluator()
         assert "/auditor" in page.url, (
@@ -174,18 +176,17 @@ class TestEvaluatorRoleNavigation:
         ws = WorkspacePage(page)
         ws.go_to_workspace()
 
-        if not ws.is_visible(ws.AI_MAKER_CARD, timeout=5_000):
-            pytest.skip("AI Maker card not visible")
-
+        assert ws.is_visible(ws.AI_MAKER_CARD, timeout=5_000), (
+            "AI Maker card not visible"
+        )
         ws.select_ai_maker()
-        if not ws.is_visible(ws.ORG_CIVICDATALAB_CARD, timeout=5_000):
-            pytest.skip("CivicdataLab not visible")
-
+        assert ws.is_visible(ws.ORG_CIVICDATALAB_CARD, timeout=5_000), (
+            "CivicdataLab org card not visible after selecting AI Maker"
+        )
         ws.select_civicdatalab()
 
         switch_roles = page.locator("text=Switch Roles")
-        if not switch_roles.is_visible():
-            pytest.skip("Switch Roles link not found on dashboard")
+        assert switch_roles.is_visible(), "Switch Roles link not found on dashboard"
 
         switch_roles.click()
         # SPA navigation uses history.pushState — wait_for_load_state alone
