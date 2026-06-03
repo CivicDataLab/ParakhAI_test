@@ -370,6 +370,7 @@ def authenticated_page_fast(
     context.set_default_timeout(Config.TIMEOUT)
     pg = context.new_page()
     pg.set_default_timeout(Config.TIMEOUT)
+    pg.on("dialog", lambda dialog: dialog.accept())
 
     yield pg
 

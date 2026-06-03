@@ -130,8 +130,9 @@ class TestNewEvaluationModal:
         ep = EvaluationsPage(page)
         ep.go_to_evaluations_list()
         ep.click_new_evaluation()
-        if not ep.is_new_eval_modal_visible():
-            pytest.skip("Modal not visible")
+        assert ep.is_new_eval_modal_visible(), (
+            "Modal not visible — platform may be unavailable or slow"
+        )
         assert ep.is_visible("text=Select AI Model"), (
             "'Select AI Model' label must appear in the modal"
         )
@@ -141,8 +142,9 @@ class TestNewEvaluationModal:
         ep = EvaluationsPage(page)
         ep.go_to_evaluations_list()
         ep.click_new_evaluation()
-        if not ep.is_new_eval_modal_visible():
-            pytest.skip("Modal not visible")
+        assert ep.is_new_eval_modal_visible(), (
+            "Modal not visible — platform may be unavailable or slow"
+        )
         assert ep.is_visible("text=Select Model Version"), (
             "'Select Model Version' label must appear in the modal"
         )
@@ -152,8 +154,9 @@ class TestNewEvaluationModal:
         ep = EvaluationsPage(page)
         ep.go_to_evaluations_list()
         ep.click_new_evaluation()
-        if not ep.is_new_eval_modal_visible():
-            pytest.skip("Modal not visible")
+        assert ep.is_new_eval_modal_visible(), (
+            "Modal not visible — platform may be unavailable or slow"
+        )
         ep.click_modal_cancel()
         page.wait_for_timeout(400)
         assert not ep.is_visible(ep.MODAL_TITLE, timeout=2_000), (
@@ -168,8 +171,9 @@ class TestNewEvaluationModal:
         ep = EvaluationsPage(page)
         ep.go_to_evaluations_list()
         ep.click_new_evaluation()
-        if not ep.is_new_eval_modal_visible():
-            pytest.skip("Modal not visible")
+        assert ep.is_new_eval_modal_visible(), (
+            "Modal not visible — platform may be unavailable or slow"
+        )
         ep.click_modal_start()
         assert ep.is_wizard_visible() or "/evaluations/new" in page.url, (
             "Clicking Start must navigate to the evaluation wizard"
@@ -187,11 +191,11 @@ class TestNewEvaluationWizard:
         ep = EvaluationsPage(page)
         ep.go_to_evaluations_list()
         ep.click_new_evaluation()
-        if not ep.is_new_eval_modal_visible():
-            pytest.skip("Modal not visible")
+        assert ep.is_new_eval_modal_visible(), (
+            "Modal not visible — platform may be unavailable or slow"
+        )
         ep.click_modal_start()
-        if not ep.is_wizard_visible():
-            pytest.skip("Wizard not visible")
+        assert ep.is_wizard_visible(), "Wizard not visible after clicking Start"
         assert ep.is_visible(ep.WIZARD_TAB_CONFIGURATION), (
             "'Evaluation Configuration' tab must be visible and active"
         )
@@ -205,11 +209,11 @@ class TestNewEvaluationWizard:
         ep = EvaluationsPage(page)
         ep.go_to_evaluations_list()
         ep.click_new_evaluation()
-        if not ep.is_new_eval_modal_visible():
-            pytest.skip("Modal not visible")
+        assert ep.is_new_eval_modal_visible(), (
+            "Modal not visible — platform may be unavailable or slow"
+        )
         ep.click_modal_start()
-        if not ep.is_wizard_visible():
-            pytest.skip("Wizard not visible")
+        assert ep.is_wizard_visible(), "Wizard not visible after clicking Start"
         assert ep.is_auto_saved_indicator_visible(), (
             "'Auto-saved' indicator must be visible in the wizard"
         )
@@ -221,11 +225,11 @@ class TestNewEvaluationWizard:
         ep = EvaluationsPage(page)
         ep.go_to_evaluations_list()
         ep.click_new_evaluation()
-        if not ep.is_new_eval_modal_visible():
-            pytest.skip("Modal not visible")
+        assert ep.is_new_eval_modal_visible(), (
+            "Modal not visible — platform may be unavailable or slow"
+        )
         ep.click_modal_start()
-        if not ep.is_wizard_visible():
-            pytest.skip("Wizard not visible")
+        assert ep.is_wizard_visible(), "Wizard not visible after clicking Start"
         missing = []
         for selector in [ep.EVAL_TYPE_TECHNICAL, ep.EVAL_TYPE_DOMAIN, ep.EVAL_TYPE_CULTURAL]:
             if not ep.is_visible(selector, timeout=3_000):
@@ -239,11 +243,11 @@ class TestNewEvaluationWizard:
         ep = EvaluationsPage(page)
         ep.go_to_evaluations_list()
         ep.click_new_evaluation()
-        if not ep.is_new_eval_modal_visible():
-            pytest.skip("Modal not visible")
+        assert ep.is_new_eval_modal_visible(), (
+            "Modal not visible — platform may be unavailable or slow"
+        )
         ep.click_modal_start()
-        if not ep.is_wizard_visible():
-            pytest.skip("Wizard not visible")
+        assert ep.is_wizard_visible(), "Wizard not visible after clicking Start"
         # The Technical Evaluation type label should be present
         assert ep.is_visible(ep.EVAL_TYPE_TECHNICAL), (
             "'Technical Evaluation' must be visible as default option"
@@ -256,11 +260,11 @@ class TestNewEvaluationWizard:
         ep = EvaluationsPage(page)
         ep.go_to_evaluations_list()
         ep.click_new_evaluation()
-        if not ep.is_new_eval_modal_visible():
-            pytest.skip("Modal not visible")
+        assert ep.is_new_eval_modal_visible(), (
+            "Modal not visible — platform may be unavailable or slow"
+        )
         ep.click_modal_start()
-        if not ep.is_wizard_visible():
-            pytest.skip("Wizard not visible")
+        assert ep.is_wizard_visible(), "Wizard not visible after clicking Start"
         page.keyboard.press("End")
         page.wait_for_timeout(300)
         for module_sel in [
@@ -279,11 +283,11 @@ class TestNewEvaluationWizard:
         ep = EvaluationsPage(page)
         ep.go_to_evaluations_list()
         ep.click_new_evaluation()
-        if not ep.is_new_eval_modal_visible():
-            pytest.skip("Modal not visible")
+        assert ep.is_new_eval_modal_visible(), (
+            "Modal not visible — platform may be unavailable or slow"
+        )
         ep.click_modal_start()
-        if not ep.is_wizard_visible():
-            pytest.skip("Wizard not visible")
+        assert ep.is_wizard_visible(), "Wizard not visible after clicking Start"
         ep.click_test_cases_tab()
         page.wait_for_timeout(400)
         assert ep.is_objective_validation_error_visible(), (
@@ -292,18 +296,20 @@ class TestNewEvaluationWizard:
         if ep.is_visible(ep.WIZARD_CANCEL_EVALUATION, timeout=3_000):
             ep.cancel_evaluation()
 
+    @pytest.mark.xfail(reason="App bug #10 — see docs/app_bugs.md", strict=False)
     def test_cancel_evaluation_returns_to_list(self, page: Page):
         """Clicking 'Cancel Evaluation' from the wizard returns to the evaluations list."""
         ep = EvaluationsPage(page)
         ep.go_to_evaluations_list()
         ep.click_new_evaluation()
-        if not ep.is_new_eval_modal_visible():
-            pytest.skip("Modal not visible")
+        assert ep.is_new_eval_modal_visible(), (
+            "Modal not visible — platform may be unavailable or slow"
+        )
         ep.click_modal_start()
-        if not ep.is_wizard_visible():
-            pytest.skip("Wizard not visible")
-        if not ep.is_visible(ep.WIZARD_CANCEL_EVALUATION, timeout=5_000):
-            pytest.skip("Cancel Evaluation button not found in wizard")
+        assert ep.is_wizard_visible(), "Wizard not visible after clicking Start"
+        assert ep.is_visible(ep.WIZARD_CANCEL_EVALUATION, timeout=5_000), (
+            "Cancel Evaluation button not found in wizard"
+        )
         ep.cancel_evaluation()
         assert "/evaluations" in page.url and "new" not in page.url, (
             "After cancelling, URL must return to the evaluations list"
@@ -482,8 +488,9 @@ class TestEvaluationDetail:
         """'Back to List' button returns to the evaluations list."""
         ep = EvaluationsPage(page)
         ep.go_to_evaluation_detail(completed_eval_id)
-        if not ep.is_visible(EvaluationsLocators.BACK_TO_LIST_BUTTON, timeout=5_000):
-            pytest.skip("'Back to List' not found")
+        assert ep.is_visible(EvaluationsLocators.BACK_TO_LIST_BUTTON, timeout=5_000), (
+            "'Back to List' button not found on evaluation detail page"
+        )
         ep.click_back_to_list()
         assert "/evaluations" in page.url and str(completed_eval_id) not in page.url, (
             "'Back to List' must return to the evaluations list page"

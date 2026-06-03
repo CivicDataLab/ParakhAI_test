@@ -43,25 +43,29 @@ def page(authenticated_page_fast):
     return authenticated_page_fast
 
 
-def _navigate_to_civicdatalab_dashboard(page: Page) -> bool:
-    """
-    Helper: navigate the full flow from homepage to CivicdataLab AI Maker dashboard.
-    Returns True on success, False if any step is not available.
+def _navigate_to_civicdatalab_dashboard(page: Page) -> None:
+    """Helper: full navigation from homepage to CivicdataLab AI Maker dashboard.
+
+    Raises AssertionError if any step fails — platform availability is required.
     """
     ws = WorkspacePage(page)
     ws.go_to_workspace()
 
-    if not ws.is_visible(ws.AI_MAKER_CARD, timeout=5_000):
-        return False
+    assert ws.is_visible(ws.AI_MAKER_CARD, timeout=5_000), (
+        "AI Maker card not visible — user may not be authenticated or platform is slow"
+    )
     ws.select_ai_maker()
     page.wait_for_load_state("domcontentloaded")
 
-    if not ws.is_visible(ws.ORG_CIVICDATALAB_CARD, timeout=5_000):
-        return False
+    assert ws.is_visible(ws.ORG_CIVICDATALAB_CARD, timeout=5_000), (
+        "CivicdataLab org card not visible after selecting AI Maker"
+    )
     ws.select_civicdatalab()
     page.wait_for_load_state("domcontentloaded")
 
-    return "/ai-maker/1" in page.url
+    assert "/ai-maker/1" in page.url, (
+        f"Expected /ai-maker/1 in URL after selecting CivicdataLab, got: {page.url}"
+    )
 
 
 class TestFlow01_EntryToDashboard:
@@ -72,9 +76,7 @@ class TestFlow01_EntryToDashboard:
 
     def test_complete_entry_to_dashboard_flow(self, page: Page):
         """Full navigation: home → role selection → org selection → dashboard."""
-        success = _navigate_to_civicdatalab_dashboard(page)
-        if not success:
-            pytest.skip("Role selection or org selection not available — check auth state")
+        _navigate_to_civicdatalab_dashboard(page)
         ai = AIMakerPage(page)
         assert ai.is_overview_visible(), (
             "Flow 1: After navigating to CivicdataLab AI Maker, Overview must be visible"
@@ -82,9 +84,7 @@ class TestFlow01_EntryToDashboard:
 
     def test_overview_stats_load_after_navigation(self, page: Page):
         """Stats cards are visible after completing the entry flow."""
-        success = _navigate_to_civicdatalab_dashboard(page)
-        if not success:
-            pytest.skip("Dashboard entry flow not available")
+        _navigate_to_civicdatalab_dashboard(page)
         ai = AIMakerPage(page)
         assert ai.is_stat_evaluation_runs_visible(), (
             "Flow 1: Evaluation Runs stat must be visible after full entry flow"
@@ -92,9 +92,7 @@ class TestFlow01_EntryToDashboard:
 
     def test_sidebar_is_fully_populated_after_entry(self, page: Page):
         """All sidebar navigation links render after completing the entry flow."""
-        success = _navigate_to_civicdatalab_dashboard(page)
-        if not success:
-            pytest.skip("Dashboard entry flow not available")
+        _navigate_to_civicdatalab_dashboard(page)
         ai = AIMakerPage(page)
         assert ai.is_sidebar_nav_complete(), (
             "Flow 1: All 5 sidebar items must be visible after navigating to dashboard"
@@ -190,18 +188,17 @@ class TestFlow03_NewEvaluationWizardCancel:
         ep = EvaluationsPage(page)
         ep.go_to_evaluations_list()
 
-        if not ep.is_visible(ep.NEW_EVALUATION_BUTTON, timeout=5_000):
-            pytest.skip("New Evaluation button not found")
+        assert ep.is_visible(ep.NEW_EVALUATION_BUTTON, timeout=5_000), (
+            "New Evaluation button not found"
+        )
 
         ep.click_new_evaluation()
-        if not ep.is_new_eval_modal_visible():
-            pytest.skip("New Evaluation modal did not appear")
+        assert ep.is_new_eval_modal_visible(), "New Evaluation modal did not appear"
 
         ep.click_modal_start()
         page.wait_for_load_state("domcontentloaded")
 
-        if not ep.is_wizard_visible():
-            pytest.skip("Wizard not visible after clicking Start")
+        assert ep.is_wizard_visible(), "Wizard not visible after clicking Start"
 
         # Verify wizard is functional before cancelling
         assert ep.is_visible(ep.WIZARD_TAB_CONFIGURATION), (
@@ -222,8 +219,7 @@ class TestFlow03_NewEvaluationWizardCancel:
         initial_row_count = ep.get_evaluation_row_count()
 
         ep.click_new_evaluation()
-        if not ep.is_new_eval_modal_visible():
-            pytest.skip("Modal not visible")
+        assert ep.is_new_eval_modal_visible(), "New Evaluation modal did not appear"
 
         ep.click_modal_start()
         page.wait_for_load_state("domcontentloaded")
@@ -309,8 +305,9 @@ class TestFlow04_EvaluationDetailAndReport:
         page.keyboard.press("End")
         page.wait_for_timeout(300)
 
-        if not ep.is_visible(EvaluationsLocators.BACK_TO_LIST_BUTTON, timeout=5_000):
-            pytest.skip("Back to List button not found")
+        assert ep.is_visible(EvaluationsLocators.BACK_TO_LIST_BUTTON, timeout=5_000), (
+            "'Back to List' button not found on evaluation detail page"
+        )
 
         ep.click_back_to_list()
         assert "/evaluations" in page.url and "288" not in page.url, (
@@ -331,8 +328,9 @@ class TestFlow05_PromptLibrarySearch:
         """Sidebar Prompt Libraries link from dashboard navigates correctly."""
         ai = AIMakerPage(page)
         ai.go_to_dashboard()
-        if not ai.is_visible(ai.SIDEBAR_PROMPT_LIBRARIES, timeout=5_000):
-            pytest.skip("Prompt Libraries sidebar link not found")
+        assert ai.is_visible(ai.SIDEBAR_PROMPT_LIBRARIES, timeout=5_000), (
+            "Prompt Libraries sidebar link not found"
+        )
         ai.go_to_prompt_libraries()
         pl = PromptLibrariesPage(page)
         assert pl.is_page_loaded(), (
@@ -365,8 +363,9 @@ class TestFlow06_EvaluatorsTeamReview:
         """Sidebar Evaluators link navigates to the evaluators management page."""
         ai = AIMakerPage(page)
         ai.go_to_dashboard()
-        if not ai.is_visible(ai.SIDEBAR_EVALUATORS, timeout=5_000):
-            pytest.skip("Evaluators sidebar link not found")
+        assert ai.is_visible(ai.SIDEBAR_EVALUATORS, timeout=5_000), (
+            "Evaluators sidebar link not found"
+        )
         ai.go_to_evaluators()
         ep = EvaluatorsPage(page)
         assert ep.is_page_loaded(), (
@@ -398,8 +397,9 @@ class TestFlow07_RoleSwitching:
         """Switch Roles from AI Maker dashboard → Evaluator role."""
         ai = AIMakerPage(page)
         ai.go_to_dashboard()
-        if not ai.is_visible(ai.SWITCH_ROLES_LINK, timeout=5_000):
-            pytest.skip("Switch Roles not found on AI Maker dashboard")
+        assert ai.is_visible(ai.SWITCH_ROLES_LINK, timeout=5_000), (
+            "Switch Roles link not found on AI Maker dashboard"
+        )
 
         ai.click_switch_roles()
         ws = WorkspacePage(page)
@@ -426,8 +426,9 @@ class TestFlow07_RoleSwitching:
         """Evaluator can navigate to the Assigned Models page."""
         er = EvaluatorRolePage(page)
         er.go_to_evaluator_home()
-        if not er.is_visible(er.SIDEBAR_ASSIGNED_MODELS, timeout=5_000):
-            pytest.skip("Assigned Models link not found")
+        assert er.is_visible(er.SIDEBAR_ASSIGNED_MODELS, timeout=5_000), (
+            "Assigned Models sidebar link not found"
+        )
         er.click_assigned_models()
         assert er.is_assignments_page_loaded(), (
             "Flow 7: Assigned Models page must load for Evaluator role"
@@ -437,8 +438,9 @@ class TestFlow07_RoleSwitching:
         """Evaluator can navigate to the Evaluations page."""
         er = EvaluatorRolePage(page)
         er.go_to_evaluator_home()
-        if not er.is_visible(er.SIDEBAR_EVALUATIONS, timeout=5_000):
-            pytest.skip("Evaluations link not found")
+        assert er.is_visible(er.SIDEBAR_EVALUATIONS, timeout=5_000), (
+            "Evaluations sidebar link not found"
+        )
         er.click_evaluations()
         assert "/evaluations" in page.url, (
             "Flow 7: Evaluator evaluations page URL must contain /evaluations"
