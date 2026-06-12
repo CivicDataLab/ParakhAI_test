@@ -495,8 +495,8 @@ def completed_eval_id(request) -> int:
         pytest.skip(f"Could not acquire access token for COMPLETED eval lookup: {exc}")
 
     list_q = """
-        query Audits($status: String) {
-          audits(status: $status) { id status }
+        query Audits($filters: [FilterSpec!]) {
+          audits(filters: $filters) { data { id status } totalItemsCount }
         }
     """
     detail_q = """
@@ -506,7 +506,11 @@ def completed_eval_id(request) -> int:
           }
         }
     """
-    audits = (graphql(token, org_id, list_q, variables={"status": "COMPLETED"}).get("audits") or [])
+    wrapper = graphql(
+        token, org_id, list_q,
+        variables={"filters": [{"field": "status", "condition": "exact", "value": "COMPLETED"}]}
+    ).get("audits") or {}
+    audits = wrapper.get("data") or []
     if not audits:
         pytest.skip("No COMPLETED evaluation found on this environment")
 

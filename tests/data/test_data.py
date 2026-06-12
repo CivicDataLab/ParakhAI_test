@@ -174,7 +174,7 @@ class TestGraphQL:
     QUERY_MY_MODELS = "query MyModels { myModels { id name modelType } }"
     QUERY_MY_AUDITS = "query MyAudits { myAudits { id } }"
     QUERY_AUDITS = """
-        query Audits($limit: Int, $offset: Int, $filters: [FilterSpec]) {
+        query Audits($limit: Int, $offset: Int, $filters: [FilterSpec!]) {
           audits(limit: $limit, offset: $offset, filters: $filters) {
             data { id name status modelId }
             totalItemsCount
