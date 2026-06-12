@@ -69,28 +69,16 @@ class NewEvaluationPage(BasePage):
         """Navigate to the evaluations list page."""
         self.navigate(self.list_url)
         self.wait_for_load("domcontentloaded")
-        # TODO: TEMP — dashboard shows 'Verifying your session...' on every
-        # protected-route navigation before rendering content. Wait for it to
-        # clear. Remove once the platform handles session checks transparently.
-        try:
-            self.page.wait_for_function(
-                "() => !document.body.innerText.includes('Verifying your session')",
-                timeout=15_000,
-            )
-        except Exception:
-            pass  # let the test assertion surface the real failure
-        # TODO: TEMP — evaluations list has the same multi-reload rendering issue
-        # as the homepage. If the 'New Evaluation' button is not visible after
-        # session verification, reload up to twice to recover.
-        for _ in range(2):
-            if self.is_visible(self.NEW_EVALUATION_BUTTON, timeout=5_000):
-                break
-            self.page.reload(wait_until="load", timeout=self.timeout)
-            self.page.wait_for_timeout(2_000)
+        # The dashboard shows a 'Verifying your session...' curtain on every
+        # cold protected-route load before rendering content. On a cold
+        # deep-link load this can take well over 5s; reloading restarts the
+        # check, so we wait it out rather than refresh (see
+        # base_page.wait_for_app_ready for the full rationale).
+        self.wait_for_app_ready(60_000)
         # Give the evaluations table data time to load before callers inspect rows.
         try:
             self.page.wait_for_selector(
-                EvaluationsLocators.EVAL_TABLE_ROW, timeout=10_000
+                EvaluationsLocators.EVAL_TABLE_ROW, timeout=30_000
             )
         except Exception:
             pass
@@ -105,11 +93,25 @@ class NewEvaluationPage(BasePage):
     # ── Modal ─────────────────────────────────────────────────────────────────
 
     def click_new_evaluation(self) -> NewEvaluationPage:
-        """Click the 'New Evaluation' button to open the modal."""
+        """Click the 'New Evaluation' button and wait for the modal to be ready.
+
+        The modal title paints immediately, but the model/version dropdowns are
+        gated behind a 'Loading models...' curtain that can take ~20s to resolve
+        on dev. Callers assert on the dropdown labels straight after, so wait the
+        curtain out here rather than racing it with a short fixed sleep.
+        """
         loc = self.page.locator(self.NEW_EVALUATION_BUTTON).first
         loc.wait_for(state="visible", timeout=self.timeout)
         loc.click()
-        self.page.wait_for_timeout(500)
+        # Wait for the 'Loading models...' curtain inside the modal to clear.
+        # Until it does, no model/version is selected and the Start button stays
+        # aria-disabled, so use a generous budget (dev can take 30s+ under load).
+        try:
+            self.page.locator("text=/^Loading models/i").first.wait_for(
+                state="hidden", timeout=60_000
+            )
+        except Exception:
+            pass  # absent or already gone — let the caller's assertion surface it
         return self
 
     def is_modal_visible(self) -> bool:
@@ -145,16 +147,24 @@ class NewEvaluationPage(BasePage):
 
     def modal_version_dropdown_has_options(self) -> bool:
         """
-        Return True if the 'Select Model Version' dropdown contains at least one option.
+        Return True if the 'Select Model Version' dropdown contains at least one
+        selectable version.
 
-        NOTE: Same stabilisation note as modal_model_dropdown_has_options.
+        Unlike the model dropdown, a model may expose a single version (e.g.
+        '1.0 (Latest)') — so the threshold here is >= 1 real option, not > 1.
+        The version <select> has no placeholder <option>, so every option is a
+        real, selectable version. Target it by accessible name to avoid relying
+        on the positional index of <select> elements on the page.
         """
+        version_select = self.page.get_by_role(
+            "combobox", name="Select Model Version"
+        ).first
+        if version_select.is_visible():
+            return version_select.locator("option").count() >= 1
+        # Fallback: the second native <select> in the modal is the version one.
         selects = self.page.locator("select")
-        count = selects.count()
-        if count >= 2:
-            version_select = selects.nth(1)
-            if version_select.is_visible():
-                return version_select.locator("option").count() > 1
+        if selects.count() >= 2 and selects.nth(1).is_visible():
+            return selects.nth(1).locator("option").count() >= 1
         return self.is_visible(EvaluationsLocators.MODAL_VERSION_OPTION, timeout=3_000)
 
     def select_first_model_and_version(self) -> None:
@@ -188,20 +198,35 @@ class NewEvaluationPage(BasePage):
         """Click 'Start' in the modal and wait for the wizard page to render."""
         # Use .first to avoid strict mode — the modal may render an enabled
         # "Start New Evaluation" button alongside a disabled "Start" button.
-        loc = self.page.locator(self.MODAL_START_BUTTON).first
-        loc.wait_for(state="visible", timeout=self.timeout)
+        # Target the *enabled* Start button: it renders aria-disabled until a
+        # model + version are selected (which only happens once the modal's
+        # model list has loaded). Waiting for the enabled one avoids a 30s
+        # auto-wait spent clicking a button that is still disabled.
+        enabled_start = self.page.locator(
+            "button:has-text('Start'):not([aria-disabled='true']):not([disabled])"
+        ).first
+        try:
+            enabled_start.wait_for(state="visible", timeout=self.timeout)
+            loc = enabled_start
+        except Exception:
+            loc = self.page.locator(self.MODAL_START_BUTTON).first
+            loc.wait_for(state="visible", timeout=self.timeout)
         loc.click()
         # Wait for the SPA URL change to /evaluations/new
         try:
             self.page.wait_for_url("**/evaluations/new**", timeout=self.timeout)
         except Exception:
             self.page.wait_for_timeout(2_000)
-        # TODO: TEMP — wizard page has the same multi-reload rendering issue as the
-        # homepage (Next.js hydration). Reload to force proper component mount.
-        # Remove once the platform rendering bug is resolved.
-        self.page.wait_for_timeout(1_000)
-        self.page.reload(wait_until="load", timeout=self.timeout)
-        self.page.wait_for_timeout(2_000)
+        # The wizard mounts client-side from this navigation and renders without
+        # a refresh. Do NOT reload here: a reload cold-loads the wizard URL,
+        # which re-triggers the ~20s 'Verifying your session...' curtain for no
+        # benefit. Wait for the Configuration tab to confirm the wizard mounted.
+        try:
+            self.page.locator(self.WIZARD_TAB_CONFIGURATION).first.wait_for(
+                state="visible", timeout=self.timeout
+            )
+        except Exception:
+            pass  # let the caller's assertion surface the real failure
         return self
 
     def click_modal_cancel(self) -> None:
@@ -452,24 +477,28 @@ class NewEvaluationPage(BasePage):
             self.page.wait_for_url("**auditId=**", timeout=self.timeout)
         except Exception:
             self.page.wait_for_timeout(3_000)
-        self.page.wait_for_timeout(1_000)
-        # Conditional reload: an older workaround forced a reload here because
-        # the Test Cases tab sometimes rendered blank after the auditId URL
-        # change. The reload itself can put the SPA back on the Configuration
-        # tab depending on routing — hurting more than it helps. Only reload
-        # if neither the dataset table nor a module card has rendered after a
-        # short wait. Verified via Playwright MCP 2026-05-08 that the happy
-        # path no longer needs a reload.
+        # Persisting the draft triggers a re-fetch gated behind a
+        # 'Loading evaluation details...' curtain that can take ~30-60s on dev,
+        # during which the page stays on the Configuration tab; once it clears
+        # the app auto-advances to the Test Cases tab. Wait it out — do NOT
+        # reload (a reload cold-loads the wizard URL and re-triggers the ~20s
+        # 'Verifying your session...' curtain, and bounces back to Configuration).
+        try:
+            self.page.locator("text=/^Loading evaluation details/i").first.wait_for(
+                state="hidden", timeout=60_000
+            )
+        except Exception:
+            pass  # absent or already gone
+        # Confirm we actually landed on the Test Cases tab by waiting for its
+        # real content: the manual module-selection cards (specific class, no
+        # false-match on the Configuration tab) or the automated dataset table.
         try:
             self.page.locator(
-                f"{EvaluationsLocators.AUTOMATED_DATASET_TABLE}, "
-                f"{EvaluationsLocators.MANUAL_MODULE_CARD}"
-            ).first.wait_for(state="visible", timeout=4_000)
-            return
+                "[class*='moduleselectioncard'], "
+                ":text('Select Prompt Datasets')"
+            ).first.wait_for(state="visible", timeout=20_000)
         except Exception:
-            pass
-        self.page.reload(wait_until="load", timeout=self.timeout)
-        self.page.wait_for_timeout(2_000)
+            pass  # let the caller's wait_for_* assertion surface the real failure
 
     # ── Wizard — Test Cases tab (Automated) ────────────────────────────────────
 
@@ -535,19 +564,25 @@ class NewEvaluationPage(BasePage):
         Wait for at least `min_count` module cards to render on the Test Cases
         tab (Manual mode). Returns True on success, False on timeout. Use this
         instead of `is_module_card_visible()` directly after
-        `click_add_test_cases()` — module cards hydrate after the post-reload
-        SPA settle.
+        `click_add_test_cases()` — module cards hydrate after the SPA settle.
+
+        Counts the specific module-selection card class only. The broad
+        `MANUAL_MODULE_CARD` fallback chain must NOT be used here: its
+        `div:has(:text('Hallucination...')):has(:text('Test Cases'))` clause
+        also matches the Configuration tab (module checkbox label + 'Test Cases'
+        tab button), which would report a false positive while the Test Cases
+        tab is still behind the 'Loading evaluation details...' curtain.
         """
+        card_selector = "[class*='moduleselectioncard']"
         try:
             self.page.wait_for_function(
-                f"""() => document.querySelectorAll(
-                    "{EvaluationsLocators.MANUAL_MODULE_CARD.split(',')[0].strip()}"
-                ).length >= {min_count}""",
+                f'() => document.querySelectorAll("{card_selector}").length'
+                f" >= {min_count}",
                 timeout=timeout,
             )
             return True
         except Exception:
-            return self.get_module_card_count() >= min_count
+            return self.page.locator(card_selector).count() >= min_count
 
     def click_first_module_card(self) -> None:
         """
@@ -707,6 +742,18 @@ class NewEvaluationPage(BasePage):
             modules = ["hallucination"]
 
         self.select_evaluation_type(eval_type)
+        # The Scope dropdown, module checkboxes, and (enabled) Mode dropdown all
+        # render together only after the wizard's 'Loading modules...' fetch
+        # resolves — which can take ~30s+ on dev. Wait it out once here so the
+        # field interactions below don't each race the same curtain with their
+        # own timeout (the cause of intermittent 'select[name=auditScope]'
+        # timeouts when the suite runs back-to-back).
+        try:
+            self.page.locator("text=/^Loading modules/i").first.wait_for(
+                state="hidden", timeout=45_000
+            )
+        except Exception:
+            pass  # absent or already gone — field waits below will surface issues
         self.select_evaluation_scope(scope)
         self.fill_evaluation_objective(objective)
         # Check modules BEFORE selecting mode — mode dropdown starts disabled

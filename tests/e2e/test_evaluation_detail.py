@@ -79,7 +79,6 @@ class TestEvaluationDetailSampleIssues:
 class TestEvaluationDetailBackNavigation:
     """The Back to List button returns to the evaluations list."""
 
-    @pytest.mark.xfail(reason="App bug #6 — see docs/app_bugs.md", strict=False)
     def test_back_button_removes_eval_id_from_url(self, authenticated_page, completed_eval_id):
         ep = _go(authenticated_page, completed_eval_id)
         if not ep.is_visible(EvaluationDetailLocators.BACK_TO_LIST):

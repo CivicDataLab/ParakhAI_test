@@ -21,6 +21,9 @@ class ModelsLocators:
     MODEL_CARD_TITLE = "[class*='card' i] a, [class*='title' i] a"
     MODEL_TYPE_BADGE = "text=Text Generation"
 
+    # ── Models list: new action buttons (Jun 2026) ────────────────────────────
+    ADD_A_NEW_MODEL_BUTTON = "button:has-text('Add A New Model'), a:has-text('Add A New Model')"
+
     # Model card metadata
     MODEL_DATE = "[class*='date'], [class*='Date']"
     MODEL_TEST_CASES = "text=test cases"
@@ -52,6 +55,19 @@ class ModelsLocators:
     DATE_UPDATED_COL = "text=DATE UPDATED"
     CAPABILITIES_COL = "text=CAPABILITIES"
     LIFECYCLE_STAGE_COL = "text=LIFECYCLE STAGE"
+
+    # ── Model detail: new action buttons (Jun 2026) ───────────────────────────
+    EDIT_MODEL_BUTTON = "button:has-text('Edit model'), a:has-text('Edit model')"
+    # opub-ui Button renders disabled as aria-disabled; fallback covers native disabled too.
+    START_EVALUATION_BUTTON_DISABLED = (
+        "button:has-text('Start Evaluation')[aria-disabled='true'], "
+        "button:has-text('Start Evaluation')[disabled]"
+    )
+    DEPRECATED_TOAST = (
+        "[class*='toast']:has-text('deprecated'), "
+        "[role='alert']:has-text('deprecated'), "
+        "text=Sorry this model version is deprecated"
+    )
 
     # Past evaluations table
     PAST_EVALUATIONS_HEADING = "text=Past Evaluations"

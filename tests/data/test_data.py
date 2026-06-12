@@ -174,8 +174,11 @@ class TestGraphQL:
     QUERY_MY_MODELS = "query MyModels { myModels { id name modelType } }"
     QUERY_MY_AUDITS = "query MyAudits { myAudits { id } }"
     QUERY_AUDITS = """
-        query Audits($status: String, $modelId: ID) {
-          audits(status: $status, modelId: $modelId) { id name status modelId }
+        query Audits($limit: Int, $offset: Int, $filters: [FilterSpec]) {
+          audits(limit: $limit, offset: $offset, filters: $filters) {
+            data { id name status modelId }
+            totalItemsCount
+          }
         }
     """
     QUERY_AUDIT = """
@@ -192,14 +195,26 @@ class TestGraphQL:
           auditMetrics { evaluationRuns testCasesCount models issuesFlagged }
         }
     """
+    QUERY_AUDITOR_METRICS = """
+        query AuditorMetrics {
+          auditorMetrics {
+            assignmentsCount assignmentsAccepted assignmentsDeclined
+            assignmentsPending assignmentsCompleted
+            auditsDone testCasesCount failedTestCasesCount
+          }
+        }
+    """
     QUERY_AUDIT_DOMAIN_OPTIONS = """
         query AuditDomainOptions($domain: String!) {
           auditDomainOptions(domain: $domain) { code displayName }
         }
     """
     QUERY_AUDIT_TESTS = """
-        query AuditTests($auditId: ID!) {
-          auditTests(auditId: $auditId) { id testInput }
+        query AuditTests($auditId: ID!, $limit: Int, $offset: Int) {
+          auditTests(auditId: $auditId, limit: $limit, offset: $offset) {
+            data { id testInput }
+            totalItemsCount
+          }
         }
     """
     QUERY_AUDIT_TASKS = """
