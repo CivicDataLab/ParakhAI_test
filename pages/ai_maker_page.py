@@ -45,6 +45,17 @@ class AIMakerPage(BasePage):
         self.wait_for_app_ready()
         return self
 
+    def go_to_landing(self) -> "AIMakerPage":
+        """Navigate to the AI Maker landing/org-selection page (no org id).
+
+        This is a distinct page from the per-org dashboard (`/ai-maker/{org}`):
+        it lists the user's organisations and hosts the **Add Organisation**
+        primary button. The org dashboard does NOT carry that button.
+        """
+        self.navigate(Config.url("/dashboard/ai-maker"))
+        self.wait_for_app_ready()
+        return self
+
     def go_to_models(self) -> None:
         self.click(self.SIDEBAR_MODELS)
         self.wait_for_app_ready()

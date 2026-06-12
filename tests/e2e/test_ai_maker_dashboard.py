@@ -216,17 +216,15 @@ class TestAIMakerButtons:
     """New action buttons trigger AlertDialogs for external CivicDataSpace redirects."""
 
     def test_add_organisation_button_is_visible(self, page: Page):
-        from locators.ai_maker_locators import AIMakerLocators
         ai = AIMakerPage(page)
-        ai.go_to_dashboard()
+        ai.go_to_landing()
         assert ai.is_visible(ai.ADD_ORGANISATION_BUTTON), (
             "'Add Organisation' button must be visible on the AI Maker landing page"
         )
 
     def test_add_organisation_button_opens_dialog(self, page: Page):
-        from locators.ai_maker_locators import AIMakerLocators
         ai = AIMakerPage(page)
-        ai.go_to_dashboard()
+        ai.go_to_landing()
         if not ai.is_visible(ai.ADD_ORGANISATION_BUTTON):
             pytest.skip("'Add Organisation' button not found")
         ai.click(ai.ADD_ORGANISATION_BUTTON)
@@ -239,9 +237,8 @@ class TestAIMakerButtons:
         )
 
     def test_add_organisation_dialog_can_be_dismissed(self, page: Page):
-        from locators.ai_maker_locators import AIMakerLocators
         ai = AIMakerPage(page)
-        ai.go_to_dashboard()
+        ai.go_to_landing()
         if not ai.is_visible(ai.ADD_ORGANISATION_BUTTON):
             pytest.skip("'Add Organisation' button not found")
         ai.click(ai.ADD_ORGANISATION_BUTTON)
@@ -261,7 +258,10 @@ class TestAIMakerButtons:
         from pages.models_page import ModelsPage
         mp = ModelsPage(page)
         mp.go_to_models_list()
-        visible = page.locator(ModelsLocators.ADD_A_NEW_MODEL_BUTTON).count() > 0
+        # Use the auto-waiting is_visible (count() does not wait) with a generous
+        # budget — the models list sits behind the session curtain + a data query
+        # that can take ~45s on dev.
+        visible = mp.is_visible(ModelsLocators.ADD_A_NEW_MODEL_BUTTON, timeout=50_000)
         assert visible, (
             "'Add A New Model' button must be visible on the models list page"
         )

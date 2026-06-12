@@ -102,6 +102,11 @@ class TestAuditorDashboardMetrics:
             EvaluatorRoleLocators.STAT_TEST_CASES,
             EvaluatorRoleLocators.STAT_ISSUES_FLAGGED,
         ]
+        # The Overview stat cards render only after the dashboard's data query
+        # resolves, which can take ~45s on dev. Gate on the first card so the
+        # per-label is_visible() checks below don't race the data arrival (the
+        # cause of the earlier intermittent "found 2 of 4").
+        base.is_visible(labels[0], timeout=50_000)
         visible_count = sum(1 for sel in labels if base.is_visible(sel))
         assert visible_count >= 3, (
             f"Expected at least 3 auditor stat card labels, found {visible_count}"
@@ -116,6 +121,7 @@ class TestAuditorDashboardMetrics:
         base = BasePage(authenticated_page)
         base.navigate(Config.url(self.AUDITOR_DASHBOARD_PATH))
         base.wait_for_app_ready()
+        base.is_visible(EvaluatorRoleLocators.STAT_EVALUATION_RUNS, timeout=50_000)
         # Fetch the text near each label and check it contains a digit.
         for sel in [
             EvaluatorRoleLocators.STAT_INVITATIONS_RECEIVED,
