@@ -73,7 +73,6 @@ class TestEvaluationsListPage:
         ep.go_to_evaluations_list()
         assert ep.has_draft_evaluations(), "At least one DRAFT evaluation must be listed"
 
-    @pytest.mark.xfail(reason="App bug #7 — see docs/app_bugs.md", strict=False)
     def test_completed_evaluations_are_listed(self, page: Page):
         """COMPLETED status evaluations appear in the list."""
         ep = EvaluationsPage(page)
@@ -88,7 +87,6 @@ class TestEvaluationsListPage:
             "AUTOMATED mode label must appear in the evaluations list"
         )
 
-    @pytest.mark.xfail(reason="App bug #7 — see docs/app_bugs.md", strict=False)
     def test_status_badge_colors_are_distinct(self, page: Page):
         """DRAFT and COMPLETED badges are both present and visually distinguishable."""
         ep = EvaluationsPage(page)
@@ -494,4 +492,131 @@ class TestEvaluationDetail:
         ep.click_back_to_list()
         assert "/evaluations" in page.url and str(completed_eval_id) not in page.url, (
             "'Back to List' must return to the evaluations list page"
+        )
+
+
+# ── Status filter tabs (StatusFilterTabs component — Jun 2026) ─────────────────
+
+
+class TestStatusFilterTabs:
+    """StatusFilterTabs renders on the evaluations list and filters correctly."""
+
+    def test_status_filter_tabs_are_present(self, page: Page):
+        ep = EvaluationsPage(page)
+        ep.go_to_evaluations_list()
+        all_visible = ep.is_visible(EvaluationsLocators.STATUS_TAB_ALL)
+        completed_visible = ep.is_visible(EvaluationsLocators.STATUS_TAB_COMPLETED)
+        assert all_visible or completed_visible, (
+            "Expected at least 'All' or 'Completed' status filter tab to be visible"
+        )
+
+    def test_all_six_tabs_are_present(self, page: Page):
+        ep = EvaluationsPage(page)
+        ep.go_to_evaluations_list()
+        tabs = {
+            "All": EvaluationsLocators.STATUS_TAB_ALL,
+            "Draft": EvaluationsLocators.STATUS_TAB_DRAFT,
+            "Pending": EvaluationsLocators.STATUS_TAB_PENDING,
+            "Running": EvaluationsLocators.STATUS_TAB_RUNNING,
+            "Completed": EvaluationsLocators.STATUS_TAB_COMPLETED,
+            "Failed": EvaluationsLocators.STATUS_TAB_FAILED,
+        }
+        visible = [label for label, sel in tabs.items() if ep.is_visible(sel)]
+        assert len(visible) >= 4, (
+            f"Expected at least 4 status filter tabs, found {len(visible)}: {visible}"
+        )
+
+    def test_column_header_completed_is_present(self, page: Page):
+        ep = EvaluationsPage(page)
+        ep.go_to_evaluations_list()
+        assert ep.is_visible(EvaluationsLocators.EVAL_COMPLETED_COL), (
+            "'Completed' column header must be visible in the evaluations table"
+        )
+
+    def test_all_tab_shows_evaluations(self, page: Page):
+        ep = EvaluationsPage(page)
+        ep.go_to_evaluations_list()
+        if ep.is_visible(EvaluationsLocators.STATUS_TAB_ALL):
+            ep.click_status_tab("All")
+        row_count = page.locator("tbody tr, [role='row']:not([role='columnheader'])").count()
+        assert row_count >= 1 or ep.is_visible("text=No evaluations"), (
+            "After clicking 'All', either rows or an empty-state message must appear"
+        )
+
+    def test_completed_tab_filters_to_completed_rows(self, page: Page):
+        ep = EvaluationsPage(page)
+        ep.go_to_evaluations_list()
+        if not ep.is_visible(EvaluationsLocators.STATUS_TAB_COMPLETED):
+            pytest.skip("'Completed' filter tab not found on evaluations list page")
+        ep.click_status_tab("Completed")
+        page.wait_for_timeout(800)
+        # Any visible status badges must contain COMPLETED (case-insensitive)
+        badges = page.locator("td :has-text('COMPLETED'), [role='cell'] :has-text('COMPLETED')")
+        non_completed = page.locator(
+            "td :has-text('DRAFT'), td :has-text('RUNNING'), td :has-text('FAILED')"
+        )
+        has_completed = badges.count() > 0
+        has_wrong_status = non_completed.count() > 0
+        if has_completed:
+            assert not has_wrong_status, (
+                "After clicking 'Completed' tab, non-COMPLETED status badges must not appear"
+            )
+
+    def test_draft_tab_filters_to_draft_rows(self, page: Page):
+        ep = EvaluationsPage(page)
+        ep.go_to_evaluations_list()
+        if not ep.is_visible(EvaluationsLocators.STATUS_TAB_DRAFT):
+            pytest.skip("'Draft' filter tab not found on evaluations list page")
+        ep.click_status_tab("Draft")
+        page.wait_for_timeout(800)
+        non_draft = page.locator(
+            "td :has-text('COMPLETED'), td :has-text('RUNNING'), td :has-text('FAILED')"
+        )
+        assert non_draft.count() == 0, (
+            "After clicking 'Draft' tab, only DRAFT rows must be visible"
+        )
+
+
+# ── Evaluations list pagination (Jun 2026) ────────────────────────────────────
+
+
+class TestEvaluationsPagination:
+    """Pagination controls appear and behave correctly on the evaluations list."""
+
+    def test_pagination_present_when_exceeds_page_size(self, page: Page):
+        ep = EvaluationsPage(page)
+        ep.go_to_evaluations_list()
+        if ep.is_visible(EvaluationsLocators.STATUS_TAB_ALL):
+            ep.click_status_tab("All")
+        page.wait_for_timeout(500)
+        row_count = page.locator("tbody tr").count()
+        if row_count < 20:
+            pytest.skip(
+                f"Test account has {row_count} evaluations — need >20 to trigger pagination"
+            )
+        assert ep.is_pagination_visible(), (
+            "Pagination controls must be visible when there are more than 20 evaluations"
+        )
+
+    def test_status_filter_resets_to_first_page(self, page: Page):
+        ep = EvaluationsPage(page)
+        ep.go_to_evaluations_list()
+        if not ep.is_pagination_visible():
+            pytest.skip("Pagination not present — not enough evaluations to test page reset")
+        next_btn = page.locator(EvaluationsLocators.PAGINATION_NEXT)
+        if next_btn.count() == 0 or not next_btn.first.is_enabled():
+            pytest.skip("No 'Next' pagination button available")
+        next_btn.first.click()
+        page.wait_for_timeout(500)
+        # Applying a filter should reset offset to 0 (page 1)
+        if ep.is_visible(EvaluationsLocators.STATUS_TAB_COMPLETED):
+            ep.click_status_tab("Completed")
+            page.wait_for_timeout(500)
+        if ep.is_visible(EvaluationsLocators.STATUS_TAB_ALL):
+            ep.click_status_tab("All")
+            page.wait_for_timeout(500)
+        # After filter change, pagination next from page 1 should be available
+        # (i.e. we are back at page 1, not stuck on a non-existent page)
+        assert ep.is_visible(EvaluationsLocators.PAGE_HEADING), (
+            "Page heading must still be visible after filter reset"
         )

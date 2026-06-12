@@ -31,6 +31,17 @@ class AIMakerLocators:
     STAT_ISSUES_FLAGGED = "text=Issues Flagged"
     STAT_CARD = "[class*='stat'], [class*='card'], [class*='Card']"
 
+    # ── Org selection page: Add Organisation button (Jun 2026) ───────────────
+    ADD_ORGANISATION_BUTTON = (
+        "button:has-text('Add Organisation'), a:has-text('Add Organisation')"
+    )
+    # AlertDialog opened by Add Organisation / Add A New Model / Edit model buttons.
+    # The dialog title and "Yes, continue" CTA are stable text anchors.
+    EXTERNAL_REDIRECT_DIALOG = (
+        "[role='alertdialog'], [role='dialog'], [class*='AlertDialog'], [class*='alertdialog']"
+    )
+    EXTERNAL_REDIRECT_CONFIRM = "button:has-text('Yes, continue')"
+
     # ── Models section on home ─────────────────────────────────────────────────
     MODELS_SECTION_HEADING = "text=Models"
     # Playwright's `text=` engine treats commas as literal text; the original

@@ -81,3 +81,51 @@ class TestAuditorModelDetailPage:
         assert has_accept or has_start, (
             "Version rows exist but neither Accept nor Start button is visible"
         )
+
+
+# ── Auditor dashboard: real metrics from auditorMetrics API (Jun 2026) ─────────
+
+
+class TestAuditorDashboardMetrics:
+    """Stat cards on /dashboard/auditor are populated from the auditorMetrics API."""
+
+    AUDITOR_DASHBOARD_PATH = "/dashboard/auditor"
+
+    def test_auditor_stat_card_labels_are_rendered(self, authenticated_page):
+        from locators.evaluator_role_locators import EvaluatorRoleLocators
+        base = BasePage(authenticated_page)
+        base.navigate(Config.url(self.AUDITOR_DASHBOARD_PATH))
+        base.wait_for_app_ready()
+        labels = [
+            EvaluatorRoleLocators.STAT_INVITATIONS_RECEIVED,
+            EvaluatorRoleLocators.STAT_EVALUATION_RUNS,
+            EvaluatorRoleLocators.STAT_TEST_CASES,
+            EvaluatorRoleLocators.STAT_ISSUES_FLAGGED,
+        ]
+        visible_count = sum(1 for sel in labels if base.is_visible(sel))
+        assert visible_count >= 3, (
+            f"Expected at least 3 auditor stat card labels, found {visible_count}"
+        )
+
+    @pytest.mark.xfail(
+        strict=False,
+        reason="Stat values may be 0 for the test account if it has no auditor assignments",
+    )
+    def test_auditor_stat_cards_show_numeric_values(self, authenticated_page):
+        from locators.evaluator_role_locators import EvaluatorRoleLocators
+        base = BasePage(authenticated_page)
+        base.navigate(Config.url(self.AUDITOR_DASHBOARD_PATH))
+        base.wait_for_app_ready()
+        # Fetch the text near each label and check it contains a digit.
+        for sel in [
+            EvaluatorRoleLocators.STAT_INVITATIONS_RECEIVED,
+            EvaluatorRoleLocators.STAT_EVALUATION_RUNS,
+        ]:
+            if not base.is_visible(sel):
+                continue
+            parent = authenticated_page.locator(sel).locator("..")
+            texts = " ".join(parent.all_inner_texts())
+            has_digit = any(ch.isdigit() for ch in texts)
+            assert has_digit, (
+                f"Stat card for '{sel}' must show a numeric value, got: {texts!r}"
+            )

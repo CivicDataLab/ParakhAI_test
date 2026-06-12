@@ -72,3 +72,34 @@ class TestCancelFromModal:
         assert "/evaluations/new" not in authenticated_page.url, (
             f"Should remain on evaluations list, got: {authenticated_page.url}"
         )
+
+
+class TestCancelNavigation:
+    """Cancel uses client-side router.push (Jun 2026) — browser Back must work cleanly."""
+
+    @pytest.mark.regression_write
+    def test_cancel_browser_back_does_not_loop(self, authenticated_page: Page, sandbox_org, cleanup_evaluation):
+        """After cancelling, pressing browser Back must resolve to a clean page (no redirect loop)."""
+        nep = _open_wizard(authenticated_page)
+        # Record the audit ID if the wizard created a draft so cleanup can cancel it.
+        audit_id = nep.get_audit_id_from_url()
+        if audit_id:
+            cleanup_evaluation.append(audit_id)
+
+        nep.cancel_evaluation()
+        list_url = authenticated_page.url
+
+        # Navigate Back — with router.push the history stack has the list page,
+        # so Back should go to the page visited before the evaluations list.
+        authenticated_page.go_back()
+        authenticated_page.wait_for_timeout(800)
+
+        final_url = authenticated_page.url
+        # Must not end up stuck on /evaluations/new after pressing Back.
+        assert "/evaluations/new" not in final_url, (
+            f"Browser Back after cancel landed on wizard URL: {final_url}"
+        )
+        # Must not land on an error page.
+        assert "/error" not in final_url.lower() and "/404" not in final_url.lower(), (
+            f"Browser Back after cancel landed on error page: {final_url}"
+        )

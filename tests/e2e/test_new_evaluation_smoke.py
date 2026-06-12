@@ -29,7 +29,17 @@ from playwright.sync_api import Page
 from locators.evaluations_locators import EvaluationsLocators
 from pages.new_evaluation_page import NewEvaluationPage
 
-pytestmark = [pytest.mark.e2e, pytest.mark.smoke, pytest.mark.auth]
+# The full new-evaluation flow walks through several slow async curtains on the
+# dev environment (cold 'Verifying your session...' ~20s, 'Loading models...'
+# ~20s, 'Loading modules...' ~30s) plus the draft-persist + Test Cases tab, so a
+# single test can take ~2 min end-to-end. Override the global 120s per-test
+# timeout (pytest.ini) for this suite so genuinely-correct flows aren't killed.
+pytestmark = [
+    pytest.mark.e2e,
+    pytest.mark.smoke,
+    pytest.mark.auth,
+    pytest.mark.timeout(240),
+]
 
 # Short objective text reused across tests to trigger auto-save
 _OBJECTIVE = "Smoke-test objective: evaluate model quality automatically."

@@ -22,6 +22,12 @@ class PromptLibrariesLocators:
     CATEGORY_HEALTHCARE = "text=Healthcare"
     CATEGORY_GENERAL = "text=General"
 
+    # ── Pagination (Jun 2026) ─────────────────────────────────────────────────
+    PAGINATION_CONTAINER = "[class*='pagination'], [class*='Pagination'], [aria-label*='pagination']"
+    # Toggle removed in Jun 2026 — used to assert absence
+    PASTE_TEXT_TOGGLE = "text=Paste text, text=Paste Text"
+    UPLOAD_FILES_TOGGLE = "text=Upload files, text=Upload Files"
+
     # Known library names
     LIBRARY_KCC_ENGLISH = "text=KCC English Queries"
     LIBRARY_PARIKSHA = "text=Microsoft: PARIKSHA"
