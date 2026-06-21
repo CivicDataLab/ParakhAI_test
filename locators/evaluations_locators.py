@@ -18,13 +18,21 @@ class EvaluationsLocators:
     EVAL_COMPLETED_COL = "th:text('Completed'), :text('Completed')"
 
     # ── Status filter tabs (StatusFilterTabs component — Jun 2026) ───────────
-    # Tabs render as buttons or role=tab; use :has-text for substring match.
+    # As of late Jun 2026 the component renders 9 tabs:
+    #   All | Draft | Queued | Running | In Progress | Pending Review | Completed | Failed | Cancelled
+    # Use :has-text for substring match so count badges ("Draft(40)") still match.
     STATUS_TAB_ALL = "button:has-text('All'), [role='tab']:has-text('All')"
     STATUS_TAB_DRAFT = "button:has-text('Draft'), [role='tab']:has-text('Draft')"
+    # "Pending" is now split into "Queued" and "Pending Review" — keep old selector
+    # as a broad fallback and add the specific new ones.
     STATUS_TAB_PENDING = "button:has-text('Pending'), [role='tab']:has-text('Pending')"
+    STATUS_TAB_QUEUED = "button:has-text('Queued'), [role='tab']:has-text('Queued')"
+    STATUS_TAB_IN_PROGRESS = "button:has-text('In Progress'), [role='tab']:has-text('In Progress')"
+    STATUS_TAB_PENDING_REVIEW = "button:has-text('Pending Review'), [role='tab']:has-text('Pending Review')"
     STATUS_TAB_RUNNING = "button:has-text('Running'), [role='tab']:has-text('Running')"
     STATUS_TAB_COMPLETED = "button:has-text('Completed'), [role='tab']:has-text('Completed')"
     STATUS_TAB_FAILED = "button:has-text('Failed'), [role='tab']:has-text('Failed')"
+    STATUS_TAB_CANCELLED = "button:has-text('Cancelled'), [role='tab']:has-text('Cancelled')"
 
     # ── Pagination controls (Jun 2026) ────────────────────────────────────────
     PAGINATION_NEXT = (

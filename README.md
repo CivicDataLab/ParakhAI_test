@@ -11,8 +11,10 @@ Production-ready Python + Playwright test automation framework for the **[Parakh
 | E2E UI | Playwright + pytest | Auth, homepage, navigation, feature tabs, AI models, evaluations list + detail, New Evaluation wizard (draft, automated & manual modes, cancel paths), evaluators management, evaluator role, auditor flows, prompt libraries, mobile viewport |
 | Accessibility | axe-playwright-python (WCAG 2.1 AA) | Axe scans, alt text, ARIA, keyboard, skip links, social-icon labels |
 | Visual Regression | Pillow pixel-diff | Desktop / tablet / mobile viewports |
-| API / HTTP | requests | Status codes, headers, response time, GraphQL contracts |
-| Performance | CDP + Navigation Timing API | Load time, TTFB, LCP, mobile 3G, authenticated-route budgets |
+| API / HTTP | requests | Status codes, headers, response time, public and authenticated GraphQL contracts |
+| Security | requests + Playwright | Cookie flags, browser storage, GraphQL auth/error handling, IDOR, CORS, and input sanitisation |
+| Performance | CDP + Navigation Timing API | Load time, TTFB, LCP, mobile 3G, authenticated-route and resource-size budgets |
+| Load | requests + concurrent workers | Concurrent GraphQL reads, draft creation, authentication, pagination, and UI degradation |
 
 ---
 
@@ -61,8 +63,9 @@ pytest
 pytest tests/e2e/           -m e2e           # E2E browser tests
 pytest tests/accessibility/ -m accessibility  # WCAG / axe-core
 pytest tests/visual/        -m visual         # screenshot regression
-pytest tests/api/           -m api            # HTTP-layer (no browser)
+pytest tests/api/           -m api            # HTTP/API + security checks
 pytest tests/performance/   -m performance    # load & timing metrics
+pytest tests/load/          -m load           # explicit load/stress suite
 ```
 
 ### By marker
@@ -71,7 +74,14 @@ pytest -m smoke -v           # fast CI sanity subset
 pytest -m auth -v            # authenticated tests only (needs TEST_EMAIL_1)
 pytest -m mobile -v          # mobile-viewport tests (390px)
 pytest -m regression_write   # write-side tests (needs SANDBOX_ORG_SLUG)
+pytest -m security -v        # security checks; cookie checks also need TEST_EMAIL_1
+pytest -m load -v            # load tests; mutation scenarios need SANDBOX_ORG_SLUG
 ```
+
+Load tests are not intended for routine PR validation. Run them explicitly
+against the dev/staging sandbox, not production. The complete unfiltered
+`pytest` command includes them; use `pytest -m "not load"` for a normal local
+full-suite run without stress scenarios.
 
 ### Single file / test
 ```bash
@@ -157,8 +167,10 @@ pytest tests/visual/test_visual_regression.py::TestHomepageVisual::test_homepage
 | `@pytest.mark.e2e` | Browser UI end-to-end tests |
 | `@pytest.mark.accessibility` | WCAG / axe-core tests |
 | `@pytest.mark.visual` | Screenshot regression tests |
-| `@pytest.mark.api` | HTTP-layer tests (no browser) |
-| `@pytest.mark.performance` | Load/timing metric tests |
+| `@pytest.mark.api` | HTTP/API tests; some security checks also inspect a browser session |
+| `@pytest.mark.performance` | Page timing and resource-budget tests |
+| `@pytest.mark.load` | Explicit load/stress tests, including concurrent reads and mutations |
+| `@pytest.mark.security` | Security-focused HTTP and browser-session checks |
 | `@pytest.mark.mobile` | Mobile-viewport tests (390×844) |
 | `@pytest.mark.smoke` | Fast sanity subset for PR checks |
 | `@pytest.mark.regression` | Full regression suite |
@@ -267,8 +279,11 @@ After each run, reports are written to `reports/`:
 | `reports/e2e_summary.md` | Merged Markdown posted to GitHub Step Summary |
 | `reports/a11y_report.html` | Accessibility HTML report |
 | `reports/accessibility_report.json` | Structured axe violations JSON |
+| `reports/accessibility_*_report.json` | Authenticated-route axe results |
 | `reports/performance_metrics.json` | Public-page timing metrics |
 | `reports/performance_metrics_auth.json` | Authenticated-route timing metrics |
+| `reports/load_metrics.json` | Mutation, authentication, wizard, and UI load metrics |
+| `reports/load_metrics_graphql.json` | Concurrent GraphQL read and pagination metrics |
 | `screenshots/FAIL_*.png` | Failure screenshots |
 | `screenshots/DIFF_*.png` | Visual regression diff images |
 
@@ -334,14 +349,17 @@ ParakhAI_test/
 │   ├── ci.yml                   # PR + push pipeline (lint → parallel suites → summary)
 │   └── scheduled.yml            # Nightly regression (02:00 UTC)
 ├── tests/
-│   ├── e2e/                     # Browser UI tests (~310 tests)
+│   ├── e2e/                     # Browser UI tests (377 collected tests)
 │   │   ├── test_auth.py
 │   │   ├── test_homepage.py
+│   │   ├── test_smoke_critical.py
+│   │   ├── test_functional.py
 │   │   ├── test_navigation.py
 │   │   ├── test_feature_tabs.py
 │   │   ├── test_models.py
 │   │   ├── test_evaluations.py
 │   │   ├── test_evaluation_detail.py
+│   │   ├── test_regression_new_features.py
 │   │   ├── test_new_evaluation_smoke.py
 │   │   ├── test_new_evaluation_regression.py
 │   │   ├── test_new_evaluation_full_flow.py
@@ -360,12 +378,21 @@ ParakhAI_test/
 │   │   ├── test_prompt_libraries.py
 │   │   ├── test_user_flows.py
 │   │   └── test_mobile.py
-│   ├── accessibility/           # WCAG / axe-core tests
+│   ├── accessibility/           # Public + authenticated WCAG / axe-core tests
+│   │   ├── test_accessibility.py
+│   │   └── test_accessibility_auth.py
 │   ├── visual/                  # Screenshot regression
 │   ├── api/                     # HTTP-layer tests
+│   │   ├── test_api.py
 │   │   ├── test_graphql.py
-│   │   └── test_graphql_authenticated.py
-│   ├── performance/             # Load & timing tests
+│   │   ├── test_graphql_authenticated.py
+│   │   └── test_security.py
+│   ├── performance/             # Public/auth route timing + resource budgets
+│   │   ├── test_performance.py
+│   │   └── test_performance_auth.py
+│   ├── load/                    # Concurrent API, auth, mutation, and UI load tests
+│   │   ├── test_load.py
+│   │   └── test_load_graphql.py
 │   ├── data/
 │   │   └── test_data.py         # GraphQL queries/mutations + sandbox constants
 │   └── conftest.py              # All shared fixtures
@@ -374,12 +401,12 @@ ParakhAI_test/
 │   ├── home_page.py
 │   ├── login_page.py
 │   ├── dashboard_page.py
-│   ├── ai_maker_dashboard_page.py
+│   ├── ai_maker_page.py
 │   ├── models_page.py
 │   ├── evaluations_page.py
 │   ├── evaluation_detail_page.py
 │   ├── new_evaluation_page.py
-│   ├── evaluation_workspace_page.py
+│   ├── workspace_page.py
 │   ├── evaluators_page.py
 │   ├── evaluator_role_page.py
 │   ├── auditor_model_detail_page.py

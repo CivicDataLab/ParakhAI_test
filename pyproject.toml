@@ -11,7 +11,7 @@ requires-python = ">=3.11"
 license = { text = "MIT" }
 keywords = ["testing", "playwright", "automation", "parakh", "civicdataspace"]
 authors = [
-    { name = "QA Team", email = "qa@civicdataspace.in" }
+    { name = "QA Team", email = "saqib@civicdataspace.in" }
 ]
 
 dependencies = [
