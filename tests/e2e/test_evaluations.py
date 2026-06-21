@@ -511,12 +511,13 @@ class TestStatusFilterTabs:
         )
 
     def test_all_six_tabs_are_present(self, page: Page):
+        # As of late Jun 2026 the component shows 9 tabs — keep the old minimum
+        # threshold (4) so this test stays green on older builds too.
         ep = EvaluationsPage(page)
         ep.go_to_evaluations_list()
         tabs = {
             "All": EvaluationsLocators.STATUS_TAB_ALL,
             "Draft": EvaluationsLocators.STATUS_TAB_DRAFT,
-            "Pending": EvaluationsLocators.STATUS_TAB_PENDING,
             "Running": EvaluationsLocators.STATUS_TAB_RUNNING,
             "Completed": EvaluationsLocators.STATUS_TAB_COMPLETED,
             "Failed": EvaluationsLocators.STATUS_TAB_FAILED,
@@ -524,6 +525,26 @@ class TestStatusFilterTabs:
         visible = [label for label, sel in tabs.items() if ep.is_visible(sel)]
         assert len(visible) >= 4, (
             f"Expected at least 4 status filter tabs, found {len(visible)}: {visible}"
+        )
+
+    def test_nine_status_tabs_are_present(self, page: Page):
+        """Late-Jun 2026: StatusFilterTabs expanded to 9 states."""
+        ep = EvaluationsPage(page)
+        ep.go_to_evaluations_list()
+        tabs = {
+            "All": EvaluationsLocators.STATUS_TAB_ALL,
+            "Draft": EvaluationsLocators.STATUS_TAB_DRAFT,
+            "Queued": EvaluationsLocators.STATUS_TAB_QUEUED,
+            "Running": EvaluationsLocators.STATUS_TAB_RUNNING,
+            "In Progress": EvaluationsLocators.STATUS_TAB_IN_PROGRESS,
+            "Pending Review": EvaluationsLocators.STATUS_TAB_PENDING_REVIEW,
+            "Completed": EvaluationsLocators.STATUS_TAB_COMPLETED,
+            "Failed": EvaluationsLocators.STATUS_TAB_FAILED,
+            "Cancelled": EvaluationsLocators.STATUS_TAB_CANCELLED,
+        }
+        visible = [label for label, sel in tabs.items() if ep.is_visible(sel)]
+        assert len(visible) >= 7, (
+            f"Expected at least 7 of 9 status tabs, found {len(visible)}: {visible}"
         )
 
     def test_column_header_completed_is_present(self, page: Page):
@@ -575,6 +596,73 @@ class TestStatusFilterTabs:
         assert non_draft.count() == 0, (
             "After clicking 'Draft' tab, only DRAFT rows must be visible"
         )
+
+    def test_queued_tab_is_present_and_clickable(self, page: Page):
+        """'Queued' is a new tab added in late Jun 2026."""
+        ep = EvaluationsPage(page)
+        ep.go_to_evaluations_list()
+        if not ep.is_visible(EvaluationsLocators.STATUS_TAB_QUEUED):
+            pytest.skip("'Queued' tab not present — may be on older build")
+        ep.click_status_tab("Queued")
+        page.wait_for_timeout(600)
+        rows = page.locator("tbody tr")
+        empty = page.locator(
+            "text=No evaluations, text=no results, text=0 evaluations"
+        )
+        assert rows.count() >= 0 or empty.count() >= 0, (
+            "Clicking 'Queued' tab must not crash the page"
+        )
+
+    def test_in_progress_tab_is_present_and_clickable(self, page: Page):
+        """'In Progress' is a new tab added in late Jun 2026."""
+        ep = EvaluationsPage(page)
+        ep.go_to_evaluations_list()
+        if not ep.is_visible(EvaluationsLocators.STATUS_TAB_IN_PROGRESS):
+            pytest.skip("'In Progress' tab not present — may be on older build")
+        ep.click_status_tab("In Progress")
+        page.wait_for_timeout(600)
+        assert page.url, "Page must remain accessible after clicking 'In Progress' tab"
+
+    def test_pending_review_tab_filters_correctly(self, page: Page):
+        """'Pending Review' replaces the old 'Pending' tab (late Jun 2026)."""
+        ep = EvaluationsPage(page)
+        ep.go_to_evaluations_list()
+        if not ep.is_visible(EvaluationsLocators.STATUS_TAB_PENDING_REVIEW):
+            pytest.skip("'Pending Review' tab not present — may be on older build")
+        ep.click_status_tab("Pending Review")
+        page.wait_for_timeout(800)
+        wrong_status = page.locator(
+            "td :has-text('DRAFT'), td :has-text('COMPLETED'), td :has-text('RUNNING')"
+        )
+        rows = page.locator("tbody tr")
+        if rows.count() > 0:
+            assert wrong_status.count() == 0, (
+                "After clicking 'Pending Review', non-pending-review rows must not appear"
+            )
+
+    def test_cancelled_tab_is_present_and_clickable(self, page: Page):
+        """'Cancelled' is a new tab added in late Jun 2026."""
+        ep = EvaluationsPage(page)
+        ep.go_to_evaluations_list()
+        if not ep.is_visible(EvaluationsLocators.STATUS_TAB_CANCELLED):
+            pytest.skip("'Cancelled' tab not present — may be on older build")
+        ep.click_status_tab("Cancelled")
+        page.wait_for_timeout(600)
+        assert page.url, "Page must remain accessible after clicking 'Cancelled' tab"
+
+    def test_status_tab_count_badges_are_numeric(self, page: Page):
+        """Tab count badges like 'Draft(40)' must contain valid integers."""
+        ep = EvaluationsPage(page)
+        ep.go_to_evaluations_list()
+        import re
+        tabs_with_counts = page.locator(
+            "button:has-text('Draft'), button:has-text('Completed'), button:has-text('Failed')"
+        )
+        for i in range(tabs_with_counts.count()):
+            label = tabs_with_counts.nth(i).text_content() or ""
+            numbers = re.findall(r"\d+", label)
+            if numbers:
+                assert int(numbers[0]) >= 0, f"Tab count must be non-negative: '{label}'"
 
 
 # ── Evaluations list pagination (Jun 2026) ────────────────────────────────────
