@@ -547,6 +547,32 @@ class TestInputSanitisation:
             f"Homepage HTML response is missing security headers: {missing}"
         )
 
+    @pytest.mark.xfail(reason="SEC-002: Content-Security-Policy header absent on all responses — known bug")
+    def test_sec002_content_security_policy_header_present(self, api_client: requests.Session):
+        """SEC-002: Every HTML page response must include a Content-Security-Policy header."""
+        try:
+            resp = api_client.get(BASE + "/", timeout=15, allow_redirects=True)
+        except requests.exceptions.ConnectionError:
+            pytest.skip("Frontend unreachable")
+        headers_lower = {k.lower(): v for k, v in resp.headers.items()}
+        assert "content-security-policy" in headers_lower, (
+            "SEC-002: No Content-Security-Policy header on homepage response. "
+            "Without CSP, injected scripts execute without restriction."
+        )
+
+    @pytest.mark.xfail(reason="SEC-003: nginx version disclosed in Server response header — known bug")
+    def test_sec003_server_header_does_not_disclose_version(self, api_client: requests.Session):
+        """SEC-003: The Server response header must not include the nginx version string."""
+        try:
+            resp = api_client.get(BASE + "/", timeout=15, allow_redirects=True)
+        except requests.exceptions.ConnectionError:
+            pytest.skip("Frontend unreachable")
+        server_header = resp.headers.get("Server", resp.headers.get("server", ""))
+        assert "/" not in server_header, (
+            f"SEC-003: Server header discloses version: '{server_header}'. "
+            "Set 'server_tokens off;' in nginx.conf."
+        )
+
     def test_session_api_returns_empty_for_unauthenticated(self, api_client: requests.Session):
         """GET /api/auth/session without a session cookie must not return user data."""
         try:

@@ -223,3 +223,180 @@ class TestSessionVerificationPerformance:
             )
         elapsed = time.time() - start
         assert elapsed < 20, f"Session verification must complete within 20s, took {elapsed:.1f}s"
+
+
+# ── Additional issues from 2026-06-22 MCP exploration ────────────────────────
+
+
+class TestSEOCanonical:
+    """Canonical link tag coverage."""
+
+    @pytest.mark.xfail(reason="SEO-003: No canonical link tag on any page — known bug")
+    def test_seo003_homepage_has_canonical_link(self, page: Page):
+        """SEO-003: Homepage must have a <link rel='canonical'> tag."""
+        page.goto(Config.url("/"))
+        page.wait_for_timeout(2000)
+        canonical = page.locator("link[rel='canonical']")
+        assert canonical.count() > 0, (
+            "SEO-003: No <link rel='canonical'> found on the homepage. "
+            "Without canonical links, duplicate-URL indexing can hurt SEO."
+        )
+
+
+class TestPlatformIssuesExtended:
+    """Additional platform issues from the 2026-06-22 MCP exploration."""
+
+    @pytest.mark.xfail(reason="UX-015: All 'View' buttons on AI Model cards are disabled — known bug")
+    def test_ux015_model_card_view_button_is_enabled(self, authenticated_page_fast: Page):
+        """UX-015: At least one 'View' button on AI Model cards must be enabled."""
+        authenticated_page_fast.goto(Config.url("/dashboard/ai-maker/1/ai-models"))
+        authenticated_page_fast.wait_for_timeout(2000)
+        view_buttons = authenticated_page_fast.locator("button:has-text('View'), a:has-text('View')")
+        if view_buttons.count() == 0:
+            pytest.skip("No 'View' buttons found on AI Models page")
+        disabled_count = sum(
+            1 for i in range(view_buttons.count())
+            if view_buttons.nth(i).get_attribute("disabled") is not None
+            or view_buttons.nth(i).is_disabled()
+        )
+        enabled_count = view_buttons.count() - disabled_count
+        assert enabled_count > 0, (
+            f"UX-015: All {disabled_count} 'View' buttons on AI Model cards are disabled. "
+            "Users cannot navigate to any model detail page."
+        )
+
+    @pytest.mark.xfail(reason="UX-002: All dashboard sub-pages have identical title 'Dashboard | ParakhAI' — known bug")
+    def test_ux002_dashboard_subpages_have_unique_titles(self, authenticated_page_fast: Page):
+        """UX-002: Each dashboard sub-page must have a unique <title>."""
+        paths_and_labels = [
+            ("/dashboard/ai-maker/1/evaluations", "evaluations"),
+            ("/dashboard/ai-maker/1/ai-models", "models"),
+            ("/dashboard/ai-maker/1/auditors", "evaluators"),
+        ]
+        titles = {}
+        for path, label in paths_and_labels:
+            authenticated_page_fast.goto(Config.url(path))
+            authenticated_page_fast.wait_for_timeout(1500)
+            titles[label] = authenticated_page_fast.title()
+        unique_titles = set(titles.values())
+        assert len(unique_titles) == len(titles), (
+            f"UX-002: Multiple dashboard pages share the same <title>. Titles: {titles}"
+        )
+        for label, title in titles.items():
+            assert "Dashboard" not in title or label.lower() in title.lower(), (
+                f"UX-002: '{label}' page title is '{title}' — must include the section name, "
+                "not just 'Dashboard | ParakhAI'."
+            )
+
+    @pytest.mark.xfail(reason="UX-005: Missing H1 on AI Maker org select page — known bug")
+    def test_ux005_ai_maker_select_page_has_h1(self, authenticated_page_fast: Page):
+        """UX-005: AI Maker org select page must have exactly one <h1>."""
+        authenticated_page_fast.goto(Config.url("/dashboard/ai-maker"))
+        authenticated_page_fast.wait_for_timeout(2000)
+        h1_count = authenticated_page_fast.locator("h1").count()
+        assert h1_count == 1, (
+            f"UX-005: AI Maker org select page has {h1_count} <h1> elements (expected 1). "
+            "Breaks document outline and WCAG 2.4.6."
+        )
+
+    @pytest.mark.xfail(reason="UX-005: Missing H1 on AI Maker overview page — known bug")
+    def test_ux005_ai_maker_overview_page_has_h1(self, authenticated_page_fast: Page):
+        """UX-005: AI Maker org overview page must have exactly one <h1>."""
+        authenticated_page_fast.goto(Config.url("/dashboard/ai-maker/1"))
+        authenticated_page_fast.wait_for_timeout(2000)
+        h1_count = authenticated_page_fast.locator("h1").count()
+        assert h1_count == 1, (
+            f"UX-005: AI Maker overview page has {h1_count} <h1> elements (expected 1)."
+        )
+
+    @pytest.mark.xfail(reason="UX-006: Eval name remains editable on COMPLETED evaluations — known bug")
+    def test_ux006_completed_eval_name_is_readonly(
+        self, authenticated_page_fast: Page, completed_eval_id: int
+    ):
+        """UX-006: The evaluation name input must be read-only on COMPLETED evaluations."""
+        authenticated_page_fast.goto(
+            Config.url(f"/dashboard/ai-maker/1/evaluations/{completed_eval_id}")
+        )
+        authenticated_page_fast.wait_for_timeout(3000)
+        name_input = authenticated_page_fast.locator(
+            "input[name='name'], input[placeholder*='name'], input[aria-label*='name']"
+        ).first
+        if name_input.count() == 0:
+            pytest.skip("Eval name input not found on detail page")
+        is_readonly = (
+            name_input.get_attribute("readonly") is not None
+            or name_input.get_attribute("disabled") is not None
+            or name_input.is_disabled()
+        )
+        assert is_readonly, (
+            "UX-006: Evaluation name input is editable on a COMPLETED evaluation. "
+            "Must be read-only for all terminal statuses (COMPLETED, FAILED, CANCELLED)."
+        )
+
+    @pytest.mark.xfail(reason="UX-013: No success toast after Add Evaluator — known bug")
+    def test_ux013_add_evaluator_shows_success_feedback(self, authenticated_page_fast: Page):
+        """UX-013: Adding an evaluator must show a success toast/confirmation."""
+        authenticated_page_fast.goto(Config.url("/dashboard/ai-maker/1/auditors"))
+        authenticated_page_fast.wait_for_timeout(2000)
+        add_btn = authenticated_page_fast.locator(
+            "button:has-text('Add Evaluator'), button:has-text('Invite')"
+        ).first
+        if add_btn.count() == 0:
+            pytest.skip("Add Evaluator button not found")
+        add_btn.click()
+        authenticated_page_fast.wait_for_timeout(1000)
+        dialog = authenticated_page_fast.locator("[role='dialog']")
+        if dialog.count() == 0:
+            pytest.skip("Add Evaluator dialog did not open")
+        cancel = authenticated_page_fast.locator("[role='dialog'] button:has-text('Cancel')").first
+        if cancel.count() > 0:
+            cancel.click()
+        authenticated_page_fast.wait_for_timeout(500)
+        phantom_toast = authenticated_page_fast.locator(
+            "[role='status'], [role='alert']:has-text('success'), "
+            ".toast, [data-sonner-toast], [data-radix-toast-root]"
+        )
+        assert phantom_toast.count() == 0, (
+            "UX-013: A success toast appeared after cancelling Add Evaluator. "
+            "Success feedback must only fire when the mutation actually completes."
+        )
+
+    @pytest.mark.xfail(reason="INFRA-004: Evaluators page fires requests to civicdataspace.innull — known bug")
+    def test_infra004_evaluators_page_no_null_url_requests(self, authenticated_page_fast: Page):
+        """INFRA-004: The Evaluators page must not fire requests to 'civicdataspace.innull'."""
+        null_requests: list = []
+        authenticated_page_fast.on(
+            "request",
+            lambda req: null_requests.append(req.url) if "innull" in req.url else None,
+        )
+        authenticated_page_fast.goto(Config.url("/dashboard/ai-maker/1/auditors"))
+        authenticated_page_fast.wait_for_timeout(3000)
+        assert not null_requests, (
+            f"INFRA-004: Evaluators page fired {len(null_requests)} request(s) to malformed "
+            f"'innull' URL — a null env var is concatenated to the API base URL. "
+            f"Requests: {null_requests}"
+        )
+
+    @pytest.mark.xfail(reason="AUTH-001: Session expiry causes silent GraphQL failures — known bug")
+    def test_auth001_session_expiry_surfaces_to_user(self, authenticated_page_fast: Page):
+        """AUTH-001: When the session token expires, users must see a redirect or error message."""
+        authenticated_page_fast.goto(Config.url("/dashboard/ai-maker/1/evaluations"))
+        authenticated_page_fast.wait_for_timeout(2000)
+        authenticated_page_fast.evaluate("""() => {
+            document.cookie = 'next-auth.session-token=expired_token_test; path=/; max-age=0';
+            document.cookie = '__Secure-next-auth.session-token=expired; path=/; max-age=0';
+        }""")
+        authenticated_page_fast.reload()
+        authenticated_page_fast.wait_for_timeout(3000)
+        redirected = any(
+            kw in authenticated_page_fast.url.lower()
+            for kw in ("login", "sign-in", "auth")
+        )
+        has_error_ui = authenticated_page_fast.locator(
+            "text=session expired, text=please log in, text=sign in again, "
+            "[role='alert']:has-text('expired')"
+        ).count() > 0
+        assert redirected or has_error_ui, (
+            "AUTH-001: After session expiry, no redirect to login and no error message shown. "
+            "Pages appear functional but data silently fails to load."
+        )
