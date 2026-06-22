@@ -141,10 +141,22 @@ class TestAuthRequiredBehavior:
     def test_audits_without_auth_returns_error_or_empty(self, graphql_client):
         result = graphql_client(TestGraphQL.QUERY_AUDITS)
         has_errors = bool(result.get("errors"))
-        audits = (result.get("data") or {}).get("audits")
-        empty_list = audits == [] if audits is not None else False
-        assert has_errors or empty_list or audits is None, (
-            f"audits without auth returned unexpected data: {audits}"
+        wrapper = (result.get("data") or {}).get("audits")
+        # API returns AuditResponse(data=[], total_items_count=0) for anonymous users.
+        empty_wrapper = (
+            isinstance(wrapper, dict)
+            and wrapper.get("data") == []
+            and wrapper.get("totalItemsCount") == 0
+        ) if wrapper is not None else False
+        assert has_errors or empty_wrapper or wrapper is None, (
+            f"audits without auth returned unexpected data: {wrapper}"
+        )
+
+    def test_auditor_metrics_without_auth_returns_error(self, graphql_client):
+        result = graphql_client(TestGraphQL.QUERY_AUDITOR_METRICS)
+        # Resolver raises GraphQLError("Authentication required") for anonymous users.
+        assert bool(result.get("errors")), (
+            f"auditorMetrics without auth should return errors, got: {result}"
         )
 
     def test_request_audit_mutation_rejected_without_auth(self, graphql_client):

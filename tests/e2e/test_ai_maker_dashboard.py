@@ -205,6 +205,63 @@ class TestModelCardsonHome:
         ai.go_to_dashboard()
         page.keyboard.press("End")
         page.wait_for_timeout(300)
-        assert ai.is_visible("text=Text Generation"), (
-            "'Text Generation' badge must appear on model cards"
+        found = ai.is_visible("text=Text Generation") or ai.is_visible("text=TEXT GENERATION")
+        assert found, "'Text Generation' badge must appear on model cards"
+
+
+# ── Add Organisation / Add A New Model buttons (Jun 2026) ─────────────────────
+
+
+class TestAIMakerButtons:
+    """New action buttons trigger AlertDialogs for external CivicDataSpace redirects."""
+
+    def test_add_organisation_button_is_visible(self, page: Page):
+        ai = AIMakerPage(page)
+        ai.go_to_landing()
+        assert ai.is_visible(ai.ADD_ORGANISATION_BUTTON), (
+            "'Add Organisation' button must be visible on the AI Maker landing page"
+        )
+
+    def test_add_organisation_button_opens_dialog(self, page: Page):
+        ai = AIMakerPage(page)
+        ai.go_to_landing()
+        if not ai.is_visible(ai.ADD_ORGANISATION_BUTTON):
+            pytest.skip("'Add Organisation' button not found")
+        ai.click(ai.ADD_ORGANISATION_BUTTON)
+        page.wait_for_timeout(500)
+        dialog_visible = ai.is_visible(ai.EXTERNAL_REDIRECT_DIALOG)
+        confirm_visible = ai.is_visible(ai.EXTERNAL_REDIRECT_CONFIRM)
+        assert dialog_visible or confirm_visible, (
+            "Clicking 'Add Organisation' must open a confirmation dialog "
+            "with a 'Yes, continue' button"
+        )
+
+    def test_add_organisation_dialog_can_be_dismissed(self, page: Page):
+        ai = AIMakerPage(page)
+        ai.go_to_landing()
+        if not ai.is_visible(ai.ADD_ORGANISATION_BUTTON):
+            pytest.skip("'Add Organisation' button not found")
+        ai.click(ai.ADD_ORGANISATION_BUTTON)
+        page.wait_for_timeout(500)
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(300)
+        dialog_still_open = ai.is_visible(ai.EXTERNAL_REDIRECT_CONFIRM, timeout=1_000)
+        assert not dialog_still_open, (
+            "Pressing Escape must dismiss the confirmation dialog"
+        )
+        assert "/dashboard/ai-maker" in page.url, (
+            "After dismissing dialog, URL must still be on the AI Maker page"
+        )
+
+    def test_add_new_model_button_visible_on_models_page(self, page: Page):
+        from locators.models_locators import ModelsLocators
+        from pages.models_page import ModelsPage
+        mp = ModelsPage(page)
+        mp.go_to_models_list()
+        # Use the auto-waiting is_visible (count() does not wait) with a generous
+        # budget — the models list sits behind the session curtain + a data query
+        # that can take ~45s on dev.
+        visible = mp.is_visible(ModelsLocators.ADD_A_NEW_MODEL_BUTTON, timeout=50_000)
+        assert visible, (
+            "'Add A New Model' button must be visible on the models list page"
         )
