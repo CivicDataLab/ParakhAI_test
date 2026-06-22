@@ -352,3 +352,123 @@ class TestAuthPagesCrossCheck:
             f"Page at '{path}' has an empty <title> element. "
             "Page titles are essential for screen reader users to identify pages."
         )
+
+
+class TestDialogAccessibility:
+    """Dialog and form accessibility issues from the 2026-06-22 MCP exploration."""
+
+    @pytest.mark.auth
+    @pytest.mark.xfail(reason="UX-014: Radix dialog headings rendered twice in DOM — known bug")
+    def test_ux014_add_evaluator_dialog_heading_not_duplicated(
+        self, authenticated_page_fast: Page
+    ):
+        """UX-014: 'Add Evaluator' dialog heading must appear only once in the DOM.
+
+        MCP found the Radix DialogTitle renders twice — once for accessibility and once
+        visually — without aria-hidden on the duplicate.
+        """
+        from utils.config import Config
+
+        _nav_to(authenticated_page_fast, "/dashboard/ai-maker/1/auditors")
+        add_btn = authenticated_page_fast.locator(
+            "button:has-text('Add Evaluator'), button:has-text('Invite')"
+        ).first
+        if add_btn.count() == 0:
+            pytest.skip("Add Evaluator button not found")
+        add_btn.click()
+        authenticated_page_fast.wait_for_timeout(1000)
+        dialog = authenticated_page_fast.locator("[role='dialog']")
+        if dialog.count() == 0:
+            pytest.skip("Add Evaluator dialog did not open")
+        heading_texts = dialog.locator("h1, h2, h3").all_text_contents()
+        for text in set(heading_texts):
+            count = heading_texts.count(text)
+            assert count <= 1, (
+                f"UX-014: Heading '{text}' appears {count} times in the Add Evaluator dialog. "
+                "Radix DialogTitle renders twice — add aria-hidden to the decorative duplicate."
+            )
+
+    @pytest.mark.auth
+    @pytest.mark.xfail(reason="UX-009: Evaluations table sort headers missing aria-sort — known bug")
+    def test_ux009_evaluations_table_sort_headers_have_aria_sort(
+        self, authenticated_page_fast: Page
+    ):
+        """UX-009: Sortable column headers in the Evaluations table must have aria-sort."""
+        _nav_to(authenticated_page_fast, "/dashboard/ai-maker/1/evaluations")
+        sortable_headers = authenticated_page_fast.locator(
+            "th[role='columnheader'], th button, [aria-sort]"
+        )
+        if sortable_headers.count() == 0:
+            pytest.skip("No table column headers found on Evaluations page")
+        headers_with_sort = authenticated_page_fast.locator("[aria-sort]").count()
+        assert headers_with_sort > 0, (
+            "UX-009: No column headers have aria-sort in the Evaluations table. "
+            "Screen reader users cannot determine sort state (WCAG 1.3.1)."
+        )
+
+    @pytest.mark.auth
+    @pytest.mark.xfail(
+        reason="UX-010: New Evaluation dialog aria-describedby references non-existent element — known bug"
+    )
+    def test_ux010_new_evaluation_dialog_aria_describedby_resolves(
+        self, authenticated_page_fast: Page
+    ):
+        """UX-010: New Evaluation dialog aria-describedby must reference an existing element."""
+        _nav_to(authenticated_page_fast, "/dashboard/ai-maker/1/evaluations")
+        new_eval_btn = authenticated_page_fast.locator(
+            "button:has-text('New Evaluation'), button:has-text('Start Evaluation'), "
+            "button:has-text('Create Evaluation')"
+        ).first
+        if new_eval_btn.count() == 0:
+            pytest.skip("New Evaluation button not found")
+        new_eval_btn.click()
+        authenticated_page_fast.wait_for_timeout(1000)
+        dialog = authenticated_page_fast.locator("[role='dialog']")
+        if dialog.count() == 0:
+            pytest.skip("New Evaluation dialog did not open")
+        described_by = dialog.first.get_attribute("aria-describedby")
+        if not described_by:
+            return  # No aria-describedby at all is acceptable (no false positive)
+        referenced_el = authenticated_page_fast.locator(f"#{described_by}")
+        assert referenced_el.count() > 0, (
+            f"UX-010: New Evaluation dialog aria-describedby='{described_by}' references an "
+            f"element that does not exist in the DOM (WCAG 1.3.1)."
+        )
+
+    @pytest.mark.auth
+    @pytest.mark.xfail(
+        reason="UX-011: Select fields in New Evaluation dialog have no accessible label — known bug"
+    )
+    def test_ux011_new_evaluation_dialog_selects_have_labels(
+        self, authenticated_page_fast: Page
+    ):
+        """UX-011: Select/combobox fields in New Evaluation dialog must have accessible labels."""
+        _nav_to(authenticated_page_fast, "/dashboard/ai-maker/1/evaluations")
+        new_eval_btn = authenticated_page_fast.locator(
+            "button:has-text('New Evaluation'), button:has-text('Start Evaluation'), "
+            "button:has-text('Create Evaluation')"
+        ).first
+        if new_eval_btn.count() == 0:
+            pytest.skip("New Evaluation button not found")
+        new_eval_btn.click()
+        authenticated_page_fast.wait_for_timeout(1000)
+        dialog = authenticated_page_fast.locator("[role='dialog']")
+        if dialog.count() == 0:
+            pytest.skip("New Evaluation dialog did not open")
+        selects = dialog.locator("select, [role='combobox'], [role='listbox']")
+        if selects.count() == 0:
+            pytest.skip("No select/combobox elements found in New Evaluation dialog")
+        unlabelled = []
+        for i in range(selects.count()):
+            s = selects.nth(i)
+            has_label = (
+                s.get_attribute("aria-label") is not None
+                or s.get_attribute("aria-labelledby") is not None
+                or s.get_attribute("id") is not None
+            )
+            if not has_label:
+                unlabelled.append(s.get_attribute("class") or f"index {i}")
+        assert not unlabelled, (
+            f"UX-011: {len(unlabelled)} select/combobox element(s) in the New Evaluation "
+            f"dialog have no accessible label: {unlabelled}"
+        )
