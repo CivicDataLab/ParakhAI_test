@@ -110,6 +110,9 @@ class HomePage(BasePage):
     def is_hero_section_visible(self) -> bool:
         return self.is_visible(self.HERO_SECTION)
 
+    def is_hero_visible(self) -> bool:
+        return self.is_hero_section_visible()
+
     # ── Feature tabs ──────────────────────────────────────────────────────────
 
     def click_feature_tab(self, tab_name: str) -> None:
@@ -137,12 +140,19 @@ class HomePage(BasePage):
     def open_hamburger_menu(self) -> None:
         self.click(self.HAMBURGER_MENU)
 
+    def click_hamburger(self) -> None:
+        self.open_hamburger_menu()
+
     def is_mobile_menu_open(self) -> bool:
         return self.is_visible(self.MOBILE_NAV_ITEMS, timeout=3_000)
 
     # ── Footer ────────────────────────────────────────────────────────────────
 
     def get_social_link_count(self) -> int:
+        try:
+            self.page.locator(self.FOOTER).wait_for(state="visible", timeout=5_000)
+        except Exception:
+            pass
         return self.page.locator(self.SOCIAL_LINKS).count()
 
     def is_civicdatalab_link_present(self) -> bool:

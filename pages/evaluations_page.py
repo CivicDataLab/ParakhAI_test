@@ -61,6 +61,22 @@ class EvaluationsPage(BasePage):
     def is_evaluations_list_visible(self) -> bool:
         return self.is_visible(self.PAGE_HEADING)
 
+    def click_status_tab(self, status: str) -> None:
+        """Click a StatusFilterTab by label: 'All', 'Draft', 'Pending', 'Running', 'Completed', 'Failed'."""
+        tab_map = {
+            "All": EvaluationsLocators.STATUS_TAB_ALL,
+            "Draft": EvaluationsLocators.STATUS_TAB_DRAFT,
+            "Pending": EvaluationsLocators.STATUS_TAB_PENDING,
+            "Running": EvaluationsLocators.STATUS_TAB_RUNNING,
+            "Completed": EvaluationsLocators.STATUS_TAB_COMPLETED,
+            "Failed": EvaluationsLocators.STATUS_TAB_FAILED,
+        }
+        self.click(tab_map[status])
+        self.page.wait_for_timeout(500)
+
+    def is_pagination_visible(self) -> bool:
+        return self.is_visible(EvaluationsLocators.PAGINATION_CONTAINER)
+
     def get_evaluation_row_count(self) -> int:
         return self.page.locator(EvaluationsLocators.EVAL_TABLE_ROW).count()
 
@@ -76,7 +92,9 @@ class EvaluationsPage(BasePage):
         self.wait_for_app_ready()
 
     def click_new_evaluation(self) -> None:
-        self.click(self.NEW_EVALUATION_BUTTON)
+        loc = self.page.locator(self.NEW_EVALUATION_BUTTON).first
+        loc.wait_for(state="visible", timeout=self.timeout)
+        loc.click()
         self.page.wait_for_timeout(500)
 
     # ── New Evaluation modal ───────────────────────────────────────────────────

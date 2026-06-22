@@ -22,6 +22,7 @@ Run the suite locally before opening a PR:
 ruff check .                     # lint must be green
 pytest --collect-only            # all tests must collect
 pytest -m smoke -v               # fast sanity subset
+pytest -m "not load"             # normal full suite without stress scenarios
 ```
 
 ---
@@ -51,6 +52,9 @@ and route through the page object — not to inline it.
    `@pytest.mark.auth`.
 5. For tests that mutate platform state, use the `regression_write` marker —
    they auto-skip unless `SANDBOX_ORG_SLUG` is set.
+6. Use `security` for security-focused HTTP/session checks and `load` for
+   explicit stress or concurrency scenarios. Load tests must target a sandbox,
+   never production.
 
 ### Selector conventions
 
@@ -76,8 +80,10 @@ This tolerates minor UI changes without churning the test suite.
 | `e2e` | Browser UI end-to-end tests |
 | `accessibility` | WCAG / axe-core tests |
 | `visual` | Screenshot regression tests |
-| `api` | HTTP-layer tests (no browser) |
-| `performance` | Load/timing metric tests |
+| `api` | HTTP/API tests; some security checks also inspect a browser session |
+| `performance` | Page timing and resource-budget tests |
+| `load` | Explicit load/stress tests; run against dev/staging sandbox |
+| `security` | Cookie, auth, IDOR, CORS, error-handling, and sanitisation checks |
 | `smoke` | Fast sanity subset (PR checks) |
 | `regression` | Full regression suite |
 | `regression_write` | Tests that mutate platform state — sandbox org only |

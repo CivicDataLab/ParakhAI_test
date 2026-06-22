@@ -213,3 +213,39 @@ class TestPromptLibrarySearch:
         assert restored_count >= full_count, (
             "Clearing search must restore the original library count"
         )
+
+
+# ── Pagination + removed toggle (Jun 2026) ────────────────────────────────────
+
+
+class TestPromptLibrariesPagination:
+    """Pagination is present and the removed Paste text/Upload files toggle is gone."""
+
+    def test_pagination_present_or_all_on_one_page(self, page: Page):
+        """Pagination controls appear when there are more libraries than the page size."""
+        from locators.prompt_libraries_locators import PromptLibrariesLocators
+        from pages.prompt_libraries_page import PromptLibrariesPage
+        pl = PromptLibrariesPage(page)
+        pl.go_to_prompt_libraries()
+        card_count = page.locator(PromptLibrariesLocators.LIBRARY_CARD).count()
+        has_pagination = page.locator(
+            PromptLibrariesLocators.PAGINATION_CONTAINER
+        ).count() > 0
+        if card_count >= 12:
+            assert has_pagination, (
+                f"Pagination controls must be visible when {card_count} libraries are shown"
+            )
+        else:
+            # Fewer than 12 cards — pagination may not render; that is fine.
+            pass
+
+    def test_paste_text_toggle_is_not_present(self, page: Page):
+        """The 'Paste text / Upload files' toggle was removed in Jun 2026."""
+        from locators.prompt_libraries_locators import PromptLibrariesLocators
+        from pages.prompt_libraries_page import PromptLibrariesPage
+        pl = PromptLibrariesPage(page)
+        pl.go_to_prompt_libraries()
+        paste_visible = page.locator(PromptLibrariesLocators.PASTE_TEXT_TOGGLE).count() > 0
+        upload_visible = page.locator(PromptLibrariesLocators.UPLOAD_FILES_TOGGLE).count() > 0
+        assert not paste_visible, "'Paste text' toggle must not appear on Prompt Libraries page"
+        assert not upload_visible, "'Upload files' toggle must not appear on Prompt Libraries page"

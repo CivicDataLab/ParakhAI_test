@@ -17,6 +17,29 @@ class EvaluationsLocators:
     EVAL_TESTS_COL = "th:text('Tests'), :text('Tests')"
     EVAL_COMPLETED_COL = "th:text('Completed'), :text('Completed')"
 
+    # ── Status filter tabs (StatusFilterTabs component — Jun 2026) ───────────
+    # As of late Jun 2026 the component renders 9 tabs:
+    #   All | Draft | Queued | Running | In Progress | Pending Review | Completed | Failed | Cancelled
+    # Use :has-text for substring match so count badges ("Draft(40)") still match.
+    STATUS_TAB_ALL = "button:has-text('All'), [role='tab']:has-text('All')"
+    STATUS_TAB_DRAFT = "button:has-text('Draft'), [role='tab']:has-text('Draft')"
+    # "Pending" is now split into "Queued" and "Pending Review" — keep old selector
+    # as a broad fallback and add the specific new ones.
+    STATUS_TAB_PENDING = "button:has-text('Pending'), [role='tab']:has-text('Pending')"
+    STATUS_TAB_QUEUED = "button:has-text('Queued'), [role='tab']:has-text('Queued')"
+    STATUS_TAB_IN_PROGRESS = "button:has-text('In Progress'), [role='tab']:has-text('In Progress')"
+    STATUS_TAB_PENDING_REVIEW = "button:has-text('Pending Review'), [role='tab']:has-text('Pending Review')"
+    STATUS_TAB_RUNNING = "button:has-text('Running'), [role='tab']:has-text('Running')"
+    STATUS_TAB_COMPLETED = "button:has-text('Completed'), [role='tab']:has-text('Completed')"
+    STATUS_TAB_FAILED = "button:has-text('Failed'), [role='tab']:has-text('Failed')"
+    STATUS_TAB_CANCELLED = "button:has-text('Cancelled'), [role='tab']:has-text('Cancelled')"
+
+    # ── Pagination controls (Jun 2026) ────────────────────────────────────────
+    PAGINATION_NEXT = (
+        "button:has-text('Next'), [aria-label='Go to next page'], [class*='pagination'] button:last-child"
+    )
+    PAGINATION_CONTAINER = "[class*='pagination'], [class*='Pagination'], [aria-label*='pagination']"
+
     # Status badges and mode labels live inside the evaluations table — scope
     # the selectors to table cells so they don't match unrelated text elsewhere
     # on the page (e.g. the Mode dropdown options literally contain "Automated"
@@ -48,7 +71,11 @@ class EvaluationsLocators:
     MODAL_MODEL_DROPDOWN = "select, [class*='select'], [role='combobox']"
     MODAL_VERSION_DROPDOWN = "select, [class*='select'], [role='combobox']"
     MODAL_START_BUTTON = "button:has-text('Start')"
-    MODAL_CANCEL_BUTTON = "button:has-text('Cancel')"
+    MODAL_CANCEL_BUTTON = (
+        "[role='dialog'] button:has-text('Cancel'), "
+        "[class*='modal'] button:has-text('Cancel'), "
+        "[class*='Modal'] button:has-text('Cancel')"
+    )
 
     # Modal dropdown option lists — at least one <option> or listbox item must be present
     # NOTE: If dropdowns are custom (React-Select / Radix), add data-testid="model-option"
@@ -74,7 +101,15 @@ class EvaluationsLocators:
     )
     # NOTE: The name input uses id="auditName" per spec — prefer that; class fallback kept.
     WIZARD_EVAL_NAME_INPUT = "input#auditName, input[name='evaluationName'], input[value*='Untitled'], input[class*='name']"
-    WIZARD_CANCEL_EVALUATION = "text=Cancel Evaluation"
+    # The wizard header action is labelled just 'Cancel' (alongside 'Back to
+    # List') as of Jun 2026 — older builds said 'Cancel Evaluation'. The plain
+    # 'Cancel' button is listed last so the more specific labels win when present.
+    WIZARD_CANCEL_EVALUATION = (
+        "button:has-text('Cancel Evaluation'), "
+        "a:has-text('Cancel Evaluation'), "
+        "button:has-text('Discard'), "
+        "button:has-text('Cancel')"
+    )
     # NOTE: Add data-testid="auto-save-indicator" to the header indicator for stability.
     WIZARD_AUTO_SAVED = "text=Auto-saved"
 
@@ -156,6 +191,10 @@ class EvaluationsLocators:
     # Module cards showing Test Cases / Failed / Passed counters
     # NOTE: Add data-testid="module-card" to each card for stable selection.
     MANUAL_MODULE_CARD = (
+        # Real class as of Jun 2026: <button class="styles_moduleselectioncard__…">.
+        # Kept first so wait_for_module_cards (which uses split(',')[0] in a
+        # querySelectorAll) targets an element that actually exists.
+        "[class*='moduleselectioncard'], "
         "[class*='module-card'], "
         "[class*='moduleCard'], "
         "[class*='ModuleCard'], "

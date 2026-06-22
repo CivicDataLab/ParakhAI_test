@@ -23,6 +23,7 @@ class Config:
 
     # ── URLs ──────────────────────────────────────────────────────────────────
     BASE_URL: str = os.getenv("BASE_URL", "https://dev.parakh.civicdataspace.in")
+    CDS_URL: str = os.getenv("CDS_URL", "https://dev.civicdataspace.in")
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development").lower()
     # Keycloak SSO base URL (may differ from the app URL)
     KEYCLOAK_URL: str = os.getenv("KEYCLOAK_URL", "")
@@ -85,6 +86,11 @@ class Config:
     def url(cls, path: str = "") -> str:
         """Return an absolute URL for *path* relative to BASE_URL."""
         return cls.BASE_URL.rstrip("/") + "/" + path.lstrip("/")
+
+    @classmethod
+    def cds_url(cls, path: str = "") -> str:
+        """Return an absolute URL for *path* relative to CDS_URL."""
+        return cls.CDS_URL.rstrip("/") + "/" + path.lstrip("/")
 
     @classmethod
     def graphql_endpoint(cls) -> str:

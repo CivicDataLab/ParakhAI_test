@@ -210,7 +210,7 @@ class BasePage:
                 "expired mid-suite (bug #3 family — dev-env stability)."
             )
 
-    def wait_for_app_ready(self, timeout: int = 15_000) -> None:
+    def wait_for_app_ready(self, timeout: int = 30_000) -> None:
         """Wait for all auth/data loading curtains to clear after navigation.
 
         The authenticated SPA shows up to two sequential overlays that hide
@@ -218,19 +218,25 @@ class BasePage:
           1. 'Verifying your session…' (auth bootstrap on first paint).
           2. A route-level data spinner: 'Loading AI models…',
              'Loading overview…', 'Loading your assignments…', etc.
-        We loop up to 3 stages so sequential curtains both resolve. When the
-        loader is absent, state='hidden' is satisfied instantly and we return
-        early via the 200ms visibility re-probe.
+
+        On a cold deep-link load the 'Verifying your session…' curtain can take
+        well over 5s to clear (vs ~1.5s when warm); reloading it restarts the
+        check, so callers must wait it out rather than refresh. We give the full
+        `timeout` to each hidden-wait. If the curtain is still visible when the
+        timeout expires it stays visible (the wait raises), so we return and let
+        the caller's assertion surface the genuine failure rather than masking
+        it. The 200ms visible re-probe loops to catch a second curtain swapping
+        in (Verifying → Loading); when no loader is present that re-probe times
+        out immediately and we return.
         """
         loader = self.page.locator(
             # `Loading` may appear alone (bare spinner) or as a prefix like
             # `Loading AI models…`. Match either at element-text start.
             "text=/^(Verifying your session|Loading)/i"
         )
-        per_stage = max(timeout // 3, 2_000)
         for _ in range(3):
             try:
-                loader.first.wait_for(state="hidden", timeout=per_stage)
+                loader.first.wait_for(state="hidden", timeout=timeout)
             except Exception:  # noqa: BLE001
                 return
             try:

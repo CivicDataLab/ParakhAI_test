@@ -29,6 +29,9 @@ class AIMakerPage(BasePage):
     STAT_ISSUES_FLAGGED = AIMakerLocators.STAT_ISSUES_FLAGGED
     SWITCH_ROLES_LINK = AIMakerLocators.SWITCH_ROLES_LINK
     ADD_NEW_MODEL_BUTTON = AIMakerLocators.ADD_NEW_MODEL_BUTTON
+    ADD_ORGANISATION_BUTTON = AIMakerLocators.ADD_ORGANISATION_BUTTON
+    EXTERNAL_REDIRECT_DIALOG = AIMakerLocators.EXTERNAL_REDIRECT_DIALOG
+    EXTERNAL_REDIRECT_CONFIRM = AIMakerLocators.EXTERNAL_REDIRECT_CONFIRM
 
     def __init__(self, page: Page, org_id: int = CIVICDATALAB_ORG_ID) -> None:
         super().__init__(page)
@@ -39,6 +42,17 @@ class AIMakerPage(BasePage):
 
     def go_to_dashboard(self) -> "AIMakerPage":
         self.navigate(self.dashboard_url)
+        self.wait_for_app_ready()
+        return self
+
+    def go_to_landing(self) -> "AIMakerPage":
+        """Navigate to the AI Maker landing/org-selection page (no org id).
+
+        This is a distinct page from the per-org dashboard (`/ai-maker/{org}`):
+        it lists the user's organisations and hosts the **Add Organisation**
+        primary button. The org dashboard does NOT carry that button.
+        """
+        self.navigate(Config.url("/dashboard/ai-maker"))
         self.wait_for_app_ready()
         return self
 
