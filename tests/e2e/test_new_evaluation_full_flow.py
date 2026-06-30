@@ -214,7 +214,7 @@ class TestNewEvaluationRunEvaluation:
         audit = data.get("audit") or {}
         if audit.get("id"):
             cleanup_evaluation.append(audit["id"])
-        assert audit.get("status") in ("PENDING", "DRAFT", "RUNNING"), (
+        assert audit.get("status") in ("PENDING", "DRAFT", "QUEUED", "IN_PROGRESS"), (
             f"requestAudit must return an audit in an active state; got: {audit}"
         )
 
