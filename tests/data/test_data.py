@@ -264,6 +264,35 @@ class TestGraphQL:
           searchUserByEmail(email: $email) { user { id email } }
         }
     """
+    QUERY_ORGANIZATION = """
+        query Organization($id: ID!) {
+          organization(id: $id) { id name slug }
+        }
+    """
+    QUERY_AI_MODEL = """
+        query AiModel($modelId: ID!) {
+          aiModel(modelId: $modelId) { id name modelType provider }
+        }
+    """
+    QUERY_RESULT_SAMPLES = """
+        query ResultSamples($auditId: ID!, $samplesPerMetric: Int) {
+          resultSamples(auditId: $auditId, samplesPerMetric: $samplesPerMetric) {
+            __typename
+            ... on ManualModuleSamples { module samples { id } }
+            ... on BulkModuleSamples { module samples { id } }
+          }
+        }
+    """
+    QUERY_GENERATE_AUDIT_REPORT = """
+        query GenerateAuditReport($auditId: ID!) {
+          generateAuditReport(auditId: $auditId) { success message }
+        }
+    """
+    QUERY_SECTORS_WITH_AIMODELS = """
+        query SectorsWithAimodels($limit: Int) {
+          sectorsWithAimodels(limit: $limit) { id name }
+        }
+    """
 
     # ── Audit lifecycle mutations ─────────────────────────────────────────────
     MUTATION_REQUEST_AUDIT = """
