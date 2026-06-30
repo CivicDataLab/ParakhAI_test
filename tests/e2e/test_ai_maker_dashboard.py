@@ -265,3 +265,68 @@ class TestAIMakerButtons:
         assert visible, (
             "'Add A New Model' button must be visible on the models list page"
         )
+
+
+class TestStatCardValues:
+    """The AI Maker dashboard stat cards display numeric (non-empty) values."""
+
+    def test_evaluation_runs_value_is_numeric(self, page: Page):
+        ai = AIMakerPage(page)
+        ai.go_to_dashboard()
+        if not ai.is_stat_evaluation_runs_visible():
+            pytest.skip("Evaluation Runs stat card not visible")
+        value = ai.get_stat_value(ai.STAT_EVALUATION_RUNS)
+        assert value.replace(",", "").isdigit(), (
+            f"Evaluation Runs stat card must show a numeric value, got: '{value}'"
+        )
+
+    def test_test_cases_value_is_numeric(self, page: Page):
+        ai = AIMakerPage(page)
+        ai.go_to_dashboard()
+        if not ai.is_stat_test_cases_visible():
+            pytest.skip("Test Cases stat card not visible")
+        value = ai.get_stat_value(ai.STAT_TEST_CASES)
+        assert value.replace(",", "").isdigit(), (
+            f"Test Cases stat card must show a numeric value, got: '{value}'"
+        )
+
+    def test_models_count_value_is_numeric(self, page: Page):
+        ai = AIMakerPage(page)
+        ai.go_to_dashboard()
+        if not ai.is_stat_models_visible():
+            pytest.skip("Models stat card not visible")
+        value = ai.get_stat_value(ai.STAT_MODELS)
+        assert value.replace(",", "").isdigit(), (
+            f"Models stat card must show a numeric value, got: '{value}'"
+        )
+
+    def test_issues_flagged_value_is_numeric(self, page: Page):
+        ai = AIMakerPage(page)
+        ai.go_to_dashboard()
+        if not ai.is_stat_issues_flagged_visible():
+            pytest.skip("Issues Flagged stat card not visible")
+        value = ai.get_stat_value(ai.STAT_ISSUES_FLAGGED)
+        assert value.replace(",", "").isdigit(), (
+            f"Issues Flagged stat card must show a numeric value, got: '{value}'"
+        )
+
+    def test_all_stat_cards_non_empty(self, page: Page):
+        """No stat card on the AI Maker dashboard should render as empty or NaN."""
+        ai = AIMakerPage(page)
+        ai.go_to_dashboard()
+        stats = {
+            "Evaluation Runs": ai.STAT_EVALUATION_RUNS,
+            "Test Cases": ai.STAT_TEST_CASES,
+            "Models": ai.STAT_MODELS,
+            "Issues Flagged": ai.STAT_ISSUES_FLAGGED,
+        }
+        missing_value = []
+        for label, sel in stats.items():
+            if not ai.is_stat_evaluation_runs_visible() and label == "Evaluation Runs":
+                continue
+            val = ai.get_stat_value(sel)
+            if not val or not val.replace(",", "").isdigit():
+                missing_value.append(f"{label} (got: '{val}')")
+        assert not missing_value, (
+            f"Stat cards with missing/non-numeric values: {missing_value}"
+        )
