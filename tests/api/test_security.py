@@ -2,12 +2,13 @@
 Security tests for the Parakh platform.
 
 Areas covered:
-  TestCookieSecurity       — HttpOnly, Secure, SameSite flags; no secrets in localStorage
-  TestGraphQLSecurity      — introspection, invalid auth, malformed query, oversized input
-  TestIDORProtection       — unauthenticated access, forged org headers
-  TestResponseSecurity     — no stack traces in errors, standard error envelope
-  TestCORSPolicy           — evil-origin reflection, valid-origin CORS
-  TestInputSanitisation    — XSS payload handling, SQL injection via filters
+  TestCookieSecurity            — HttpOnly, Secure, SameSite flags; no secrets in localStorage
+  TestGraphQLSecurity           — introspection, invalid auth, malformed query, oversized input
+  TestIDORProtection            — unauthenticated access, forged org headers
+  TestPlaygroundMutationSecurity — auth boundaries + object-level access for playground mutations
+  TestResponseSecurity          — no stack traces in errors, standard error envelope
+  TestCORSPolicy                — evil-origin reflection, valid-origin CORS
+  TestInputSanitisation         — XSS payload handling, SQL injection via filters
 
 Run explicitly with:
     pytest tests/api/test_security.py -m security -v
@@ -617,3 +618,146 @@ class TestInputSanitisation:
         assert resp.status_code != 500, (
             "Server returned 500 for a query containing a null byte"
         )
+
+
+# ── Playground + review mutation security ─────────────────────────────────────
+
+
+class TestPlaygroundMutationSecurity:
+    """Auth boundaries and object-level access control for playground/review mutations.
+
+    Two layers are tested:
+    1. Unauthenticated — raw GET requests with no token must be rejected (no success=True).
+    2. Authenticated + nonexistent ID — valid session calling a mutation with an
+       unknown audit/result ID must return a structured error or success=False, never
+       a silent success.  This covers the object-level access control (BOLA/IDOR)
+       boundary for resources the caller does not own.
+    """
+
+    # ── Layer 1: unauthenticated rejection ────────────────────────────────────
+
+    @pytest.mark.parametrize(
+        "mutation_gql,mutation_field",
+        [
+            (
+                "mutation F($i: FinishManualEvaluationInput!) { finishManualEvaluation(input: $i) { success } }",
+                "finishManualEvaluation",
+            ),
+            (
+                "mutation S($i: SubmitAuditReviewInput!) { submitAuditReview(input: $i) { success } }",
+                "submitAuditReview",
+            ),
+            (
+                "mutation U($i: UpdateAuditResultInput!) { updateAuditResult(input: $i) { success } }",
+                "updateAuditResult",
+            ),
+            (
+                "mutation G($i: GenerateReasonInput!) { generatePlaygroundReason(input: $i) { success } }",
+                "generatePlaygroundReason",
+            ),
+        ],
+        ids=[
+            "finishManualEvaluation",
+            "submitAuditReview",
+            "updateAuditResult",
+            "generatePlaygroundReason",
+        ],
+    )
+    def test_mutation_unauthenticated_does_not_succeed(
+        self, api_client: requests.Session, mutation_gql, mutation_field
+    ):
+        """Unauthenticated mutation call must not return success=True."""
+        try:
+            resp = api_client.get(
+                GRAPHQL,
+                params={"query": mutation_gql},
+                headers={"Accept": "application/json"},
+                timeout=20,
+            )
+        except requests.exceptions.ConnectionError:
+            pytest.skip("GraphQL endpoint unreachable")
+
+        if resp.status_code != 200:
+            return  # Non-200 is already a rejection
+        body = resp.json()
+        has_errors = bool(body.get("errors"))
+        mutation_result = (body.get("data") or {}).get(mutation_field)
+        success_returned = isinstance(mutation_result, dict) and mutation_result.get("success") is True
+        assert has_errors or not success_returned, (
+            f"{mutation_field} without auth returned success=True — auth check missing. "
+            f"Response: {body}"
+        )
+
+    # ── Layer 2: authenticated + nonexistent object ID ────────────────────────
+
+    @pytest.mark.auth
+    def test_finish_evaluation_unknown_audit_id_returns_error(
+        self, authenticated_graphql_client
+    ):
+        """finishManualEvaluation with a nonexistent audit ID must not succeed."""
+        from tests.data.test_data import TestGraphQL
+
+        result = authenticated_graphql_client(
+            TestGraphQL.MUTATION_FINISH_MANUAL_EVALUATION,
+            variables={"input": {"auditId": "999999999"}},
+        )
+        assert "data" in result or "errors" in result
+        mutation_data = (result.get("data") or {}).get("finishManualEvaluation")
+        if mutation_data is not None:
+            assert mutation_data.get("success") is not True, (
+                "finishManualEvaluation with nonexistent auditId must not return success=True"
+            )
+
+    @pytest.mark.auth
+    def test_submit_review_unknown_audit_id_returns_error(
+        self, authenticated_graphql_client
+    ):
+        """submitAuditReview with a nonexistent audit ID must not succeed."""
+        from tests.data.test_data import TestGraphQL
+
+        result = authenticated_graphql_client(
+            TestGraphQL.MUTATION_SUBMIT_AUDIT_REVIEW,
+            variables={"input": {"auditId": "999999999"}},
+        )
+        assert "data" in result or "errors" in result
+        mutation_data = (result.get("data") or {}).get("submitAuditReview")
+        if mutation_data is not None:
+            assert mutation_data.get("success") is not True, (
+                "submitAuditReview with nonexistent auditId must not return success=True"
+            )
+
+    @pytest.mark.auth
+    def test_update_result_unknown_result_id_returns_error(
+        self, authenticated_graphql_client
+    ):
+        """updateAuditResult with a nonexistent result ID must not succeed."""
+        from tests.data.test_data import TestGraphQL
+
+        result = authenticated_graphql_client(
+            TestGraphQL.MUTATION_UPDATE_AUDIT_RESULT,
+            variables={"input": {"resultId": "999999999", "evaluatorSuccess": True}},
+        )
+        assert "data" in result or "errors" in result
+        mutation_data = (result.get("data") or {}).get("updateAuditResult")
+        if mutation_data is not None:
+            assert mutation_data.get("success") is not True, (
+                "updateAuditResult with nonexistent resultId must not return success=True"
+            )
+
+    @pytest.mark.auth
+    def test_generate_reason_unknown_audit_id_returns_error(
+        self, authenticated_graphql_client
+    ):
+        """generatePlaygroundReason with a nonexistent audit ID must not succeed."""
+        from tests.data.test_data import TestGraphQL
+
+        result = authenticated_graphql_client(
+            TestGraphQL.MUTATION_GENERATE_PLAYGROUND_REASON,
+            variables={"input": {"auditId": "999999999", "testInput": "test", "actualOutput": "output"}},
+        )
+        assert "data" in result or "errors" in result
+        mutation_data = (result.get("data") or {}).get("generatePlaygroundReason")
+        if mutation_data is not None:
+            assert mutation_data.get("success") is not True, (
+                "generatePlaygroundReason with nonexistent auditId must not return success=True"
+            )
