@@ -16,6 +16,7 @@ class EvaluationDetailPage(BasePage):
     """Evaluation detail — overview, summary, risk cards, module tabs, sample issues."""
 
     BACK_TO_LIST = EvaluationDetailLocators.BACK_TO_LIST
+    GENERATE_REPORT_BUTTON = EvaluationDetailLocators.GENERATE_REPORT_BUTTON
     OVERVIEW_HEADING = EvaluationDetailLocators.OVERVIEW_HEADING
     SUMMARY_HEADING = EvaluationDetailLocators.SUMMARY_HEADING
     SUMMARY_PASS_RATE = EvaluationDetailLocators.SUMMARY_PASS_RATE
@@ -65,6 +66,13 @@ class EvaluationDetailPage(BasePage):
 
     def is_sample_issues_section_visible(self) -> bool:
         return self.is_visible(self.SAMPLE_ISSUES_HEADING)
+
+    def is_generate_report_button_visible(self) -> bool:
+        return self.is_visible(self.GENERATE_REPORT_BUTTON, timeout=5_000)
+
+    def click_generate_report(self) -> None:
+        self.click(self.GENERATE_REPORT_BUTTON)
+        self.wait_for_load("networkidle")
 
     def is_download_button_visible(self) -> bool:
         return self.is_visible(self.DOWNLOAD_REPORT_BUTTON)
