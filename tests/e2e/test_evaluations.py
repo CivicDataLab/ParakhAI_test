@@ -518,7 +518,7 @@ class TestStatusFilterTabs:
         tabs = {
             "All": EvaluationsLocators.STATUS_TAB_ALL,
             "Draft": EvaluationsLocators.STATUS_TAB_DRAFT,
-            "Running": EvaluationsLocators.STATUS_TAB_RUNNING,
+            "In Progress": EvaluationsLocators.STATUS_TAB_IN_PROGRESS,
             "Completed": EvaluationsLocators.STATUS_TAB_COMPLETED,
             "Failed": EvaluationsLocators.STATUS_TAB_FAILED,
         }
@@ -535,7 +535,6 @@ class TestStatusFilterTabs:
             "All": EvaluationsLocators.STATUS_TAB_ALL,
             "Draft": EvaluationsLocators.STATUS_TAB_DRAFT,
             "Queued": EvaluationsLocators.STATUS_TAB_QUEUED,
-            "Running": EvaluationsLocators.STATUS_TAB_RUNNING,
             "In Progress": EvaluationsLocators.STATUS_TAB_IN_PROGRESS,
             "Pending Review": EvaluationsLocators.STATUS_TAB_PENDING_REVIEW,
             "Completed": EvaluationsLocators.STATUS_TAB_COMPLETED,
@@ -574,7 +573,7 @@ class TestStatusFilterTabs:
         # Any visible status badges must contain COMPLETED (case-insensitive)
         badges = page.locator("td :has-text('COMPLETED'), [role='cell'] :has-text('COMPLETED')")
         non_completed = page.locator(
-            "td :has-text('DRAFT'), td :has-text('RUNNING'), td :has-text('FAILED')"
+            "td :has-text('DRAFT'), td :has-text('IN_PROGRESS'), td :has-text('FAILED')"
         )
         has_completed = badges.count() > 0
         has_wrong_status = non_completed.count() > 0
@@ -591,7 +590,7 @@ class TestStatusFilterTabs:
         ep.click_status_tab("Draft")
         page.wait_for_timeout(800)
         non_draft = page.locator(
-            "td :has-text('COMPLETED'), td :has-text('RUNNING'), td :has-text('FAILED')"
+            "td :has-text('COMPLETED'), td :has-text('IN_PROGRESS'), td :has-text('FAILED')"
         )
         assert non_draft.count() == 0, (
             "After clicking 'Draft' tab, only DRAFT rows must be visible"
@@ -632,7 +631,7 @@ class TestStatusFilterTabs:
         ep.click_status_tab("Pending Review")
         page.wait_for_timeout(800)
         wrong_status = page.locator(
-            "td :has-text('DRAFT'), td :has-text('COMPLETED'), td :has-text('RUNNING')"
+            "td :has-text('DRAFT'), td :has-text('COMPLETED'), td :has-text('IN_PROGRESS')"
         )
         rows = page.locator("tbody tr")
         if rows.count() > 0:
