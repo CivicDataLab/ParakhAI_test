@@ -256,6 +256,34 @@ class TestPublicRegistryQueries:
         )
         assert "data" in result or "errors" in result
 
+    def test_prompt_datasets_returns_list(self, authenticated_graphql_client):
+        result = authenticated_graphql_client(TestGraphQL.QUERY_PROMPT_DATASETS)
+        assert "data" in result or "errors" in result
+        if result.get("data") and result["data"].get("promptDatasets") is not None:
+            assert isinstance(result["data"]["promptDatasets"], list)
+
+    def test_prompt_dataset_unknown_id_returns_null_or_error(self, authenticated_graphql_client):
+        result = authenticated_graphql_client(
+            TestGraphQL.QUERY_PROMPT_DATASET, variables={"datasetId": "999999999"}
+        )
+        assert "data" in result or "errors" in result
+        if result.get("data") is not None:
+            ds = result["data"].get("promptDataset")
+            assert ds is None or isinstance(ds, dict), (
+                "promptDataset with unknown ID must return null or a dict"
+            )
+
+    def test_test_cases_unknown_dataset_returns_empty_or_error(self, authenticated_graphql_client):
+        result = authenticated_graphql_client(
+            TestGraphQL.QUERY_TEST_CASES, variables={"datasetId": "999999999", "limit": 5}
+        )
+        assert "data" in result or "errors" in result
+        if result.get("data") and result["data"].get("testCases") is not None:
+            assert isinstance(result["data"]["testCases"], list)
+            assert result["data"]["testCases"] == [], (
+                "testCases with unknown datasetId must return empty list"
+            )
+
 
 # ── Org-header enforcement (regression for prior prod failure) ────────────────
 
