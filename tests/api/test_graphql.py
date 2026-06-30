@@ -177,3 +177,44 @@ class TestAuthRequiredBehavior:
         assert resp.status_code != 200 or "errors" in resp.json(), (
             "Server must refuse an unauthenticated mutation request"
         )
+
+
+# ── Playground + review mutations: unauthenticated rejection ──────────────────
+
+
+class TestPlaygroundMutationsWithoutAuth:
+    """Each new playground/review mutation must be rejected without a valid token.
+
+    Sends each mutation as a GET request (no auth header).  The server either:
+    - Refuses GET mutations outright (405 / errors in body), or
+    - Returns an auth error before executing the mutation.
+    Either outcome satisfies the assertion — what must NOT happen is a
+    successful mutation response.
+    """
+
+    _MUTATIONS = [
+        ("callModelForManualEval", TestGraphQL.MUTATION_CALL_MODEL_FOR_MANUAL_EVAL),
+        ("submitManualTestCase", TestGraphQL.MUTATION_SUBMIT_MANUAL_TEST_CASE),
+        ("finishManualEvaluation", TestGraphQL.MUTATION_FINISH_MANUAL_EVALUATION),
+        ("generatePlaygroundReason", TestGraphQL.MUTATION_GENERATE_PLAYGROUND_REASON),
+        ("generatePlaygroundIdealOutput", TestGraphQL.MUTATION_GENERATE_PLAYGROUND_IDEAL_OUTPUT),
+        ("updateAuditResult", TestGraphQL.MUTATION_UPDATE_AUDIT_RESULT),
+        ("submitAuditReview", TestGraphQL.MUTATION_SUBMIT_AUDIT_REVIEW),
+    ]
+
+    @pytest.mark.parametrize(
+        "mutation_name,mutation_gql",
+        _MUTATIONS,
+        ids=[m[0] for m in _MUTATIONS],
+    )
+    def test_mutation_rejected_without_auth(self, graphql_client, mutation_name, mutation_gql):
+        result = graphql_client(mutation_gql)
+        # The mutation must not return a non-null success result for an unauthenticated call
+        has_errors = bool(result.get("errors"))
+        mutation_result = (result.get("data") or {}).get(mutation_name)
+        success_returned = (
+            isinstance(mutation_result, dict) and mutation_result.get("success") is True
+        )
+        assert has_errors or not success_returned, (
+            f"{mutation_name} without auth must not return success=True; got: {result}"
+        )
