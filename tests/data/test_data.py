@@ -343,6 +343,46 @@ class TestGraphQL:
         }
     """
 
+    # ── Playground AI-assist mutations ────────────────────────────────────────
+    MUTATION_GENERATE_PLAYGROUND_REASON = """
+        mutation GenerateReason($input: GenerateReasonInput!) {
+          generatePlaygroundReason(input: $input) { success message reason }
+        }
+    """
+    MUTATION_GENERATE_PLAYGROUND_IDEAL_OUTPUT = """
+        mutation GenerateIdealOutput($input: GenerateIdealOutputInput!) {
+          generatePlaygroundIdealOutput(input: $input) { success message idealOutput }
+        }
+    """
+
+    # ── Evaluator review mutations ────────────────────────────────────────────
+    MUTATION_UPDATE_AUDIT_RESULT = """
+        mutation UpdateAuditResult($input: UpdateAuditResultInput!) {
+          updateAuditResult(input: $input) {
+            success message result { id isReviewed evaluatorSuccess evaluatorRiskLevel }
+          }
+        }
+    """
+    MUTATION_SUBMIT_AUDIT_REVIEW = """
+        mutation SubmitAuditReview($input: SubmitAuditReviewInput!) {
+          submitAuditReview(input: $input) { success message audit { id status } }
+        }
+    """
+
+    # ── Playground status queries ─────────────────────────────────────────────
+    QUERY_PLAYGROUND_EVALUATION_STATUS = """
+        query PlaygroundEvalStatus($auditId: ID!) {
+          playgroundEvaluationStatus(auditId: $auditId) {
+            canFinish testCaseCount auditStatus
+          }
+        }
+    """
+    QUERY_MANUAL_TEST_CASES = """
+        query ManualTestCases($auditId: ID!) {
+          manualTestCases(auditId: $auditId) { id testInput actualOutput status }
+        }
+    """
+
     # ── Legacy (still referenced by some tests) ───────────────────────────────
     MUTATION_CREATE_DATASET = """
         mutation CreateDataset($input: CreateDatasetInput!) {
@@ -395,7 +435,7 @@ class TestModelConstants:
         "OPENAI", "LLAMA_OLLAMA", "LLAMA_TOGETHER", "LLAMA_REPLICATE",
         "LLAMA_CUSTOM", "CUSTOM", "HUGGINGFACE",
     ]
-    AUDIT_STATUSES = ["PENDING", "RUNNING", "COMPLETED", "FAILED", "CANCELLED"]
+    AUDIT_STATUSES = ["PENDING", "QUEUED", "IN_PROGRESS", "PENDING_REVIEW", "COMPLETED", "FAILED", "CANCELLED"]
     DATASET_TYPES = [
         "TRANSLATION", "GENERATION", "SUMMARIZATION", "QA", "SENTIMENT",
         "CLASSIFICATION", "NER", "BIAS", "TOXICITY", "GENERAL",
