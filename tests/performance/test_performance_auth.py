@@ -322,3 +322,104 @@ class TestNavigationTimingNewRoutes:
             )
         # Always passes — collects metrics for trend analysis
         assert True, "Metrics collection run complete"
+
+
+# ── New Routes: Playground and Evaluator Review ───────────────────────────────
+
+_EVALUATIONS_PATH = f"/dashboard/ai-maker/{_ORG_ID}/evaluations"
+_EVALUATOR_HOME_PATH = "/dashboard/evaluator"
+
+
+@pytest.mark.timeout(120)
+class TestNewRoutePerformanceBudgets:
+    """Load-time and DOMContentLoaded budgets for routes introduced in the Jun 2026 dev cycle.
+
+    Covers: evaluations list, evaluator home (new-role dashboard). Playground
+    and review detail routes require a known audit ID (runtime-discovered), so
+    those are measured as part of TestAuthRoutePerformance.
+    """
+
+    def test_evaluations_list_load_time(self, authenticated_page_fast: Page):
+        """Evaluations list must load within the auth-route budget."""
+        elapsed_s, metrics = _nav_and_measure(authenticated_page_fast, _EVALUATIONS_PATH)
+
+        save_json_report(
+            {
+                "label": "evaluations_list",
+                "url": authenticated_page_fast.url,
+                "elapsed_s": elapsed_s,
+                "timestamp": datetime.now().isoformat(),
+                **metrics,
+            },
+            "performance_metrics_auth.json",
+        )
+
+        assert elapsed_s < BUDGET["auth_page_load_s"], (
+            f"Evaluations list load time {elapsed_s:.2f}s exceeds budget of "
+            f"{BUDGET['auth_page_load_s']}s"
+        )
+
+    def test_evaluations_list_dom_content_loaded(self, authenticated_page_fast: Page):
+        """DOMContentLoaded on the evaluations list must be within budget."""
+        authenticated_page_fast.goto(
+            Config.url(_EVALUATIONS_PATH), wait_until="domcontentloaded", timeout=60_000
+        )
+        authenticated_page_fast.wait_for_timeout(500)
+
+        metrics = get_performance_metrics(authenticated_page_fast)
+        dcl = metrics.get("dom_content_loaded_ms", 0)
+
+        save_json_report(
+            {
+                "label": "evaluations_list_dcl",
+                "url": authenticated_page_fast.url,
+                "timestamp": datetime.now().isoformat(),
+                **metrics,
+            },
+            "performance_metrics_auth.json",
+        )
+
+        assert dcl < BUDGET["dom_content_loaded_ms"], (
+            f"Evaluations list DOMContentLoaded {dcl:.0f}ms exceeds "
+            f"{BUDGET['dom_content_loaded_ms']}ms budget"
+        )
+
+    def test_evaluator_home_load_time(self, authenticated_page_fast: Page):
+        """Evaluator dashboard home must load within the auth-route budget."""
+        elapsed_s, metrics = _nav_and_measure(authenticated_page_fast, _EVALUATOR_HOME_PATH)
+
+        save_json_report(
+            {
+                "label": "evaluator_home",
+                "url": authenticated_page_fast.url,
+                "elapsed_s": elapsed_s,
+                "timestamp": datetime.now().isoformat(),
+                **metrics,
+            },
+            "performance_metrics_auth.json",
+        )
+
+        assert elapsed_s < BUDGET["auth_page_load_s"], (
+            f"Evaluator home load time {elapsed_s:.2f}s exceeds budget of "
+            f"{BUDGET['auth_page_load_s']}s"
+        )
+
+    def test_full_new_route_metrics_collection(self, authenticated_page_fast: Page):
+        """Collect and persist Navigation Timing for all Jun 2026 routes."""
+        routes = [
+            (_EVALUATIONS_PATH, "evaluations_list_timing"),
+            (_EVALUATOR_HOME_PATH, "evaluator_home_timing"),
+        ]
+        for path, label in routes:
+            elapsed_s, metrics = _nav_and_measure(authenticated_page_fast, path)
+            save_json_report(
+                {
+                    "label": label,
+                    "url": Config.url(path),
+                    "elapsed_s": elapsed_s,
+                    "timestamp": datetime.now().isoformat(),
+                    **metrics,
+                },
+                "performance_metrics_auth.json",
+            )
+        assert True, "New route metrics collection complete"
