@@ -63,7 +63,13 @@ class EvaluationDetailLocators:
     SAMPLE_ISSUES_HEADING = "text=Sample Issues"
     ISSUE_EXPAND_TRIGGER = "button[aria-expanded], [class*='accordion'] button"
 
-    # Report download
+    # Report download — two-step flow (changed upstream Jun 2026):
+    # user must click "Generate Report" first; "Download Report" appears after generation.
+    GENERATE_REPORT_BUTTON = (
+        "button:has-text('Generate Report'), "
+        "a:has-text('Generate Report')"
+    )
     DOWNLOAD_REPORT_BUTTON = (
-        "button:has-text('Download Report'), a:has-text('Download Report')"
+        "button:has-text('Download Report'), "
+        "a:has-text('Download Report')"
     )
