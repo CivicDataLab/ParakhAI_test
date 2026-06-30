@@ -44,7 +44,8 @@ class EvaluatorRoleLocators:
     EVALUATIONS_PAGE_HEADING = "text=Evaluations"
     EVAL_FILTER_DRAFT = "text=Draft"
     EVAL_FILTER_PENDING = "text=Pending"
-    EVAL_FILTER_RUNNING = "text=Running"
+    EVAL_FILTER_IN_PROGRESS = "text=In Progress"
+    EVAL_FILTER_RUNNING = EVAL_FILTER_IN_PROGRESS  # backward-compat alias
     EVAL_FILTER_COMPLETED = "text=Completed"
     EVAL_FILTER_FAILED = "text=Failed"
     NO_EVALUATIONS_MESSAGE = "text=No evaluations found"

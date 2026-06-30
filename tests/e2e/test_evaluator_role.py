@@ -209,7 +209,7 @@ class TestEvaluatorEvaluations:
         for tab_sel in [
             EvaluatorRoleLocators.EVAL_FILTER_DRAFT,
             EvaluatorRoleLocators.EVAL_FILTER_PENDING,
-            EvaluatorRoleLocators.EVAL_FILTER_RUNNING,
+            EvaluatorRoleLocators.EVAL_FILTER_IN_PROGRESS,
             EvaluatorRoleLocators.EVAL_FILTER_COMPLETED,
             EvaluatorRoleLocators.EVAL_FILTER_FAILED,
         ]:
