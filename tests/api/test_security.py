@@ -666,7 +666,11 @@ class TestPlaygroundMutationSecurity:
     def test_mutation_unauthenticated_does_not_succeed(
         self, api_client: requests.Session, mutation_gql, mutation_field
     ):
-        """Unauthenticated mutation call must not return success=True."""
+        """Unauthenticated mutation call must be rejected.
+
+        The server returns HTTP 400 for mutations on GET ('mutations are not allowed
+        when using GET') — that non-200 status is the expected rejection signal.
+        """
         try:
             resp = api_client.get(
                 GRAPHQL,
@@ -678,7 +682,7 @@ class TestPlaygroundMutationSecurity:
             pytest.skip("GraphQL endpoint unreachable")
 
         if resp.status_code != 200:
-            return  # Non-200 is already a rejection
+            return  # Non-200 (e.g. 400 "mutations not allowed on GET") is a valid rejection
         body = resp.json()
         has_errors = bool(body.get("errors"))
         mutation_result = (body.get("data") or {}).get(mutation_field)

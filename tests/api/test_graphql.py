@@ -185,11 +185,9 @@ class TestAuthRequiredBehavior:
 class TestPlaygroundMutationsWithoutAuth:
     """Each new playground/review mutation must be rejected without a valid token.
 
-    Sends each mutation as a GET request (no auth header).  The server either:
-    - Refuses GET mutations outright (405 / errors in body), or
-    - Returns an auth error before executing the mutation.
-    Either outcome satisfies the assertion — what must NOT happen is a
-    successful mutation response.
+    Uses raw GET requests (not the graphql_client fixture, which asserts status==200).
+    The server returns HTTP 400 for mutations on GET ("mutations are not allowed when
+    using GET") — that non-200 status is the expected rejection signal.
     """
 
     _MUTATIONS = [
@@ -207,14 +205,24 @@ class TestPlaygroundMutationsWithoutAuth:
         _MUTATIONS,
         ids=[m[0] for m in _MUTATIONS],
     )
-    def test_mutation_rejected_without_auth(self, graphql_client, mutation_name, mutation_gql):
-        result = graphql_client(mutation_gql)
-        # The mutation must not return a non-null success result for an unauthenticated call
-        has_errors = bool(result.get("errors"))
-        mutation_result = (result.get("data") or {}).get(mutation_name)
-        success_returned = (
-            isinstance(mutation_result, dict) and mutation_result.get("success") is True
+    def test_mutation_rejected_without_auth(self, mutation_name, mutation_gql):
+        import requests as _requests
+        from utils.config import Config
+
+        resp = _requests.get(
+            Config.graphql_endpoint(),
+            params={"query": mutation_gql},
+            headers={"Accept": "application/json"},
+            timeout=20,
         )
+        # Server must refuse: non-200 status (e.g. 400 "mutations not allowed on GET")
+        # or a response body containing errors with no success=True mutation result.
+        if resp.status_code != 200:
+            return  # Non-200 is the expected rejection — test passes
+        body = resp.json()
+        has_errors = bool(body.get("errors"))
+        mutation_result = (body.get("data") or {}).get(mutation_name)
+        success_returned = isinstance(mutation_result, dict) and mutation_result.get("success") is True
         assert has_errors or not success_returned, (
-            f"{mutation_name} without auth must not return success=True; got: {result}"
+            f"{mutation_name} without auth must not return success=True; got: {body}"
         )
