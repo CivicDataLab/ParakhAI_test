@@ -704,6 +704,7 @@ class TestPlaygroundMutationSecurity:
         result = authenticated_graphql_client(
             TestGraphQL.MUTATION_FINISH_MANUAL_EVALUATION,
             variables={"input": {"auditId": "999999999"}},
+            method="POST",
         )
         assert "data" in result or "errors" in result
         mutation_data = (result.get("data") or {}).get("finishManualEvaluation")
@@ -722,6 +723,7 @@ class TestPlaygroundMutationSecurity:
         result = authenticated_graphql_client(
             TestGraphQL.MUTATION_SUBMIT_AUDIT_REVIEW,
             variables={"input": {"auditId": "999999999"}},
+            method="POST",
         )
         assert "data" in result or "errors" in result
         mutation_data = (result.get("data") or {}).get("submitAuditReview")
@@ -740,6 +742,7 @@ class TestPlaygroundMutationSecurity:
         result = authenticated_graphql_client(
             TestGraphQL.MUTATION_UPDATE_AUDIT_RESULT,
             variables={"input": {"resultId": "999999999", "evaluatorSuccess": True}},
+            method="POST",
         )
         assert "data" in result or "errors" in result
         mutation_data = (result.get("data") or {}).get("updateAuditResult")
@@ -758,6 +761,7 @@ class TestPlaygroundMutationSecurity:
         result = authenticated_graphql_client(
             TestGraphQL.MUTATION_GENERATE_PLAYGROUND_REASON,
             variables={"input": {"auditId": "999999999", "testInput": "test", "actualOutput": "output"}},
+            method="POST",
         )
         assert "data" in result or "errors" in result
         mutation_data = (result.get("data") or {}).get("generatePlaygroundReason")
