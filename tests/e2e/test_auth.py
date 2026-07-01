@@ -53,11 +53,8 @@ class TestLoginPageStructure:
         )
 
     def test_register_link_present(self, page: Page):
-        """A link to create a new account should be visible on the login page."""
-        login = _navigate_to_login(page)
-        assert login.is_register_link_visible(), (
-            "Register/Sign Up link should be present on the login page"
-        )
+        """Self-registration is disabled on this deployment — no Register link expected."""
+        pytest.skip("Keycloak self-registration is disabled; Register link intentionally absent")
 
     def test_sign_in_button_is_visible(self, page: Page):
         """The submit button must be visible and not disabled by default."""
