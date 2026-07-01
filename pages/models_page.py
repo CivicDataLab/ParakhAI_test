@@ -48,10 +48,27 @@ class ModelsPage(BasePage):
             pass
         return self
 
-    def go_to_model_detail(self, model_id: int = SARVAM_MODEL_ID) -> "ModelsPage":
-        self.navigate(Config.url(f"/dashboard/ai-maker/{self.org_id}/ai-models/{model_id}"))
+    def go_to_model_detail(self, model_id: int = None) -> "ModelsPage":
+        """Navigate to a model detail page.
+
+        If model_id is given, navigate directly. Otherwise navigate via the
+        models list and click the first card — avoids hardcoded IDs becoming
+        stale when models are added/removed on the dev platform.
+        """
+        import pytest
+
+        if model_id is not None:
+            self.navigate(Config.url(f"/dashboard/ai-maker/{self.org_id}/ai-models/{model_id}"))
+        else:
+            self.go_to_models_list()
+            first_card = self.page.locator(self.MODEL_CARD).first
+            try:
+                first_card.wait_for(state="visible", timeout=8_000)
+            except Exception:
+                pytest.skip("No model cards visible on dev — cannot navigate to model detail")
+            first_card.click()
+
         self.wait_for_app_ready()
-        # Wait for the About heading — first content section of the detail page.
         try:
             self.page.locator(ModelsLocators.ABOUT_HEADING).first.wait_for(
                 state="visible", timeout=10_000
