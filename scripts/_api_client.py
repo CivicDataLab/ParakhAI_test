@@ -138,13 +138,10 @@ def graphql(token: str, org_id: str, query: str, variables: dict | None = None) 
 # ── Reusable queries / mutations ──────────────────────────────────────────────
 
 LIST_AUDITS_QUERY = """
-query GetAudits($status: String, $limit: Int) {
-  audits(status: $status, limit: $limit) {
-    id
-    name
-    status
-    evaluationMode
-    createdAt
+query GetAudits($limit: Int, $offset: Int) {
+  audits(limit: $limit, offset: $offset) {
+    data { id name status evaluationMode createdAt }
+    totalItemsCount
   }
 }
 """

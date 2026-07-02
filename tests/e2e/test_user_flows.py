@@ -179,41 +179,44 @@ class TestFlow02_DashboardToModelDetail:
 
 class TestFlow03_NewEvaluationWizardCancel:
     """
-    FLOW 3: Evaluations list → New Evaluation → Select model → Start → Cancel
-    Verifies the wizard can be opened and cleanly cancelled.
+    FLOW 3 (Jul 2026 redesign): Evaluations list → New Evaluation → two-step
+    modal → dismiss. Read-only — 'Start Evaluation' is never clicked, so no
+    draft is created (draft-creating flows: test_add_evaluation_bulk.py).
     """
 
-    def test_complete_new_evaluation_open_and_cancel_flow(self, page: Page):
-        """Full flow: evaluations list → modal → start → wizard → cancel."""
-        ep = EvaluationsPage(page)
-        ep.go_to_evaluations_list()
+    def test_complete_modal_open_navigate_and_dismiss_flow(self, page: Page):
+        """Full flow: list → modal step 1 → step 2 → back → dismiss."""
+        from pages.new_evaluation_page import NewEvaluationPage
 
-        assert ep.is_visible(ep.NEW_EVALUATION_BUTTON, timeout=5_000), (
+        nep = NewEvaluationPage(page)
+        nep.go_to_evaluations_list()
+
+        assert nep.is_visible(nep.NEW_EVALUATION_BUTTON, timeout=5_000), (
             "New Evaluation button not found"
         )
 
-        ep.click_new_evaluation()
-        assert ep.is_new_eval_modal_visible(), "New Evaluation modal did not appear"
+        nep.click_new_evaluation()
+        assert nep.is_modal_visible(), "'Start an Evaluation' modal did not appear"
 
-        ep.click_modal_start()
-        page.wait_for_load_state("domcontentloaded")
-
-        assert ep.is_wizard_visible(), "Wizard not visible after clicking Start"
-
-        # Verify wizard is functional before cancelling
-        assert ep.is_visible(ep.WIZARD_TAB_CONFIGURATION), (
-            "Flow 3: Wizard must show 'Evaluation Configuration' tab"
+        nep.select_first_model_and_version()
+        nep.select_evaluation_method("bulk")
+        nep.click_modal_next()
+        assert nep.get_modal_step() == "2", (
+            "Flow 3: Next must advance the modal to step 2"
         )
 
-        # Cancel and verify clean return
-        if ep.is_visible(ep.WIZARD_CANCEL_EVALUATION, timeout=5_000):
-            ep.cancel_evaluation()
-            assert "/evaluations" in page.url and "new" not in page.url, (
-                "Flow 3: Cancelling wizard must return to evaluations list"
-            )
+        nep.click_modal_back()
+        assert nep.get_modal_step() == "1", (
+            "Flow 3: Back must return the modal to step 1"
+        )
 
-    def test_wizard_does_not_persist_cancelled_evaluation_in_list(self, page: Page):
-        """After cancelling from the wizard, the list shows a DRAFT record."""
+        nep.click_modal_cancel()
+        assert "auditId=" not in page.url, (
+            "Flow 3: Dismissing the modal must not create a draft"
+        )
+
+    def test_dismissed_modal_does_not_add_list_rows(self, page: Page):
+        """Dismissing the modal without Start leaves the list unchanged."""
         ep = EvaluationsPage(page)
         ep.go_to_evaluations_list()
         initial_row_count = ep.get_evaluation_row_count()
@@ -221,18 +224,13 @@ class TestFlow03_NewEvaluationWizardCancel:
         ep.click_new_evaluation()
         assert ep.is_new_eval_modal_visible(), "New Evaluation modal did not appear"
 
-        ep.click_modal_start()
-        page.wait_for_load_state("domcontentloaded")
+        ep.click_modal_cancel()
+        page.wait_for_timeout(1_000)
 
-        if ep.is_visible(ep.WIZARD_CANCEL_EVALUATION, timeout=5_000):
-            ep.cancel_evaluation()
-
-        # The cancelled draft should appear as DRAFT in the list
-        ep.go_to_evaluations_list()
         new_row_count = ep.get_evaluation_row_count()
-        # Cancelled evals typically save as DRAFT
-        assert new_row_count >= initial_row_count, (
-            "Flow 3: Cancelling an evaluation may add a DRAFT entry to the list"
+        assert new_row_count == initial_row_count, (
+            f"Dismissing the modal must not change the list "
+            f"({initial_row_count} → {new_row_count} rows)"
         )
 
 

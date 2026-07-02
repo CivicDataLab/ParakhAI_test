@@ -200,21 +200,38 @@ def authenticated_page(browser_context: BrowserContext, request) -> Page:
 
 
 @pytest.fixture(scope="function")
-def authenticated_page_u2(browser_context: BrowserContext, request) -> Page:
+def authenticated_page_u2(browser: Browser, request) -> Page:
     """
     Desktop page pre-authenticated as TEST_USER_2 (slot 2).
 
-    Use for multi-user / parallel scenarios where both accounts must be
-    active simultaneously.
+    Uses its own isolated browser context so it doesn't share cookies with
+    authenticated_page (USER_1). Required for multi-user parallel scenarios.
     """
     if not Config.TEST_EMAIL_2 or Config.TEST_EMAIL_2.endswith("@example.com"):
         pytest.skip(
             "TEST_EMAIL_2 / TEST_PASSWORD_2 not configured — "
             "set them in .env to run secondary-user tests."
         )
-    yield from _make_auth_page(
-        browser_context, request, Config.TEST_EMAIL_2, Config.TEST_PASSWORD_2, "AUTH_U2"
+    context = browser.new_context(
+        viewport={"width": 1440, "height": 900},
+        locale="en-US",
+        ignore_https_errors=True,
     )
+    context.set_default_timeout(Config.TIMEOUT)
+    pg = context.new_page()
+    pg.set_default_timeout(Config.TIMEOUT)
+    pg.on("dialog", lambda dialog: dialog.accept())
+    _do_login(pg, Config.TEST_EMAIL_2, Config.TEST_PASSWORD_2)
+
+    yield pg
+
+    if Config.SCREENSHOT_ON_FAILURE and getattr(request.node, "rep_call", None) is not None:
+        if request.node.rep_call.failed:
+            path = take_screenshot(pg, f"FAIL_AUTH_U2_{request.node.name}")
+            request.node.user_properties.append(("screenshot", str(path)))
+
+    pg.close()
+    context.close()
 
 
 # ── API client ────────────────────────────────────────────────────────────────
@@ -272,7 +289,7 @@ def graphql_client(api_client):
             Config.graphql_endpoint(),
             params=params,
             headers=headers,
-            timeout=20,
+            timeout=60,
         )
         assert resp.status_code == 200, (
             f"GraphQL returned {resp.status_code}: {resp.text[:300]}"
@@ -441,22 +458,39 @@ def authenticated_graphql_client():
     )
 
     def _call(query: str, variables=None, method: str = "GET") -> dict:
+        nonlocal token
         body = {"query": query}
         if variables:
             body["variables"] = variables
         endpoint = Config.graphql_endpoint()
-        if method.upper() == "POST":
-            resp = session.post(
-                endpoint,
-                json=body,
-                headers={"Content-Type": "application/json"},
-                timeout=20,
-            )
-        else:
-            params = {"query": query}
-            if variables:
-                params["variables"] = _json.dumps(variables)
-            resp = session.get(endpoint, params=params, timeout=20)
+
+        def _do_request():
+            if method.upper() == "POST":
+                return session.post(
+                    endpoint,
+                    json=body,
+                    headers={"Content-Type": "application/json"},
+                    timeout=60,
+                )
+            else:
+                params = {"query": query}
+                if variables:
+                    params["variables"] = _json.dumps(variables)
+                return session.get(endpoint, params=params, timeout=60)
+
+        resp = _do_request()
+        # Re-acquire token if expired and retry once
+        if resp.status_code in (401, 403) or (
+            resp.status_code == 200
+            and "expired" in resp.text.lower()
+            and "token" in resp.text.lower()
+        ):
+            try:
+                token = get_access_token(headless=True)
+                session.headers.update({"Authorization": f"Bearer {token}"})
+                resp = _do_request()
+            except Exception:
+                pass
         assert resp.status_code == 200, (
             f"GraphQL {method} returned {resp.status_code}: {resp.text[:300]}"
         )

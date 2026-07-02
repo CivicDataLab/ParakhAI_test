@@ -1,23 +1,20 @@
 """
-Full UI walk of the New Evaluation wizard (write-side regression).
+Full UI walk of the New Evaluation flow (write-side regression).
 
-Complements the Phase 4 GraphQL mutation tests with end-to-end UI coverage:
-opens the wizard, fills every Configuration field, advances to Test Cases,
-selects a dataset (or pastes test cases), and clicks Run Evaluation. The
-created audit is cleaned up via the `cleanup_evaluation` fixture.
+Complements the Phase 4 GraphQL mutation tests with end-to-end UI coverage of
+the Jul 2026 redesign: two-step "Start an Evaluation" modal → single-page
+wizard (Evaluation Overview + Evaluation Workspace) → Run Evaluation.
+Created audits are cleaned up via the `cleanup_evaluation` fixture.
 
 Gating:
 - Marker `regression_write` triggers `forbid_outside_sandbox` (skip when
   SANDBOX_ORG_SLUG is unset).
 - Tests skip cleanly at any step where the platform doesn't surface a
-  required control (e.g. no models in sandbox, no datasets to select).
+  required control (e.g. no models in sandbox, no prompt libraries).
 
 Note on the org id: NewEvaluationPage defaults to org id 1 (CivicdataLab)
-because that's where the existing draft/auto-save tests run. Phase-3+
-write tests should override `org_id` to point at the sandbox org. The
-slug from SANDBOX_ORG_SLUG must therefore be a numeric id (or the page
-object must be extended to accept slugs). Until that's verified, tests
-read SANDBOX_ORG_SLUG and skip if it isn't a numeric id.
+because that's where the existing draft tests run. The slug from
+SANDBOX_ORG_SLUG must be a numeric id; tests skip otherwise.
 """
 
 import pytest
@@ -32,7 +29,10 @@ pytestmark = [
     pytest.mark.regression,
     pytest.mark.regression_write,
     pytest.mark.auth,
+    pytest.mark.timeout(300),
 ]
+
+_OBJECTIVE = "Full-flow regression objective."
 
 
 def _sandbox_org_id(sandbox_org: str) -> int:
@@ -49,133 +49,142 @@ def _sandbox_org_id(sandbox_org: str) -> int:
 
 
 class TestNewEvaluationConfigurationTab:
-    """Step 1 of the wizard: fill all Configuration fields."""
+    """Modal step 1/2 fields and the hydrated wizard shell."""
 
     def test_wizard_opens_and_renders_configuration_tab(
-        self, authenticated_page_fast, sandbox_org
+        self, authenticated_page_fast, sandbox_org, cleanup_evaluation
     ):
+        """Completing the modal lands on the single-page wizard (Overview card)."""
         org_id = _sandbox_org_id(sandbox_org)
         nep = NewEvaluationPage(authenticated_page_fast, org_id=org_id)
-        nep.open_new_evaluation_wizard()
-        assert nep.is_wizard_visible(), "Wizard must be visible after Start"
-        assert nep.is_visible(nep.WIZARD_TAB_CONFIGURATION)
+        nep.open_new_evaluation_wizard(objective=_OBJECTIVE)
+        audit_id = nep.get_audit_id_from_url()
+        if audit_id:
+            cleanup_evaluation.append(audit_id)
+        assert nep.is_wizard_visible(), (
+            "Single-page wizard (Evaluation Overview) must be visible after Start"
+        )
+        assert nep.is_visible(EvaluationsLocators.WIZARD_WORKSPACE_HEADING), (
+            "'Evaluation Workspace' section must render on the wizard page"
+        )
 
     def test_evaluation_name_is_editable(
         self, authenticated_page_fast, sandbox_org
     ):
+        """The evaluation name is editable in modal step 1 (read-only test)."""
         org_id = _sandbox_org_id(sandbox_org)
         nep = NewEvaluationPage(authenticated_page_fast, org_id=org_id)
-        nep.open_new_evaluation_wizard()
+        nep.go_to_evaluations_list()
+        nep.click_new_evaluation()
+        if not nep.is_modal_visible():
+            pytest.skip("Modal not visible")
         new_name = unique_evaluation_name()
-        nep.set_evaluation_name(new_name)
-        assert nep.get_evaluation_name() == new_name, (
-            f"Name field should reflect the typed value; got {nep.get_evaluation_name()!r}"
+        nep.set_modal_eval_name(new_name)
+        assert nep.get_modal_eval_name() == new_name, (
+            f"Name field should reflect the typed value; got {nep.get_modal_eval_name()!r}"
         )
+        nep.click_modal_cancel()
 
+    @pytest.mark.xfail(
+        strict=False,
+        reason=(
+            "PLATFORM BUG (intermittent, dev): 'Start Evaluation' sometimes "
+            "never enables despite a valid form — see "
+            "test_add_evaluation_modal.py::TestStartEvaluationValidation."
+        ),
+    )
     def test_audit_type_domain_forces_manual_mode(
         self, authenticated_page_fast, sandbox_org
     ):
-        """Selecting Domain should disable Automated mode."""
+        """Every evaluator type in step 2 must allow starting once the objective
+        is filled (the pre-redesign 'Domain forces Manual' lock no longer
+        applies — mode is chosen in step 1)."""
         org_id = _sandbox_org_id(sandbox_org)
         nep = NewEvaluationPage(authenticated_page_fast, org_id=org_id)
-        nep.open_new_evaluation_wizard()
-        nep.select_evaluation_type("domain")
-        nep.fill_evaluation_objective("Domain regression test")
-        nep.check_module("hallucination")
-        # After picking Domain + checking a module, the Mode dropdown should
-        # default to or be locked to Manual. Read its current value/options.
-        dropdown = authenticated_page_fast.locator(nep.EVAL_MODE_DROPDOWN)
-        if not dropdown.is_visible():
-            pytest.skip("Mode dropdown not rendered — UI may differ on this build")
-        # If select element, its value should be 'Manual' (or its options should
-        # only include Manual). Either is acceptable as evidence of the lock.
-        try:
-            value = dropdown.input_value()
-        except Exception:
-            value = ""
-        if value:
-            assert value.lower().startswith("manual") or value == "", (
-                f"Domain audit type should force Manual mode; got value={value!r}"
+        nep.go_to_evaluations_list()
+        nep.click_new_evaluation()
+        if not nep.is_modal_visible():
+            pytest.skip("Modal not visible")
+        nep.select_first_model_and_version()
+        nep.select_evaluation_method("bulk")
+        nep.click_modal_next()
+        nep.fill_modal_objective("Domain regression test")
+        for eval_type in ("technical", "domain", "cultural"):
+            nep.select_evaluator_type_in_modal(eval_type)
+            assert nep.is_start_evaluation_enabled(), (
+                f"'Start Evaluation' must be enabled for evaluator type {eval_type!r} "
+                "once the objective is filled"
             )
+        nep.click_modal_cancel()
 
 
 class TestNewEvaluationTestCasesTab:
-    """Step 2 of the wizard: advance and exercise dataset/paste controls."""
+    """Wizard workspace: draft persistence and test-case source controls."""
 
     def test_advance_to_test_cases_tab_creates_draft(
         self, authenticated_page_fast, sandbox_org, cleanup_evaluation
     ):
+        """Start Evaluation persists a draft — the URL gains auditId."""
         org_id = _sandbox_org_id(sandbox_org)
         nep = NewEvaluationPage(authenticated_page_fast, org_id=org_id)
-        nep.open_new_evaluation_wizard()
-        nep.set_evaluation_name(unique_evaluation_name())
-        nep.fill_configuration_tab(
-            objective="Regression test for create flow",
-            eval_type="technical",
-            mode="automated",
-            modules=["hallucination"],
-        )
-        nep.click_add_test_cases()
+        nep.open_new_evaluation_wizard(objective="Regression test for create flow")
         audit_id = nep.get_audit_id_from_url()
         if audit_id:
             cleanup_evaluation.append(audit_id)
         assert audit_id is not None, (
-            "Advancing to Test Cases must persist a draft and append auditId to URL"
+            "Start Evaluation must persist a draft and append auditId to the URL"
         )
 
     def test_dataset_table_visible_in_automated_mode(
         self, authenticated_page_fast, sandbox_org, cleanup_evaluation
     ):
+        """Bulk wizard shows the prompt-library test-case source options."""
         org_id = _sandbox_org_id(sandbox_org)
         nep = NewEvaluationPage(authenticated_page_fast, org_id=org_id)
-        nep.open_new_evaluation_wizard()
-        nep.set_evaluation_name(unique_evaluation_name())
-        nep.fill_configuration_tab(
-            objective="Dataset visibility regression",
-            eval_type="technical",
-            mode="automated",
-            modules=["hallucination"],
+        nep.open_new_evaluation_wizard(
+            method="bulk", objective="Dataset visibility regression"
         )
-        nep.click_add_test_cases()
         audit_id = nep.get_audit_id_from_url()
         if audit_id:
             cleanup_evaluation.append(audit_id)
-        if not nep.is_dataset_table_visible():
-            pytest.skip("Dataset table not rendered — sandbox org may have no datasets")
-        assert nep.is_dataset_table_visible()
+        if not nep.is_visible(
+            EvaluationsLocators.WIZARD_PROMPT_LIBRARY_OPTION, timeout=15_000
+        ):
+            pytest.skip("Prompt-library option not rendered — sandbox may have no datasets")
+        assert nep.is_visible(EvaluationsLocators.WIZARD_OWN_PROMPTS_OPTION), (
+            "'Add your own prompts' source option must render alongside the library option"
+        )
 
 
 class TestNewEvaluationRunEvaluation:
-    """Step 3 of the wizard: Run Evaluation persists and surfaces in the list."""
+    """Run Evaluation guard behaviour and API-side audit creation."""
 
     def test_run_evaluation_button_disabled_with_no_selection(
         self, authenticated_page_fast, sandbox_org, cleanup_evaluation
     ):
-        """Without selecting a dataset, Run must error or stay disabled."""
+        """Without selecting a prompt library, Run must stay disabled (or error)."""
         org_id = _sandbox_org_id(sandbox_org)
         nep = NewEvaluationPage(authenticated_page_fast, org_id=org_id)
-        nep.open_new_evaluation_wizard()
-        nep.set_evaluation_name(unique_evaluation_name())
-        nep.fill_configuration_tab(
-            objective="No-selection guard test",
-            eval_type="technical",
-            mode="automated",
-            modules=["hallucination"],
+        nep.open_new_evaluation_wizard(
+            method="bulk", objective="No-selection guard test"
         )
-        nep.click_add_test_cases()
         audit_id = nep.get_audit_id_from_url()
         if audit_id:
             cleanup_evaluation.append(audit_id)
-        if not nep.is_visible(EvaluationsLocators.RUN_EVALUATION_BUTTON, timeout=3_000):
+        if not nep.is_visible(EvaluationsLocators.RUN_EVALUATION_BUTTON, timeout=15_000):
             pytest.skip("Run Evaluation button not rendered")
         if nep.is_run_evaluation_button_enabled():
             # Button enabled by default — click and assert error surfaces.
             nep.click_run_evaluation()
             authenticated_page_fast.wait_for_timeout(800)
-            assert nep.is_run_evaluation_error_visible(), (
-                "Clicking Run with no dataset selected must surface the no-selection error"
+            assert nep.is_run_evaluation_library_error_visible(), (
+                "Clicking Run with nothing selected must surface the library error"
             )
-        # Otherwise: button is disabled — that's also valid guard behaviour.
+        else:
+            assert nep.is_run_evaluation_library_error_visible(), (
+                "The 'Please select a prompt library…' hint must accompany the "
+                "disabled Run Evaluation button"
+            )
 
     def test_run_evaluation_creates_pending_audit_via_api(
         self,

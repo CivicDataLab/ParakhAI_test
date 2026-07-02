@@ -144,5 +144,5 @@ class TestDownloadReportButton:
             if any(kw in e.lower() for kw in ("typeerror", "referenceerror", "syntaxerror"))
         ]
         assert not critical_errors, (
-            f"JavaScript errors during report flow:\n" + "\n".join(critical_errors)
+            "JavaScript errors during report flow:\n" + "\n".join(critical_errors)
         )

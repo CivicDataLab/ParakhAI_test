@@ -67,18 +67,36 @@ class EvaluationsLocators:
     )
 
     # ── New Evaluation modal ───────────────────────────────────────────────────
+    # Two-step Radix dialog. The dialog element carries
+    # data-start-evaluation-step="1" / "2" so the current step can be asserted.
     MODAL_TITLE = "[role='dialog']:has-text('Start an Evaluation')"
+    MODAL_DIALOG = "[role='dialog'][data-start-evaluation-step]"
+    MODAL_STEP_1 = "[role='dialog'][data-start-evaluation-step='1']"
+    MODAL_STEP_2 = "[role='dialog'][data-start-evaluation-step='2']"
     MODAL_MODEL_DROPDOWN = "select[name='modelSelect']"
     MODAL_VERSION_DROPDOWN = "select[name='versionSelect']"
     MODAL_EVAL_NAME_INPUT = "input[name='evaluationName']"
     MODAL_EVAL_METHOD_BULK = "input[name='evaluationMethod'][value='bulk']"
     MODAL_EVAL_METHOD_PLAYGROUND = "input[name='evaluationMethod'][value='manual']"
     MODAL_NEXT_BUTTON = "[role='dialog'] button:has-text('Next')"
+    MODAL_BACK_BUTTON = "[role='dialog'] button:has-text('Back')"
     MODAL_START_BUTTON = "[role='dialog'] button:has-text('Start Evaluation')"
     MODAL_CANCEL_BUTTON = (
         "[role='dialog'] button[aria-label='Close dialog'], "
         "[role='dialog'] button:has-text('Cancel')"
     )
+    MODAL_LOADING_MODELS = "[role='dialog'] :text('Loading models')"
+
+    # Step-2 evaluator-type radios (values: Technical / Domain / Cultural;
+    # Technical is checked by default).
+    MODAL_EVALUATOR_TYPE_RADIO = "input[name='evaluatorType']"
+    MODAL_EVALUATOR_TECHNICAL = "input[name='evaluatorType'][value='Technical']"
+    MODAL_EVALUATOR_DOMAIN = "input[name='evaluatorType'][value='Domain']"
+    MODAL_EVALUATOR_CULTURAL = "input[name='evaluatorType'][value='Cultural']"
+    # Step-2 objective textarea — required; Start Evaluation stays disabled
+    # while it is empty.
+    MODAL_OBJECTIVE_TEXTAREA = "[role='dialog'] textarea"
+    MODAL_STEP2_HEADING = "[role='dialog'] :text('I am evaluating as')"
 
     # Modal dropdown option lists — at least one <option> or listbox item must be present
     # NOTE: If dropdowns are custom (React-Select / Radix), add data-testid="model-option"
@@ -86,17 +104,33 @@ class EvaluationsLocators:
     MODAL_MODEL_OPTION = "option, [role='option'], [class*='option']"
     MODAL_VERSION_OPTION = "option, [role='option'], [class*='option']"
 
-    # ── New Evaluation wizard ──────────────────────────────────────────────────
-    # Scope tab selectors to <button> / [role='tab'] so they don't collide with
-    # the same text appearing in module-card counters ("0 Test Cases").
+    # ── New Evaluation wizard (single-page layout, Jul 2026 redesign) ─────────
+    # The wizard at /evaluations/new?auditId=… is now ONE page — there are no
+    # Configuration / Test Cases tabs any more ([role='tab'] count is 0).
+    # Layout: header (name, Draft badge, Back to List, Cancel) → Evaluation
+    # Overview card → Evaluation Workspace (modules + test-case source + Run).
+    WIZARD_LOADING_CURTAIN = "text=Loading evaluation details"
+    WIZARD_OVERVIEW_HEADING = "text=Evaluation Overview"
+    WIZARD_WORKSPACE_HEADING = "text=Evaluation Workspace"
+    WIZARD_MODULES_HEADING = "text=Evaluation Modules"
+    WIZARD_DRAFT_BADGE = ":text('Draft')"
+    WIZARD_BACK_TO_LIST = "button:has-text('Back to List'), a:has-text('Back to List')"
+    # Test-case source options (Bulk workspace)
+    WIZARD_PROMPT_LIBRARY_OPTION = "text=Select a prompt library"
+    WIZARD_OWN_PROMPTS_OPTION = "text=Add your own prompts"
+    WIZARD_PREMADE_LIBRARIES_LABEL = "text=Select from pre-made prompt libraries"
+    WIZARD_MAX_TEST_CASES_NOTE = "text=Maximum test cases for your current selection"
+    WIZARD_SUBMODULE_PROMPT = "text=Select sub-modules from dropdown"
+    # Error under the Run Evaluation button when no prompt library is selected
+    RUN_EVALUATION_LIBRARY_ERROR = "text=Please select a prompt library"
+
+    # DEPRECATED (pre-Jul-2026 tabbed wizard) — kept so old imports don't break;
+    # do not assert on these, the tabs no longer exist.
     WIZARD_TAB_CONFIGURATION = (
         "[data-testid='tab-configuration'], "
         "[role='tab']:has-text('Evaluation Configuration'), "
         "button:has-text('Evaluation Configuration')"
     )
-    # `:not(:has-text('0 '))` was meant to exclude the counter, but the
-    # "Add Test Cases" action button also matches `button:has-text('Test Cases')`.
-    # Scope the fallback to the auditConfigTab class to disambiguate.
     WIZARD_TAB_TEST_CASES = (
         "[data-testid='tab-test-cases'], "
         "[role='tab']:has-text('Test Cases'), "
@@ -264,10 +298,14 @@ class EvaluationsLocators:
     )
 
     # ── Draft row navigation ───────────────────────────────────────────────────
-    # A DRAFT row's clickable area should navigate to /evaluations/new?auditId=...
-    # NOTE: Add data-testid="draft-row-link" to draft rows for stable selection.
+    # The clickable element is the <a> INSIDE the first cell (evaluation name),
+    # NOT the <tr> itself — clicking the row body does not navigate. The anchor
+    # href is /en/dashboard/ai-maker/{org}/evaluations/new?auditId={id} for
+    # drafts and /evaluations/{id} for completed evals. Confirmed live 2026-07-02.
     DRAFT_ROW = "tr:has-text('DRAFT'), [class*='row']:has-text('DRAFT')"
     COMPLETED_ROW = "tr:has-text('COMPLETED'), [class*='row']:has-text('COMPLETED')"
+    DRAFT_ROW_LINK = "tr:has-text('DRAFT') td:first-child a"
+    COMPLETED_ROW_LINK = "tr:has-text('COMPLETED') td:first-child a"
 
     # ── Evaluation detail ──────────────────────────────────────────────────────
     DETAIL_EVAL_NAME = "[class*='eval-name'], [class*='title'], h1, h2"

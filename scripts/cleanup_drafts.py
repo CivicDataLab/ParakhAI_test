@@ -48,10 +48,25 @@ def main() -> int:
     token = get_access_token(headless=not args.headed)
 
     print(f"→ Fetching audits for org {args.org_id} (limit={args.limit}) ...", flush=True)
-    data = graphql(
-        token, args.org_id, LIST_AUDITS_QUERY, {"status": None, "limit": args.limit}
-    )
-    audits = data["audits"]
+    # The API caps limit at 100 — page through with offset until args.limit
+    # audits are fetched or the list is exhausted.
+    audits: list = []
+    offset = 0
+    while len(audits) < args.limit:
+        page_size = min(100, args.limit - len(audits))
+        data = graphql(
+            token,
+            args.org_id,
+            LIST_AUDITS_QUERY,
+            {"limit": page_size, "offset": offset},
+        )
+        payload = data.get("audits") or {}
+        page = payload.get("data") or []
+        audits.extend(page)
+        offset += len(page)
+        total = payload.get("totalItemsCount") or 0
+        if not page or offset >= total:
+            break
     targets = [a for a in audits if a["status"] in statuses]
 
     print(f"  fetched {len(audits)} audits, {len(targets)} match {sorted(statuses)}")
