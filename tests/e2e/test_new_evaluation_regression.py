@@ -63,7 +63,10 @@ class TestRapidDoubleClickPrevention:
         if not nep.is_modal_visible():
             pytest.skip("Modal not visible")
 
-        # Double-click 'Start'
+        # Complete step 1, then double-click 'Start Evaluation' in step 2
+        nep.select_first_model_and_version()
+        nep.page.locator("input[name='evaluationMethod'][value='bulk']").click()
+        nep.click_modal_next()
         start_btn = authenticated_page.locator(EvaluationsLocators.MODAL_START_BUTTON)
         start_btn.dblclick()
         authenticated_page.wait_for_load_state("domcontentloaded")
