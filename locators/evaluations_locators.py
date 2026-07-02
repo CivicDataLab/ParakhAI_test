@@ -67,14 +67,17 @@ class EvaluationsLocators:
     )
 
     # ── New Evaluation modal ───────────────────────────────────────────────────
-    MODAL_TITLE = "[role='dialog']:has-text('Start New Evaluation'), [class*='modal']:has-text('Start New Evaluation'), [class*='Modal']:has-text('Start New Evaluation')"
-    MODAL_MODEL_DROPDOWN = "select, [class*='select'], [role='combobox']"
-    MODAL_VERSION_DROPDOWN = "select, [class*='select'], [role='combobox']"
-    MODAL_START_BUTTON = "button:has-text('Start')"
+    MODAL_TITLE = "[role='dialog']:has-text('Start an Evaluation')"
+    MODAL_MODEL_DROPDOWN = "select[name='modelSelect']"
+    MODAL_VERSION_DROPDOWN = "select[name='versionSelect']"
+    MODAL_EVAL_NAME_INPUT = "input[name='evaluationName']"
+    MODAL_EVAL_METHOD_BULK = "input[name='evaluationMethod'][value='bulk']"
+    MODAL_EVAL_METHOD_PLAYGROUND = "input[name='evaluationMethod'][value='manual']"
+    MODAL_NEXT_BUTTON = "[role='dialog'] button:has-text('Next')"
+    MODAL_START_BUTTON = "[role='dialog'] button:has-text('Start Evaluation')"
     MODAL_CANCEL_BUTTON = (
-        "[role='dialog'] button:has-text('Cancel'), "
-        "[class*='modal'] button:has-text('Cancel'), "
-        "[class*='Modal'] button:has-text('Cancel')"
+        "[role='dialog'] button[aria-label='Close dialog'], "
+        "[role='dialog'] button:has-text('Cancel')"
     )
 
     # Modal dropdown option lists — at least one <option> or listbox item must be present
@@ -114,12 +117,12 @@ class EvaluationsLocators:
     WIZARD_AUTO_SAVED = "text=Auto-saved"
 
     # Evaluation type radio options
-    EVAL_TYPE_TECHNICAL = "text=Technical Evaluation"
-    EVAL_TYPE_DOMAIN = "text=Domain Evaluation"
-    EVAL_TYPE_CULTURAL = "text=Cultural Evaluation"
-    EVAL_TYPE_TECHNICAL_RADIO = "input[type='radio']:near(:text('Technical Evaluation'))"
-    EVAL_TYPE_DOMAIN_RADIO = "input[type='radio']:near(:text('Domain Evaluation'))"
-    EVAL_TYPE_CULTURAL_RADIO = "input[type='radio']:near(:text('Cultural Evaluation'))"
+    EVAL_TYPE_TECHNICAL = "label:has-text('a technical evaluator'), :text('a technical evaluator')"
+    EVAL_TYPE_DOMAIN = "label:has-text('a domain expert'), :text('a domain expert')"
+    EVAL_TYPE_CULTURAL = "label:has-text('a cultural expert'), :text('a cultural expert')"
+    EVAL_TYPE_TECHNICAL_RADIO = "input[type='radio']:near(:text('a technical evaluator'))"
+    EVAL_TYPE_DOMAIN_RADIO = "input[type='radio']:near(:text('a domain expert'))"
+    EVAL_TYPE_CULTURAL_RADIO = "input[type='radio']:near(:text('a cultural expert'))"
 
     # Evaluation objective
     EVAL_OBJECTIVE_TEXTAREA = "textarea, [class*='objective']"

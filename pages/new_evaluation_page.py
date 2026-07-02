@@ -115,118 +115,90 @@ class NewEvaluationPage(BasePage):
         return self
 
     def is_modal_visible(self) -> bool:
-        """Return True if the 'Start New Evaluation' modal is open."""
+        """Return True if the 'Start an Evaluation' modal is open."""
         return self.is_visible(self.MODAL_TITLE)
 
     def modal_model_dropdown_has_options(self) -> bool:
-        """
-        Return True if the 'Select AI Model' dropdown contains at least one option.
-
-        Handles both native <select> and custom combobox patterns.
-        NOTE: If only placeholder text renders, add data-testid="model-option" to
-        each option element so this selector can target them directly.
-        """
-        # Try native <select> first
-        native = self.page.locator("select").first
-        if native.is_visible():
-            return native.locator("option").count() > 1  # >1 excludes placeholder
-        # Fallback: custom combobox — open it and count list items
-        combo = self.page.locator(
-            "[aria-label*='AI Model'], [aria-label*='model'], "
-            "[class*='model'] [role='combobox']"
-        ).first
-        if combo.is_visible():
-            combo.click()
-            self.page.wait_for_timeout(300)
-            count = self.page.locator("[role='option'], [role='listbox'] li").count()
-            # Close without selecting
-            self.page.keyboard.press("Escape")
-            return count > 0
-        # Last resort: check for visible option text
-        return self.is_visible(EvaluationsLocators.MODAL_MODEL_OPTION, timeout=3_000)
+        """Return True if the model dropdown has at least one real model option."""
+        model_select = self.page.locator("select[name='modelSelect']")
+        if model_select.is_visible():
+            return model_select.locator("option").count() > 1
+        return False
 
     def modal_version_dropdown_has_options(self) -> bool:
-        """
-        Return True if the 'Select Model Version' dropdown contains at least one
-        selectable version.
-
-        Unlike the model dropdown, a model may expose a single version (e.g.
-        '1.0 (Latest)') — so the threshold here is >= 1 real option, not > 1.
-        The version <select> has no placeholder <option>, so every option is a
-        real, selectable version. Target it by accessible name to avoid relying
-        on the positional index of <select> elements on the page.
-        """
-        version_select = self.page.get_by_role(
-            "combobox", name="Select Model Version"
-        ).first
+        """Return True if the version dropdown has at least one option."""
+        version_select = self.page.locator("select[name='versionSelect']")
         if version_select.is_visible():
             return version_select.locator("option").count() >= 1
-        # Fallback: the second native <select> in the modal is the version one.
-        selects = self.page.locator("select")
-        if selects.count() >= 2 and selects.nth(1).is_visible():
-            return selects.nth(1).locator("option").count() >= 1
-        return self.is_visible(EvaluationsLocators.MODAL_VERSION_OPTION, timeout=3_000)
+        return False
 
     def select_first_model_and_version(self) -> None:
-        """
-        Select the first available option in both model and version dropdowns.
-
-        The modal renders three <select> elements:
-          index 0 — rows-per-page selector (10 / 25 / 50 / 100) — skip this one
-          index 1 — AI Model dropdown
-          index 2 — Model Version dropdown
-
-        Works for native <select> elements.  If the dropdowns are custom comboboxes
-        (React-Select / Radix), add data-testid="model-dropdown" /
-        data-testid="version-dropdown" and update this method to use those selectors.
-        """
-        selects = self.page.locator("select")
-        n = selects.count()
-        # Start at index 1 to skip the rows-per-page selector at index 0
-        for i in range(1, min(n, 3)):
-            sel = selects.nth(i)
-            if not sel.is_visible():
-                continue
-            opts = sel.locator("option")
-            if opts.count() > 0:
-                val = opts.first.get_attribute("value")
+        """Select the first real model (skip 'New AI Model' at index 0) and first version."""
+        model_select = self.page.locator("select[name='modelSelect']")
+        if model_select.is_visible():
+            opts = model_select.locator("option")
+            if opts.count() > 1:
+                val = opts.nth(1).get_attribute("value")
                 if val:
-                    sel.select_option(value=val)
-                    self.page.wait_for_timeout(300)
+                    model_select.select_option(value=val)
+                    self.page.wait_for_timeout(500)
+
+    def click_modal_next(self) -> NewEvaluationPage:
+        """Click 'Next' in step 1 of the modal to advance to step 2."""
+        loc = self.page.locator(EvaluationsLocators.MODAL_NEXT_BUTTON).first
+        loc.wait_for(state="visible", timeout=self.timeout)
+        loc.click()
+        try:
+            self.page.locator("text=I am evaluating as").wait_for(state="visible", timeout=15_000)
+        except Exception:
+            pass
+        return self
 
     def click_modal_start(self) -> NewEvaluationPage:
-        """Click 'Start' in the modal and wait for the wizard page to render."""
-        # Use .first to avoid strict mode — the modal may render an enabled
-        # "Start New Evaluation" button alongside a disabled "Start" button.
-        # Target the *enabled* Start button: it renders aria-disabled until a
-        # model + version are selected (which only happens once the modal's
-        # model list has loaded). Waiting for the enabled one avoids a 30s
-        # auto-wait spent clicking a button that is still disabled.
-        enabled_start = self.page.locator(
-            "button:has-text('Start'):not([aria-disabled='true']):not([disabled])"
-        ).first
-        try:
-            enabled_start.wait_for(state="visible", timeout=self.timeout)
-            loc = enabled_start
-        except Exception:
-            loc = self.page.locator(self.MODAL_START_BUTTON).first
-            loc.wait_for(state="visible", timeout=self.timeout)
+        """Click 'Start Evaluation' in step 2 of the modal and wait for the wizard."""
+        loc = self.page.locator(self.MODAL_START_BUTTON).first
+        loc.wait_for(state="visible", timeout=self.timeout)
         loc.click()
-        # Wait for the SPA URL change to /evaluations/new
         try:
             self.page.wait_for_url("**/evaluations/new**", timeout=self.timeout)
         except Exception:
             self.page.wait_for_timeout(2_000)
-        # The wizard mounts client-side from this navigation and renders without
-        # a refresh. Do NOT reload here: a reload cold-loads the wizard URL,
-        # which re-triggers the ~20s 'Verifying your session...' curtain for no
-        # benefit. Wait for the Configuration tab to confirm the wizard mounted.
         try:
             self.page.locator(self.WIZARD_TAB_CONFIGURATION).first.wait_for(
                 state="visible", timeout=self.timeout
             )
         except Exception:
-            pass  # let the caller's assertion surface the real failure
+            pass
+        return self
+
+    def start_evaluation_from_modal(
+        self,
+        model_index: int = 1,
+        method: str = "bulk",
+        eval_type: str = "technical",
+    ) -> "NewEvaluationPage":
+        """Complete both modal steps and land on the wizard configuration page."""
+        model_select = self.page.locator("select[name='modelSelect']")
+        model_select.wait_for(state="visible", timeout=self.timeout)
+        opts = model_select.locator("option").all()
+        if len(opts) > model_index:
+            val = opts[model_index].get_attribute("value")
+            model_select.select_option(val)
+        self.page.wait_for_timeout(500)
+        self.page.locator(f"input[name='evaluationMethod'][value='{method}']").click()
+        self.click_modal_next()
+        type_radio_map = {
+            "technical": "input[type='radio']:near(:text('a technical evaluator'))",
+            "domain": "input[type='radio']:near(:text('a domain expert'))",
+            "cultural": "input[type='radio']:near(:text('a cultural expert'))",
+        }
+        radio_sel = type_radio_map.get(eval_type, type_radio_map["technical"])
+        try:
+            self.page.locator(radio_sel).first.click(timeout=5_000)
+        except Exception:
+            pass
+        self.click_modal_start()
+        self.wait_for_app_ready(60_000)
         return self
 
     def click_modal_cancel(self) -> None:
@@ -697,21 +669,15 @@ class NewEvaluationPage(BasePage):
     # ── Composite helpers (multi-step) ─────────────────────────────────────────
 
     def open_new_evaluation_wizard(self) -> NewEvaluationPage:
-        """
-        Full flow: navigate to list → click New Evaluation → Start.
-
-        Skips the test if the modal or wizard is not reachable.
-        Returns self for fluent chaining.
-        """
+        """Full flow: navigate to list → click New Evaluation → complete both modal steps."""
         self.go_to_evaluations_list()
         self.click_new_evaluation()
         assert self.is_modal_visible(), (
-            "'Start New Evaluation' modal did not appear — platform may be unavailable or slow"
+            "'Start an Evaluation' modal did not appear — platform may be unavailable or slow"
         )
-        self.select_first_model_and_version()
-        self.click_modal_start()
+        self.start_evaluation_from_modal()
         assert self.is_wizard_visible(), (
-            "Evaluation wizard did not load after clicking Start"
+            "Evaluation wizard did not load after clicking Start Evaluation"
         )
         return self
 

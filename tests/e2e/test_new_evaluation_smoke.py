@@ -65,19 +65,19 @@ class TestNewEvaluationModal:
         nep.click_new_evaluation()
 
         assert nep.is_modal_visible(), (
-            "'Start New Evaluation' modal must appear after clicking the button"
+            "'Start an Evaluation' modal must appear after clicking the button"
         )
-        assert nep.is_visible("text=Select AI Model"), (
-            "'Select AI Model' label must be visible in the modal"
+        assert nep.is_visible("text=Select an AI Model"), (
+            "'Select an AI Model' label must be visible in the modal"
         )
-        assert nep.is_visible("text=Select Model Version"), (
-            "'Select Model Version' label must be visible in the modal"
+        assert nep.is_visible("text=Select a Version"), (
+            "'Select a Version' label must be visible in the modal"
         )
         assert nep.modal_model_dropdown_has_options(), (
-            "'Select AI Model' dropdown must have at least one selectable option"
+            "'Select an AI Model' dropdown must have at least one selectable option"
         )
         assert nep.modal_version_dropdown_has_options(), (
-            "'Select Model Version' dropdown must have at least one selectable option"
+            "'Select a Version' dropdown must have at least one selectable option"
         )
         # Clean up — dismiss modal
         nep.click_modal_cancel()
@@ -93,8 +93,7 @@ class TestNewEvaluationModal:
         if not nep.is_modal_visible():
             pytest.skip("Modal not visible — cannot test Start navigation")
 
-        nep.select_first_model_and_version()
-        nep.click_modal_start()
+        nep.start_evaluation_from_modal()
 
         assert nep.is_on_wizard_url(), (
             f"Expected /evaluations/new in URL after Start, got: {authenticated_page.url}"
