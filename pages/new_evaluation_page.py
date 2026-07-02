@@ -1,18 +1,19 @@
 """
-Page object for the New Evaluation wizard — Draft & Auto-Save flow.
+Page object for the New Evaluation flow (Jul 2026 redesign).
 
 Covers:
-  • "New Evaluation" modal (model + version dropdowns → Start)
-  • Evaluation Configuration tab (name, type, objective, modules, mode)
-  • Test Cases tab — Automated mode (dataset selection, paste/upload, Run Evaluation)
-  • Test Cases tab — Manual mode   (module cards, test entry, Change Module, Finish)
-  • Auto-save indicator
-  • Cancel Evaluation
-  • Draft row navigation from the list
+  • "Start an Evaluation" modal — two steps:
+      step 1: model + version selects, evaluation name, method (bulk/manual)
+      step 2: evaluator-type radios, objective textarea → Start Evaluation
+  • Single-page wizard at /evaluations/new?auditId=… (NO tabs any more):
+      header (editable name, Draft badge, Back to List, Cancel)
+      Evaluation Overview card (Eval ID / Scope / Mode / Evaluator / Objective)
+      Evaluation Workspace — Bulk: module checkboxes + prompt-library source
+                             + Run Evaluation; Playground: prompt workspace
+  • Draft row navigation from the list (anchor inside the first cell)
 
 Entry URL : /dashboard/ai-maker/{org_id}/evaluations  (click New Evaluation)
-Wizard URL: /evaluations/new?modelId=…&versionId=…
-            /evaluations/new?auditId=…  (re-open a draft)
+Wizard URL: /evaluations/new?auditId=…
 """
 
 from __future__ import annotations
@@ -86,7 +87,11 @@ class NewEvaluationPage(BasePage):
 
     def go_to_draft(self, audit_id: int | str) -> NewEvaluationPage:
         """Directly navigate to a known draft by its auditId query param."""
-        self.navigate(Config.url(f"/evaluations/new?auditId={audit_id}"))
+        self.navigate(
+            Config.url(
+                f"/dashboard/ai-maker/{self.org_id}/evaluations/new?auditId={audit_id}"
+            )
+        )
         self.wait_for_load("domcontentloaded")
         return self
 
@@ -118,30 +123,92 @@ class NewEvaluationPage(BasePage):
         """Return True if the 'Start an Evaluation' modal is open."""
         return self.is_visible(self.MODAL_TITLE)
 
+    def get_modal_step(self) -> str | None:
+        """Return the current modal step ('1' or '2'), or None if no modal is open.
+
+        The data-start-evaluation-step attribute is only set on step 2 on some
+        builds, so fall back to content detection: step 2 shows the
+        'I am evaluating as' heading, step 1 shows the model select.
+        """
+        try:
+            dlg = self.page.locator(EvaluationsLocators.MODAL_DIALOG).first
+            step = dlg.get_attribute("data-start-evaluation-step", timeout=2_000)
+            if step:
+                return step
+        except Exception:
+            pass
+        if not self.is_visible(self.MODAL_TITLE, timeout=2_000):
+            return None
+        if self.is_visible(EvaluationsLocators.MODAL_STEP2_HEADING, timeout=1_000):
+            return "2"
+        return "1"
+
     def modal_model_dropdown_has_options(self) -> bool:
         """Return True if the model dropdown has at least one real model option."""
-        model_select = self.page.locator("select[name='modelSelect']")
+        model_select = self.page.locator(EvaluationsLocators.MODAL_MODEL_DROPDOWN)
         if model_select.is_visible():
             return model_select.locator("option").count() > 1
         return False
 
     def modal_version_dropdown_has_options(self) -> bool:
         """Return True if the version dropdown has at least one option."""
-        version_select = self.page.locator("select[name='versionSelect']")
+        version_select = self.page.locator(EvaluationsLocators.MODAL_VERSION_DROPDOWN)
         if version_select.is_visible():
             return version_select.locator("option").count() >= 1
         return False
 
+    def get_modal_model_options(self) -> list[tuple[str, str]]:
+        """Return [(value, text), ...] for every model option."""
+        opts = self.page.locator(
+            f"{EvaluationsLocators.MODAL_MODEL_DROPDOWN} option"
+        ).all()
+        return [(o.get_attribute("value") or "", o.inner_text().strip()) for o in opts]
+
+    def get_modal_version_options(self) -> list[str]:
+        """Return the visible text of every version option."""
+        opts = self.page.locator(
+            f"{EvaluationsLocators.MODAL_VERSION_DROPDOWN} option"
+        ).all()
+        return [o.inner_text().strip() for o in opts]
+
+    def select_model_by_index(self, index: int = 1) -> None:
+        """Select a model by option index (index 0 is 'New AI Model'; real models from 1)."""
+        model_select = self.page.locator(EvaluationsLocators.MODAL_MODEL_DROPDOWN)
+        model_select.wait_for(state="visible", timeout=self.timeout)
+        opts = model_select.locator("option")
+        if opts.count() > index:
+            val = opts.nth(index).get_attribute("value")
+            if val:
+                model_select.select_option(value=val)
+                self.page.wait_for_timeout(500)
+
     def select_first_model_and_version(self) -> None:
         """Select the first real model (skip 'New AI Model' at index 0) and first version."""
-        model_select = self.page.locator("select[name='modelSelect']")
-        if model_select.is_visible():
-            opts = model_select.locator("option")
-            if opts.count() > 1:
-                val = opts.nth(1).get_attribute("value")
-                if val:
-                    model_select.select_option(value=val)
-                    self.page.wait_for_timeout(500)
+        self.select_model_by_index(1)
+
+    def get_modal_eval_name(self) -> str:
+        """Return the current value of the evaluation-name input in the modal."""
+        loc = self.page.locator(EvaluationsLocators.MODAL_EVAL_NAME_INPUT)
+        loc.wait_for(state="visible", timeout=self.timeout)
+        return loc.input_value()
+
+    def set_modal_eval_name(self, name: str) -> None:
+        """Replace the evaluation name in the modal's step-1 input."""
+        loc = self.page.locator(EvaluationsLocators.MODAL_EVAL_NAME_INPUT)
+        loc.wait_for(state="visible", timeout=self.timeout)
+        loc.fill(name)
+
+    def select_evaluation_method(self, method: str = "bulk") -> None:
+        """Select the evaluation-method radio in step 1: 'bulk' or 'manual' (Playground)."""
+        self.page.locator(
+            f"input[name='evaluationMethod'][value='{method}']"
+        ).click()
+
+    def is_method_selected(self, method: str) -> bool:
+        """Return True if the given evaluation-method radio is checked."""
+        return self.page.locator(
+            f"input[name='evaluationMethod'][value='{method}']"
+        ).is_checked()
 
     def click_modal_next(self) -> NewEvaluationPage:
         """Click 'Next' in step 1 of the modal to advance to step 2."""
@@ -149,26 +216,104 @@ class NewEvaluationPage(BasePage):
         loc.wait_for(state="visible", timeout=self.timeout)
         loc.click()
         try:
-            self.page.locator("text=I am evaluating as").wait_for(state="visible", timeout=15_000)
+            self.page.locator(EvaluationsLocators.MODAL_STEP2_HEADING).first.wait_for(
+                state="visible", timeout=15_000
+            )
         except Exception:
             pass
         return self
 
+    def click_modal_back(self) -> NewEvaluationPage:
+        """Click 'Back' inside the modal (step 2 → step 1, or step 1 → close)."""
+        loc = self.page.locator(EvaluationsLocators.MODAL_BACK_BUTTON).first
+        loc.wait_for(state="visible", timeout=self.timeout)
+        loc.click()
+        self.page.wait_for_timeout(500)
+        return self
+
+    def select_evaluator_type_in_modal(self, eval_type: str = "technical") -> None:
+        """Select the evaluator-type radio in step 2 (technical/domain/cultural)."""
+        value_map = {
+            "technical": EvaluationsLocators.MODAL_EVALUATOR_TECHNICAL,
+            "domain": EvaluationsLocators.MODAL_EVALUATOR_DOMAIN,
+            "cultural": EvaluationsLocators.MODAL_EVALUATOR_CULTURAL,
+        }
+        sel = value_map.get(eval_type.lower(), value_map["technical"])
+        self.page.locator(sel).first.check()
+
+    def get_checked_evaluator_type(self) -> str | None:
+        """Return the value (Technical/Domain/Cultural) of the checked step-2 radio."""
+        radios = self.page.locator(EvaluationsLocators.MODAL_EVALUATOR_TYPE_RADIO).all()
+        for r in radios:
+            if r.is_checked():
+                return r.get_attribute("value")
+        return None
+
+    def fill_modal_objective(self, objective: str) -> None:
+        """Fill the required objective textarea in modal step 2.
+
+        Uses real keyboard events — the Start button's enable-validation only
+        fires on keystrokes (verified live 2026-07-02: fill()/blur never
+        enables it, press_sequentially does). Clearing likewise needs
+        select-all + Backspace key events.
+        """
+        ta = self.page.locator(EvaluationsLocators.MODAL_OBJECTIVE_TEXTAREA).first
+        ta.wait_for(state="visible", timeout=self.timeout)
+        ta.click()
+        self.page.keyboard.press("ControlOrMeta+a")
+        self.page.keyboard.press("Backspace")
+        if objective:
+            ta.press_sequentially(objective, delay=5)
+        self.page.wait_for_timeout(300)
+
+    def get_modal_objective(self) -> str:
+        """Return the current objective textarea value in modal step 2."""
+        ta = self.page.locator(EvaluationsLocators.MODAL_OBJECTIVE_TEXTAREA).first
+        ta.wait_for(state="visible", timeout=self.timeout)
+        return ta.input_value()
+
+    def is_start_evaluation_enabled(self, settle_ms: int = 2_000) -> bool:
+        """Return True if the 'Start Evaluation' button in step 2 is enabled.
+
+        The button uses aria-disabled (Radix) as well as the disabled attribute.
+        The enabled state updates asynchronously after typing in the objective,
+        so poll briefly (settle_ms) before reporting disabled.
+        """
+        btn = self.page.locator(self.MODAL_START_BUTTON).first
+
+        def _enabled() -> bool:
+            if not btn.is_visible():
+                return False
+            if btn.get_attribute("aria-disabled") == "true":
+                return False
+            return btn.is_enabled()
+
+        polls = max(1, settle_ms // 250)
+        for _ in range(polls):
+            if _enabled():
+                return True
+            self.page.wait_for_timeout(250)
+        return _enabled()
+
     def click_modal_start(self) -> NewEvaluationPage:
-        """Click 'Start Evaluation' in step 2 of the modal and wait for the wizard."""
+        """Click 'Start Evaluation' in step 2 and wait for the wizard navigation.
+
+        The Radix dialog overlay keeps intercepting pointer events until the
+        dialog fully closes, so wait for hidden BEFORE any further clicks.
+        """
         loc = self.page.locator(self.MODAL_START_BUTTON).first
         loc.wait_for(state="visible", timeout=self.timeout)
         loc.click()
         try:
-            self.page.wait_for_url("**/evaluations/new**", timeout=self.timeout)
-        except Exception:
-            self.page.wait_for_timeout(2_000)
-        try:
-            self.page.locator(self.WIZARD_TAB_CONFIGURATION).first.wait_for(
-                state="visible", timeout=self.timeout
+            self.page.locator(EvaluationsLocators.MODAL_DIALOG).first.wait_for(
+                state="hidden", timeout=20_000
             )
         except Exception:
             pass
+        try:
+            self.page.wait_for_url("**auditId=**", timeout=self.timeout)
+        except Exception:
+            self.page.wait_for_timeout(2_000)
         return self
 
     def start_evaluation_from_modal(
@@ -176,42 +321,132 @@ class NewEvaluationPage(BasePage):
         model_index: int = 1,
         method: str = "bulk",
         eval_type: str = "technical",
-    ) -> "NewEvaluationPage":
-        """Complete both modal steps and land on the wizard configuration page."""
-        model_select = self.page.locator("select[name='modelSelect']")
-        model_select.wait_for(state="visible", timeout=self.timeout)
-        opts = model_select.locator("option").all()
-        if len(opts) > model_index:
-            val = opts[model_index].get_attribute("value")
-            model_select.select_option(val)
-        self.page.wait_for_timeout(500)
-        self.page.locator(f"input[name='evaluationMethod'][value='{method}']").click()
+        objective: str = "Automated test evaluation objective",
+        name: str | None = None,
+    ) -> NewEvaluationPage:
+        """Complete both modal steps and land on the single-page wizard.
+
+        Precondition: the modal is already open (call click_new_evaluation()).
+        """
+        self.select_model_by_index(model_index)
+        if name is not None:
+            self.set_modal_eval_name(name)
+        self.select_evaluation_method(method)
         self.click_modal_next()
-        type_radio_map = {
-            "technical": "input[type='radio']:near(:text('a technical evaluator'))",
-            "domain": "input[type='radio']:near(:text('a domain expert'))",
-            "cultural": "input[type='radio']:near(:text('a cultural expert'))",
-        }
-        radio_sel = type_radio_map.get(eval_type, type_radio_map["technical"])
-        try:
-            self.page.locator(radio_sel).first.click(timeout=5_000)
-        except Exception:
-            pass
+        self.select_evaluator_type_in_modal(eval_type)
+        self.fill_modal_objective(objective)
         self.click_modal_start()
-        self.wait_for_app_ready(60_000)
         return self
 
     def click_modal_cancel(self) -> None:
-        """Click 'Cancel' in the modal."""
-        loc = self.page.locator(self.MODAL_CANCEL_BUTTON).first
-        loc.wait_for(state="visible", timeout=self.timeout)
-        loc.click()
+        """Dismiss the modal via its close control, falling back to Escape."""
+        try:
+            loc = self.page.locator(self.MODAL_CANCEL_BUTTON).first
+            loc.wait_for(state="visible", timeout=10_000)
+            loc.click()
+            self.page.locator(self.MODAL_TITLE).first.wait_for(
+                state="hidden", timeout=8_000
+            )
+        except Exception:
+            pass
+        if self.is_visible(self.MODAL_TITLE, timeout=1_000):
+            self.page.keyboard.press("Escape")
+            try:
+                self.page.locator(self.MODAL_TITLE).first.wait_for(
+                    state="hidden", timeout=8_000
+                )
+            except Exception:
+                pass
 
-    # ── Wizard — general ──────────────────────────────────────────────────────
+    # ── Wizard — general (single-page layout) ─────────────────────────────────
+
+    def wait_for_wizard_loaded(self, timeout: int = 90_000) -> bool:
+        """Wait until the single-page wizard has fully hydrated.
+
+        The wizard shows a 'Loading evaluation details...' curtain for ~20s on
+        dev, and content can flash empty in between. Poll until the curtain is
+        gone AND the Evaluation Overview card is rendered. Returns True on
+        success, False on timeout (callers assert).
+        """
+        deadline_polls = max(1, timeout // 3_000)
+        for _ in range(deadline_polls):
+            try:
+                body = self.page.locator("body").inner_text()
+            except Exception:
+                body = ""
+            if (
+                "Loading evaluation details" not in body
+                and "Evaluation Overview" in body
+            ):
+                return True
+            self.page.wait_for_timeout(3_000)
+        return False
 
     def is_wizard_visible(self) -> bool:
-        """Return True if the Evaluation Configuration tab is visible (wizard is open)."""
-        return self.is_visible(self.WIZARD_TAB_CONFIGURATION)
+        """Return True if the single-page wizard is open (Evaluation Overview card rendered)."""
+        return self.is_visible(EvaluationsLocators.WIZARD_OVERVIEW_HEADING, timeout=5_000)
+
+    def get_overview_field(self, label: str) -> str | None:
+        """Read a field from the Evaluation Overview card by its label.
+
+        The card renders lines like 'Scope : Healthcare' / 'Mode : Bulk
+        Evaluation'. Returns the value part, or None if the label is absent.
+        """
+        try:
+            body = self.page.locator("body").inner_text()
+        except Exception:
+            return None
+        for line in body.split("\n"):
+            line = line.strip()
+            key, sep, value = line.partition(":")
+            # Exact label match (not prefix) so 'Mode' doesn't hit 'Modules : --'.
+            if sep and key.strip().lower() == label.lower():
+                return value.strip()
+        return None
+
+    def click_back_to_list(self) -> None:
+        """Click 'Back to List' in the wizard header and wait for the list page."""
+        self.click(EvaluationsLocators.WIZARD_BACK_TO_LIST)
+        try:
+            self.page.wait_for_function(
+                "() => !window.location.search.includes('auditId=')",
+                timeout=self.timeout,
+            )
+        except Exception:
+            self.wait_for_load("domcontentloaded")
+        self.page.wait_for_timeout(1_000)
+
+    # ── Wizard — Bulk workspace (test-case source) ────────────────────────────
+
+    def select_prompt_library_source(self) -> None:
+        """Choose the 'Select a prompt library' test-case source."""
+        self.page.locator(
+            EvaluationsLocators.WIZARD_PROMPT_LIBRARY_OPTION
+        ).first.click()
+        self.page.wait_for_timeout(500)
+
+    def select_own_prompts_source(self) -> None:
+        """Choose the 'Add your own prompts' test-case source."""
+        self.page.locator(
+            EvaluationsLocators.WIZARD_OWN_PROMPTS_OPTION
+        ).first.click()
+        self.page.wait_for_timeout(500)
+
+    def is_max_test_cases_note_visible(self) -> bool:
+        """Return True if the 'Maximum test cases…' note is rendered."""
+        return self.is_visible(
+            EvaluationsLocators.WIZARD_MAX_TEST_CASES_NOTE, timeout=3_000
+        )
+
+    def is_submodule_prompt_visible(self) -> bool:
+        """Return True if 'Select sub-modules from dropdown' is shown (module checked)."""
+        return self.is_visible(EvaluationsLocators.WIZARD_SUBMODULE_PROMPT, timeout=3_000)
+
+    def is_run_evaluation_library_error_visible(self) -> bool:
+        """Return True if 'Please select a prompt library…' error is shown."""
+        return self.is_visible(
+            EvaluationsLocators.RUN_EVALUATION_LIBRARY_ERROR, timeout=3_000
+        )
 
     def is_on_wizard_url(self, timeout: int = 10_000) -> bool:
         """
@@ -258,6 +493,20 @@ class NewEvaluationPage(BasePage):
         if "Auto-saved" appears elsewhere on the page.
         """
         return self.is_visible(self.WIZARD_AUTO_SAVED, timeout=timeout)
+
+    def is_cancel_evaluation_enabled(self) -> bool:
+        """Return True if the wizard header 'Cancel' button is enabled.
+
+        On the redesigned page the Cancel button (styles_cancelAuditButton)
+        cancels a RUNNING audit — it is aria-disabled for a fresh DRAFT.
+        Use click_back_to_list() to leave a draft.
+        """
+        btn = self.page.locator(self.WIZARD_CANCEL_EVALUATION).first
+        if not btn.is_visible():
+            return False
+        if btn.get_attribute("aria-disabled") == "true":
+            return False
+        return btn.is_enabled()
 
     def cancel_evaluation(self) -> None:
         """Click 'Cancel Evaluation ✕' and wait to return to the list."""
@@ -608,77 +857,77 @@ class NewEvaluationPage(BasePage):
         return self.page.locator(EvaluationsLocators.DRAFT_ROW).count()
 
     def click_first_draft_row(self) -> None:
-        """Click the first DRAFT row in the evaluations list."""
-        row = self.page.locator(EvaluationsLocators.DRAFT_ROW).first
-        row.wait_for(state="visible", timeout=self.timeout)
-        row.click()
-        self.wait_for_load("domcontentloaded")
+        """Open the first DRAFT evaluation from the list.
+
+        The navigable element is the <a> inside the first cell — clicking the
+        <tr> body does NOT navigate (confirmed live 2026-07-02).
+        """
+        link = self.page.locator(EvaluationsLocators.DRAFT_ROW_LINK).first
+        link.wait_for(state="visible", timeout=self.timeout)
+        link.click()
+        try:
+            self.page.wait_for_url("**auditId=**", timeout=self.timeout)
+        except Exception:
+            self.wait_for_load("domcontentloaded")
 
     def click_first_completed_row(self) -> None:
-        """Click the first COMPLETED row in the evaluations list."""
-        row = self.page.locator(EvaluationsLocators.COMPLETED_ROW).first
-        row.wait_for(state="visible", timeout=self.timeout)
-        row.click()
+        """Open the first COMPLETED evaluation from the list (via its name anchor)."""
+        link = self.page.locator(EvaluationsLocators.COMPLETED_ROW_LINK).first
+        link.wait_for(state="visible", timeout=self.timeout)
+        link.click()
         self.wait_for_load("domcontentloaded")
+
+    def get_first_draft_href(self) -> str | None:
+        """Return the href of the first DRAFT row's name anchor (or None)."""
+        link = self.page.locator(EvaluationsLocators.DRAFT_ROW_LINK).first
+        try:
+            link.wait_for(state="visible", timeout=self.timeout)
+            return link.get_attribute("href")
+        except Exception:
+            return None
+
+    def get_first_completed_href(self) -> str | None:
+        """Return the href of the first COMPLETED row's name anchor (or None)."""
+        link = self.page.locator(EvaluationsLocators.COMPLETED_ROW_LINK).first
+        try:
+            link.wait_for(state="visible", timeout=self.timeout)
+            return link.get_attribute("href")
+        except Exception:
+            return None
 
     def draft_row_href_contains_new(self) -> bool:
-        """
-        Return True if the first DRAFT row's anchor href contains '/evaluations/new'.
-
-        Validates that DRAFT rows link to the editable wizard, not the read-only
-        report view.
-
-        NOTE: If the row is a <tr> with a click handler rather than an <a>, this
-        check will evaluate the URL *after* navigation instead. Add
-        data-testid="draft-row-link" wrapping the <tr> in an <a> for reliability.
-        """
-        row = self.page.locator(EvaluationsLocators.DRAFT_ROW).first
-        # Wait for the row to attach so get_attribute returns its real value
-        # rather than None from a not-yet-rendered element.
-        row.wait_for(state="visible", timeout=self.timeout)
-        href = row.get_attribute("href")
-        if href is not None:
-            return "/evaluations/new" in href
-        # Fallback: navigate and check URL
-        row.click()
-        self.wait_for_load("domcontentloaded")
-        result = "/evaluations/new" in self.page.url
-        self.page.go_back()
-        self.wait_for_load("domcontentloaded")
-        return result
+        """Return True if the first DRAFT row's anchor links to /evaluations/new?auditId=…"""
+        href = self.get_first_draft_href()
+        return href is not None and "/evaluations/new" in href and "auditId=" in href
 
     def completed_row_href_excludes_new(self) -> bool:
-        """
-        Return True if the first COMPLETED row links to /evaluations/{id} (not /new).
-
-        NOTE: Same stabilisation note as draft_row_href_contains_new.
-        """
-        row = self.page.locator(EvaluationsLocators.COMPLETED_ROW).first
-        row.wait_for(state="visible", timeout=self.timeout)
-        href = row.get_attribute("href")
-        if href is not None:
-            return "/evaluations/" in href and "new" not in href
-        # Fallback: navigate and check URL
-        row.click()
-        self.wait_for_load("domcontentloaded")
-        result = "/evaluations/" in self.page.url and "new" not in self.page.url
-        self.page.go_back()
-        self.wait_for_load("domcontentloaded")
-        return result
+        """Return True if the first COMPLETED row's anchor links to /evaluations/{id} (not /new)."""
+        href = self.get_first_completed_href()
+        return href is not None and "/evaluations/" in href and "/new" not in href
 
     # ── Composite helpers (multi-step) ─────────────────────────────────────────
 
-    def open_new_evaluation_wizard(self) -> NewEvaluationPage:
-        """Full flow: navigate to list → click New Evaluation → complete both modal steps."""
+    def open_new_evaluation_wizard(
+        self,
+        method: str = "bulk",
+        eval_type: str = "technical",
+        objective: str = "Automated test evaluation objective",
+    ) -> NewEvaluationPage:
+        """Full flow: list → New Evaluation → both modal steps → hydrated wizard.
+
+        After 'Start Evaluation' the platform navigates to
+        /evaluations/new?auditId={id}; the page hydrates behind a
+        'Loading evaluation details...' curtain (~20s on dev).
+        """
         self.go_to_evaluations_list()
         self.click_new_evaluation()
         assert self.is_modal_visible(), (
             "'Start an Evaluation' modal did not appear — platform may be unavailable or slow"
         )
-        self.start_evaluation_from_modal()
-        assert self.is_wizard_visible(), (
-            "Evaluation wizard did not load after clicking Start Evaluation"
+        self.start_evaluation_from_modal(
+            method=method, eval_type=eval_type, objective=objective
         )
+        self.wait_for_wizard_loaded()
         return self
 
     def fill_configuration_tab(

@@ -136,6 +136,11 @@ class TestGraphQL:
           aiModels(limit: $limit) { id name modelType provider isPublic }
         }
     """
+    QUERY_AI_MODELS_WITH_VERSIONS = """
+        query AiModels($limit: Int) {
+          aiModels(limit: $limit) { id name versions { id } }
+        }
+    """
     QUERY_PROMPT_DATASETS = """
         query PromptDatasets {
           promptDatasets { id }
@@ -234,7 +239,7 @@ class TestGraphQL:
     """
     QUERY_ORGANIZATION_AUDITORS = """
         query OrganizationAuditors($organizationId: ID!) {
-          organizationAuditors(organizationId: $organizationId) { auditors { id } }
+          organizationAuditors(organizationId: $organizationId) { auditors { id email } }
         }
     """
     QUERY_AUDITOR_ASSIGNMENTS = """

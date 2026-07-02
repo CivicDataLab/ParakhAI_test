@@ -21,9 +21,10 @@ class HomeLocators:
         "a:has-text('Evaluation Workspace')"
     )
     HAMBURGER_MENU = (
+        "button.mobile-hamburger-button, "
+        "button[aria-label='Open menu'], "
         "button[aria-label*='menu'], "
         "button[aria-label*='Menu'], "
-        "button.hamburger, "
         "[data-testid='mobile-menu-button']"
     )
     MOBILE_NAV_ITEMS = "nav a, [role='navigation'] a"

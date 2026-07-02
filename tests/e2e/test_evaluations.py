@@ -12,6 +12,7 @@ from playwright.sync_api import Page
 
 from locators.evaluations_locators import EvaluationsLocators
 from pages.evaluations_page import EvaluationsPage
+from pages.new_evaluation_page import NewEvaluationPage
 
 pytestmark = [pytest.mark.e2e, pytest.mark.regression, pytest.mark.auth]
 
@@ -112,43 +113,53 @@ class TestEvaluationsListPage:
 
 
 class TestNewEvaluationModal:
-    """Verify the 'New Evaluation' modal and wizard form."""
+    """Verify the two-step 'Start an Evaluation' modal (Jul 2026 redesign).
+
+    Read-only: never clicks 'Start Evaluation'. Draft-creating flows are
+    covered in test_add_evaluation_bulk.py / test_add_evaluation_playground.py.
+    """
 
     def test_new_evaluation_button_opens_modal(self, page: Page):
-        """Clicking 'New Evaluation' opens the modal dialog."""
+        """Clicking 'New Evaluation' opens the 'Start an Evaluation' modal."""
         ep = EvaluationsPage(page)
         ep.go_to_evaluations_list()
         ep.click_new_evaluation()
         assert ep.is_new_eval_modal_visible(), (
-            "'Start New Evaluation' modal must appear after clicking the button"
+            "'Start an Evaluation' modal must appear after clicking the button"
         )
 
     def test_modal_contains_model_dropdown(self, page: Page):
-        """The modal has a dropdown to select the AI model."""
-        ep = EvaluationsPage(page)
-        ep.go_to_evaluations_list()
-        ep.click_new_evaluation()
-        assert ep.is_new_eval_modal_visible(), (
+        """Step 1 has the 'Select an AI Model' dropdown."""
+        nep = NewEvaluationPage(page)
+        nep.go_to_evaluations_list()
+        nep.click_new_evaluation()
+        assert nep.is_modal_visible(), (
             "Modal not visible — platform may be unavailable or slow"
         )
-        assert ep.is_visible("text=Select AI Model"), (
-            "'Select AI Model' label must appear in the modal"
+        assert nep.is_visible("text=Select an AI Model"), (
+            "'Select an AI Model' label must appear in the modal"
+        )
+        assert nep.modal_model_dropdown_has_options(), (
+            "Model dropdown must contain at least one real model"
         )
 
     def test_modal_contains_version_dropdown(self, page: Page):
-        """The modal has a dropdown to select the model version."""
-        ep = EvaluationsPage(page)
-        ep.go_to_evaluations_list()
-        ep.click_new_evaluation()
-        assert ep.is_new_eval_modal_visible(), (
+        """Step 1 has the 'Select a Version' dropdown."""
+        nep = NewEvaluationPage(page)
+        nep.go_to_evaluations_list()
+        nep.click_new_evaluation()
+        assert nep.is_modal_visible(), (
             "Modal not visible — platform may be unavailable or slow"
         )
-        assert ep.is_visible("text=Select Model Version"), (
-            "'Select Model Version' label must appear in the modal"
+        assert nep.is_visible("text=Select a Version"), (
+            "'Select a Version' label must appear in the modal"
+        )
+        assert nep.modal_version_dropdown_has_options(), (
+            "Version dropdown must contain at least one option"
         )
 
     def test_modal_cancel_button_closes_modal(self, page: Page):
-        """Clicking Cancel dismisses the modal without navigating."""
+        """Dismissing the modal keeps the user on the evaluations list."""
         ep = EvaluationsPage(page)
         ep.go_to_evaluations_list()
         ep.click_new_evaluation()
@@ -160,157 +171,77 @@ class TestNewEvaluationModal:
         assert not ep.is_visible(ep.MODAL_TITLE, timeout=2_000), (
             "Modal must be closed after clicking Cancel"
         )
-        assert "/evaluations" in page.url and "new" not in page.url, (
-            "URL must remain on evaluations list after cancel"
+        assert "/evaluations" in page.url and "auditId=" not in page.url, (
+            "URL must remain on evaluations list (no draft) after cancel"
         )
 
-    def test_modal_start_button_navigates_to_wizard(self, page: Page):
-        """Clicking Start navigates to the evaluation wizard."""
-        ep = EvaluationsPage(page)
-        ep.go_to_evaluations_list()
-        ep.click_new_evaluation()
-        assert ep.is_new_eval_modal_visible(), (
+    def test_modal_next_advances_to_step_2(self, page: Page):
+        """Next advances the dialog from step 1 to step 2 (evaluator selection)."""
+        nep = NewEvaluationPage(page)
+        nep.go_to_evaluations_list()
+        nep.click_new_evaluation()
+        assert nep.is_modal_visible(), (
             "Modal not visible — platform may be unavailable or slow"
         )
-        ep.click_modal_start()
-        assert ep.is_wizard_visible() or "/evaluations/new" in page.url, (
-            "Clicking Start must navigate to the evaluation wizard"
+        nep.select_first_model_and_version()
+        nep.select_evaluation_method("bulk")
+        nep.click_modal_next()
+        assert nep.get_modal_step() == "2", (
+            "'Next' must advance the modal to step 2"
         )
-        # Clean up: cancel the draft evaluation
-        if ep.is_visible(ep.WIZARD_CANCEL_EVALUATION, timeout=3_000):
-            ep.cancel_evaluation()
 
 
-class TestNewEvaluationWizard:
-    """Verify the New Evaluation wizard form fields and validation."""
+class TestNewEvaluationModalStep2:
+    """Verify modal step 2 — evaluator types + objective gating (read-only).
 
-    def test_wizard_configuration_tab_is_active_by_default(self, page: Page):
-        """The 'Evaluation Configuration' tab is active when the wizard opens."""
-        ep = EvaluationsPage(page)
-        ep.go_to_evaluations_list()
-        ep.click_new_evaluation()
-        assert ep.is_new_eval_modal_visible(), (
-            "Modal not visible — platform may be unavailable or slow"
-        )
-        ep.click_modal_start()
-        assert ep.is_wizard_visible(), "Wizard not visible after clicking Start"
-        assert ep.is_visible(ep.WIZARD_TAB_CONFIGURATION), (
-            "'Evaluation Configuration' tab must be visible and active"
-        )
-        # Clean up
-        if ep.is_visible(ep.WIZARD_CANCEL_EVALUATION, timeout=3_000):
-            ep.cancel_evaluation()
+    The pre-Jul-2026 tabbed wizard (Configuration/Test Cases tabs, in-wizard
+    objective validation) no longer exists; its equivalents now live in modal
+    step 2 and the single-page wizard covered by test_add_evaluation_bulk.py.
+    """
 
-    @pytest.mark.xfail(reason="App bug #1 — see docs/app_bugs.md", strict=False)
-    def test_wizard_shows_auto_saved_indicator(self, page: Page):
-        """The wizard displays an auto-save indicator."""
-        ep = EvaluationsPage(page)
-        ep.go_to_evaluations_list()
-        ep.click_new_evaluation()
-        assert ep.is_new_eval_modal_visible(), (
-            "Modal not visible — platform may be unavailable or slow"
-        )
-        ep.click_modal_start()
-        assert ep.is_wizard_visible(), "Wizard not visible after clicking Start"
-        assert ep.is_auto_saved_indicator_visible(), (
-            "'Auto-saved' indicator must be visible in the wizard"
-        )
-        if ep.is_visible(ep.WIZARD_CANCEL_EVALUATION, timeout=3_000):
-            ep.cancel_evaluation()
+    @pytest.fixture
+    def on_step_2(self, page: Page) -> NewEvaluationPage:
+        nep = NewEvaluationPage(page)
+        nep.go_to_evaluations_list()
+        nep.click_new_evaluation()
+        if not nep.is_modal_visible():
+            pytest.skip("Modal not visible — platform may be unavailable or slow")
+        nep.select_first_model_and_version()
+        nep.select_evaluation_method("bulk")
+        nep.click_modal_next()
+        return nep
 
-    def test_wizard_shows_three_evaluation_types(self, page: Page):
-        """Technical, Domain, and Cultural evaluation type options are present."""
-        ep = EvaluationsPage(page)
-        ep.go_to_evaluations_list()
-        ep.click_new_evaluation()
-        assert ep.is_new_eval_modal_visible(), (
-            "Modal not visible — platform may be unavailable or slow"
-        )
-        ep.click_modal_start()
-        assert ep.is_wizard_visible(), "Wizard not visible after clicking Start"
-        missing = []
-        for selector in [ep.EVAL_TYPE_TECHNICAL, ep.EVAL_TYPE_DOMAIN, ep.EVAL_TYPE_CULTURAL]:
-            if not ep.is_visible(selector, timeout=3_000):
-                missing.append(selector)
-        assert not missing, f"Missing evaluation type options: {missing}"
-        if ep.is_visible(ep.WIZARD_CANCEL_EVALUATION, timeout=3_000):
-            ep.cancel_evaluation()
-
-    def test_technical_evaluation_is_selected_by_default(self, page: Page):
-        """'Technical Evaluation' is the pre-selected option."""
-        ep = EvaluationsPage(page)
-        ep.go_to_evaluations_list()
-        ep.click_new_evaluation()
-        assert ep.is_new_eval_modal_visible(), (
-            "Modal not visible — platform may be unavailable or slow"
-        )
-        ep.click_modal_start()
-        assert ep.is_wizard_visible(), "Wizard not visible after clicking Start"
-        # The Technical Evaluation type label should be present
-        assert ep.is_visible(ep.EVAL_TYPE_TECHNICAL), (
-            "'Technical Evaluation' must be visible as default option"
-        )
-        if ep.is_visible(ep.WIZARD_CANCEL_EVALUATION, timeout=3_000):
-            ep.cancel_evaluation()
-
-    def test_evaluation_modules_checkboxes_are_present(self, page: Page):
-        """All three evaluation module checkboxes are shown."""
-        ep = EvaluationsPage(page)
-        ep.go_to_evaluations_list()
-        ep.click_new_evaluation()
-        assert ep.is_new_eval_modal_visible(), (
-            "Modal not visible — platform may be unavailable or slow"
-        )
-        ep.click_modal_start()
-        assert ep.is_wizard_visible(), "Wizard not visible after clicking Start"
-        page.keyboard.press("End")
-        page.wait_for_timeout(300)
-        for module_sel in [
-            EvaluationsLocators.EVAL_MODULE_HALLUCINATION,
-            EvaluationsLocators.EVAL_MODULE_BIAS,
-            EvaluationsLocators.EVAL_MODULE_PRIVACY,
-        ]:
-            assert ep.is_visible(module_sel, timeout=3_000), (
-                f"Evaluation module must be visible: {module_sel}"
+    def test_step_2_shows_three_evaluator_types(self, on_step_2: NewEvaluationPage):
+        """Technical, Domain, and Cultural evaluator options are present."""
+        nep = on_step_2
+        missing = [
+            sel
+            for sel in (
+                nep.EVAL_TYPE_TECHNICAL,
+                nep.EVAL_TYPE_DOMAIN,
+                nep.EVAL_TYPE_CULTURAL,
             )
-        if ep.is_visible(ep.WIZARD_CANCEL_EVALUATION, timeout=3_000):
-            ep.cancel_evaluation()
+            if not nep.is_visible(sel, timeout=3_000)
+        ]
+        assert not missing, f"Missing evaluator type options: {missing}"
 
-    def test_test_cases_tab_requires_objective_filled(self, page: Page):
-        """Clicking 'Test Cases' tab without filling Objective shows a validation error."""
-        ep = EvaluationsPage(page)
-        ep.go_to_evaluations_list()
-        ep.click_new_evaluation()
-        assert ep.is_new_eval_modal_visible(), (
-            "Modal not visible — platform may be unavailable or slow"
+    def test_technical_evaluator_is_selected_by_default(
+        self, on_step_2: NewEvaluationPage
+    ):
+        """'a technical evaluator' is the pre-selected option."""
+        assert on_step_2.get_checked_evaluator_type() == "Technical", (
+            "'a technical evaluator' must be checked by default on step 2"
         )
-        ep.click_modal_start()
-        assert ep.is_wizard_visible(), "Wizard not visible after clicking Start"
-        ep.click_test_cases_tab()
-        page.wait_for_timeout(400)
-        assert ep.is_objective_validation_error_visible(), (
-            "Validation error 'Evaluation objective is required' must appear"
-        )
-        if ep.is_visible(ep.WIZARD_CANCEL_EVALUATION, timeout=3_000):
-            ep.cancel_evaluation()
 
-    @pytest.mark.xfail(reason="App bug #10 — see docs/app_bugs.md", strict=False)
-    def test_cancel_evaluation_returns_to_list(self, page: Page):
-        """Clicking 'Cancel Evaluation' from the wizard returns to the evaluations list."""
-        ep = EvaluationsPage(page)
-        ep.go_to_evaluations_list()
-        ep.click_new_evaluation()
-        assert ep.is_new_eval_modal_visible(), (
-            "Modal not visible — platform may be unavailable or slow"
+    def test_start_requires_objective_filled(self, on_step_2: NewEvaluationPage):
+        """'Start Evaluation' stays disabled until the objective is filled."""
+        nep = on_step_2
+        assert not nep.is_start_evaluation_enabled(), (
+            "'Start Evaluation' must be disabled while the objective is empty"
         )
-        ep.click_modal_start()
-        assert ep.is_wizard_visible(), "Wizard not visible after clicking Start"
-        assert ep.is_visible(ep.WIZARD_CANCEL_EVALUATION, timeout=5_000), (
-            "Cancel Evaluation button not found in wizard"
-        )
-        ep.cancel_evaluation()
-        assert "/evaluations" in page.url and "new" not in page.url, (
-            "After cancelling, URL must return to the evaluations list"
+        nep.fill_modal_objective("Objective gating check")
+        assert nep.is_start_evaluation_enabled(), (
+            "'Start Evaluation' must enable once the objective is filled"
         )
 
 

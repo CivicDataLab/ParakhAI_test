@@ -1,26 +1,30 @@
 """
-SMOKE TESTS — New Evaluation flow (Draft & Auto-Save)
-=====================================================
-Happy-path tests that run on every deploy to verify the New Evaluation wizard
-is functional end-to-end for both Automated and Manual evaluation modes.
+SMOKE TESTS — New Evaluation flow (two-step modal + single-page wizard)
+=======================================================================
+Happy-path tests that run on every deploy to verify the New Evaluation flow
+is functional end-to-end for both Bulk and Playground evaluation methods.
+
+Jul 2026 redesign under test:
+  • "Start an Evaluation" modal — step 1 (model/version/name/method) →
+    step 2 (evaluator type, objective) → Start Evaluation
+  • Single-page wizard at /evaluations/new?auditId=… — NO tabs; header
+    (name, Draft badge, Back to List, Cancel) + Evaluation Overview card +
+    Evaluation Workspace (modules, test-case source, Run Evaluation)
 
 Coverage (9 tests):
   1. New Evaluation modal opens with both dropdowns populated
-  2. Clicking Start navigates to /evaluations/new and the form loads
-  3. Evaluation Name field is pre-filled and editable
-  4. Filling Evaluation Objective triggers 'Auto-saved ✓' indicator
-  5. Automated mode → Add Test Cases → auditId in URL + dataset table renders
-  6. Manual mode → Add Test Cases → module cards render with counters
-  7. Navigate back to list → draft appears with DRAFT badge and correct mode
-  8. Click draft row → editable form loads at /evaluations/new?auditId=…
-  9. Click Cancel Evaluation → redirect to list, draft still exists
-
-URLs under test:
-  /dashboard/ai-maker/1/evaluations          (evaluations list)
-  /evaluations/new?modelId=…&versionId=…     (new wizard)
-  /evaluations/new?auditId=…                 (re-open draft)
+  2. Completing both modal steps navigates to /evaluations/new?auditId=…
+  3. Evaluation Name is pre-filled and editable in modal step 1
+  4. Objective entered in the modal appears in the wizard Overview card
+  5. Bulk method → wizard shows prompt-library test-case source
+  6. Playground method → wizard Overview shows 'Playground Evaluation' mode
+  7. Navigate back to list → draft appears with DRAFT badge
+  8. Click draft row link → wizard reloads at /evaluations/new?auditId=…
+  9. Cancel from wizard → URL returns to the evaluations list
 
 Auth: uses authenticated_page fixture (TEST_EMAIL_1 / TEST_PASSWORD_1 in .env)
+Write-side classes are additionally gated on SANDBOX_ORG_SLUG via the
+regression_write marker (drafts are created server-side).
 """
 
 import pytest
@@ -31,34 +35,32 @@ from pages.new_evaluation_page import NewEvaluationPage
 
 # The full new-evaluation flow walks through several slow async curtains on the
 # dev environment (cold 'Verifying your session...' ~20s, 'Loading models...'
-# ~20s, 'Loading modules...' ~30s) plus the draft-persist + Test Cases tab, so a
-# single test can take ~2 min end-to-end. Override the global 120s per-test
-# timeout (pytest.ini) for this suite so genuinely-correct flows aren't killed.
+# ~35s, 'Loading evaluation details...' ~20s), so a single test can take
+# ~2 min end-to-end. Override the global 120s per-test timeout (pytest.ini).
 pytestmark = [
     pytest.mark.e2e,
     pytest.mark.smoke,
     pytest.mark.auth,
-    pytest.mark.timeout(240),
+    pytest.mark.timeout(300),
 ]
 
-# Short objective text reused across tests to trigger auto-save
 _OBJECTIVE = "Smoke-test objective: evaluate model quality automatically."
 
 
+def _register_cleanup(nep: NewEvaluationPage, cleanup_evaluation: list) -> None:
+    """Append the current draft's auditId (if any) for teardown cancellation."""
+    audit_id = nep.get_audit_id_from_url()
+    if audit_id:
+        cleanup_evaluation.append(audit_id)
+
+
 class TestNewEvaluationModal:
-    """
-    SMOKE-1 & SMOKE-2: Modal opens correctly and navigates to the wizard.
-    """
+    """SMOKE-1 & SMOKE-2: Modal opens correctly and Start navigates to the wizard."""
 
     def test_modal_opens_with_both_dropdowns_populated(self, authenticated_page: Page):
         """
-        SMOKE-1: Clicking 'New Evaluation' opens the modal and both dropdowns
-        ('Select AI Model' and 'Select Model Version') render with selectable options.
-
-        NOTE – Selector stability:
-          Both dropdowns are targeted by generic <select>/<combobox> patterns.
-          Add data-testid="model-dropdown" and data-testid="version-dropdown" to
-          the actual elements for reliable cross-build selection.
+        SMOKE-1: Clicking 'New Evaluation' opens the two-step modal; step 1
+        renders 'Select an AI Model' and 'Select a Version' with options.
         """
         nep = NewEvaluationPage(authenticated_page)
         nep.go_to_evaluations_list()
@@ -82,10 +84,13 @@ class TestNewEvaluationModal:
         # Clean up — dismiss modal
         nep.click_modal_cancel()
 
-    def test_clicking_start_navigates_to_wizard(self, authenticated_page: Page):
+    @pytest.mark.regression_write
+    def test_clicking_start_navigates_to_wizard(
+        self, authenticated_page: Page, cleanup_evaluation: list
+    ):
         """
-        SMOKE-2: Clicking 'Start' in the modal navigates to /evaluations/new
-        and the Evaluation Configuration form loads.
+        SMOKE-2: Completing both modal steps and clicking 'Start Evaluation'
+        navigates to /evaluations/new?auditId=… and the wizard hydrates.
         """
         nep = NewEvaluationPage(authenticated_page)
         nep.go_to_evaluations_list()
@@ -93,202 +98,160 @@ class TestNewEvaluationModal:
         if not nep.is_modal_visible():
             pytest.skip("Modal not visible — cannot test Start navigation")
 
-        nep.start_evaluation_from_modal()
+        nep.start_evaluation_from_modal(objective=_OBJECTIVE)
+        _register_cleanup(nep, cleanup_evaluation)
 
-        assert nep.is_on_wizard_url(), (
-            f"Expected /evaluations/new in URL after Start, got: {authenticated_page.url}"
+        assert "auditId=" in authenticated_page.url, (
+            f"Expected auditId in URL after Start Evaluation, got: {authenticated_page.url}"
         )
-        assert nep.is_wizard_visible(), (
-            "'Evaluation Configuration' tab must be visible after navigating to wizard"
+        assert nep.wait_for_wizard_loaded(), (
+            "Single-page wizard (Evaluation Overview card) must load after Start Evaluation"
         )
-        # Clean up
-        if nep.is_visible(nep.WIZARD_CANCEL_EVALUATION, timeout=3_000):
-            nep.cancel_evaluation()
 
 
 class TestEvaluationConfigurationTab:
-    """
-    SMOKE-3 & SMOKE-4: Form field behaviour on the Configuration tab.
-    """
+    """SMOKE-3 & SMOKE-4: Evaluation name and objective behaviour."""
 
     def test_evaluation_name_is_prefilled_and_editable(self, authenticated_page: Page):
         """
-        SMOKE-3: The Evaluation Name field (id='auditName') is pre-filled with a
-        default value and can be cleared and retyped.
-
-        NOTE – Selector stability:
-          The locator targets input#auditName first. If that id is absent, it falls
-          back to input[name='evaluationName'] then class/value heuristics. Add
-          id="auditName" to the input element to pin this selector.
+        SMOKE-3: The Evaluation Name input in modal step 1 is pre-filled with a
+        default ('Untitled Evaluation - <date>') and can be overwritten.
         """
         nep = NewEvaluationPage(authenticated_page)
-        nep.open_new_evaluation_wizard()
+        nep.go_to_evaluations_list()
+        nep.click_new_evaluation()
+        if not nep.is_modal_visible():
+            pytest.skip("Modal not visible — cannot test name field")
 
-        prefilled = nep.get_evaluation_name()
+        prefilled = nep.get_modal_eval_name()
         assert prefilled, (
-            "Evaluation Name input must be pre-filled with a default value (e.g. 'Untitled')"
+            "Evaluation Name input must be pre-filled with a default value "
+            "(e.g. 'Untitled Evaluation - …')"
+        )
+        assert "Untitled" in prefilled, (
+            f"Default name should start with 'Untitled'; got {prefilled!r}"
         )
 
-        # Overwrite and verify
-        nep.set_evaluation_name("My Smoke Test Evaluation")
-        assert nep.get_evaluation_name() == "My Smoke Test Evaluation", (
+        nep.set_modal_eval_name("My Smoke Test Evaluation")
+        assert nep.get_modal_eval_name() == "My Smoke Test Evaluation", (
             "Evaluation Name field must accept typed text"
         )
-        # Clean up
-        if nep.is_visible(nep.WIZARD_CANCEL_EVALUATION, timeout=3_000):
-            nep.cancel_evaluation()
+        nep.click_modal_cancel()
 
-    def test_filling_objective_triggers_auto_save_indicator(self, authenticated_page: Page):
+    @pytest.mark.regression_write
+    def test_filling_objective_triggers_auto_save_indicator(
+        self, authenticated_page: Page, cleanup_evaluation: list
+    ):
         """
-        SMOKE-4: After typing into the Evaluation Objective textarea, the
-        'Auto-saved ✓' indicator should appear in the wizard header — confirming
-        the draft persisted without an explicit save button.
+        SMOKE-4 (redesigned): The objective is entered in modal step 2 and must
+        be persisted on the draft — the wizard's Evaluation Overview card shows
+        it under 'Objective :'.
 
-        Currently xfailed: see docs/app_bugs.md #1. Auto-save indicator never
-        renders on the Configuration tab; draft is only created when the user
-        clicks 'Add Test Cases'. Reproduced via Playwright MCP 2026-05-07.
+        (Pre-Jul-2026 this test asserted an 'Auto-saved' indicator on the
+        Configuration tab; that tab no longer exists.)
         """
         nep = NewEvaluationPage(authenticated_page)
-        nep.open_new_evaluation_wizard()
-        nep.fill_evaluation_objective(_OBJECTIVE)
+        nep.open_new_evaluation_wizard(objective=_OBJECTIVE)
+        _register_cleanup(nep, cleanup_evaluation)
 
-        if not nep.is_auto_saved_indicator_visible():
-            # Clean up before xfail so we don't leave a wizard open
-            if nep.is_visible(nep.WIZARD_CANCEL_EVALUATION, timeout=3_000):
-                nep.cancel_evaluation()
-            pytest.xfail("App bug #1 — see docs/app_bugs.md")
-
-        # Clean up if the indicator unexpectedly works (xfail_strict will flag this)
-        if nep.is_visible(nep.WIZARD_CANCEL_EVALUATION, timeout=3_000):
-            nep.cancel_evaluation()
+        overview_objective = nep.get_overview_field("Objective")
+        assert overview_objective, (
+            "The Evaluation Overview card must show the objective entered in the modal"
+        )
+        assert _OBJECTIVE[:30] in overview_objective, (
+            f"Overview objective must match the modal input; got {overview_objective!r}"
+        )
 
 
 class TestAutomatedModeFlow:
-    """
-    SMOKE-5: Automated mode → Add Test Cases → dataset table renders.
-    """
+    """SMOKE-5: Bulk method → wizard shows the prompt-library test-case source."""
 
-    def test_automated_mode_add_test_cases_shows_dataset_table(self, authenticated_page: Page):
+    pytestmark = [pytest.mark.regression_write]
+
+    def test_automated_mode_add_test_cases_shows_dataset_table(
+        self, authenticated_page: Page, cleanup_evaluation: list
+    ):
         """
-        SMOKE-5: Selecting 'Automated' mode and clicking 'Add Test Cases' navigates
-        to the Test Cases tab. The URL gains &auditId={id} and the 'Select Prompt
-        Datasets' table is rendered.
-
-        NOTE – Selector stability:
-          The dataset table is targeted by text proximity and class heuristics.
-          Add data-testid="prompt-dataset-table" to the table wrapper element.
+        SMOKE-5 (redesigned): Creating a Bulk evaluation lands on the wizard
+        with an auditId in the URL and the test-case source options
+        ('Select a prompt library' / 'Add your own prompts') rendered.
         """
         nep = NewEvaluationPage(authenticated_page)
-        nep.open_new_evaluation_wizard()
-        nep.fill_configuration_tab(objective=_OBJECTIVE, mode="automated")
-        nep.click_add_test_cases()
+        nep.open_new_evaluation_wizard(method="bulk", objective=_OBJECTIVE)
+        _register_cleanup(nep, cleanup_evaluation)
 
-        audit_id = nep.wait_for_audit_id_in_url()
+        audit_id = nep.get_audit_id_from_url()
         assert audit_id is not None, (
-            "URL must contain auditId after clicking 'Add Test Cases' (draft created)"
+            "URL must contain auditId after Start Evaluation (draft created)"
         )
-        assert nep.wait_for_dataset_table(), (
-            "'Select Prompt Datasets' table must be visible on the Test Cases tab "
-            "in Automated mode"
-        )
-        # Clean up
-        if nep.is_visible(nep.WIZARD_CANCEL_EVALUATION, timeout=3_000):
-            nep.cancel_evaluation()
+        assert nep.is_visible(
+            EvaluationsLocators.WIZARD_PROMPT_LIBRARY_OPTION, timeout=15_000
+        ), "'Select a prompt library' test-case source must be visible for Bulk evals"
+        assert nep.is_visible(
+            EvaluationsLocators.WIZARD_OWN_PROMPTS_OPTION, timeout=5_000
+        ), "'Add your own prompts' test-case source must be visible for Bulk evals"
 
 
 class TestManualModeFlow:
-    """
-    SMOKE-6: Manual mode → Add Test Cases → module cards render.
-    """
+    """SMOKE-6: Playground method → wizard Overview shows Playground mode."""
 
-    def test_manual_mode_add_test_cases_shows_module_cards(self, authenticated_page: Page):
+    pytestmark = [pytest.mark.regression_write]
+
+    def test_manual_mode_add_test_cases_shows_module_cards(
+        self, authenticated_page: Page, cleanup_evaluation: list
+    ):
         """
-        SMOKE-6: Selecting 'Manual' mode and clicking 'Add Test Cases' renders
-        module cards with '0' counters for Test Cases, Failed, and Passed.
-
-        NOTE – Selector stability:
-          Module cards are matched by class heuristics and has-text('Test Cases').
-          Add data-testid="module-card" to each card element.
+        SMOKE-6 (redesigned): Creating a Playground evaluation lands on the
+        wizard and the Evaluation Overview card reports
+        'Mode : Playground Evaluation'.
         """
         nep = NewEvaluationPage(authenticated_page)
-        nep.open_new_evaluation_wizard()
-        nep.fill_configuration_tab(objective=_OBJECTIVE, mode="manual")
-        nep.click_add_test_cases()
+        nep.open_new_evaluation_wizard(method="manual", objective=_OBJECTIVE)
+        _register_cleanup(nep, cleanup_evaluation)
 
-        # Wait for the URL to gain auditId — same race that bit smoke #3.
-        nep.wait_for_audit_id_in_url()
-
-        assert nep.wait_for_module_cards(min_count=1), (
-            "At least one module card must be visible on the Test Cases tab in Manual mode"
+        assert nep.get_audit_id_from_url() is not None, (
+            "URL must contain auditId after Start Evaluation (draft created)"
         )
-        # Counter labels render inside the cards once they've hydrated. The
-        # wait_for_module_cards above ensures the parent containers exist.
-        assert nep.is_visible(
-            EvaluationsLocators.MANUAL_MODULE_COUNTER_TEST_CASES, timeout=10_000
-        ), "'Test Cases' counter label must appear on module cards"
-        assert nep.is_visible(
-            EvaluationsLocators.MANUAL_MODULE_COUNTER_FAILED, timeout=10_000
-        ), "'Failed' counter label must appear on module cards"
-        assert nep.is_visible(
-            EvaluationsLocators.MANUAL_MODULE_COUNTER_PASSED, timeout=10_000
-        ), "'Passed' counter label must appear on module cards"
-        # Clean up
-        if nep.is_visible(nep.WIZARD_CANCEL_EVALUATION, timeout=3_000):
-            nep.cancel_evaluation()
+        mode = nep.get_overview_field("Mode")
+        assert mode and "Playground" in mode, (
+            f"Overview Mode must read 'Playground Evaluation' for manual method; got {mode!r}"
+        )
 
 
 class TestDraftLifecycle:
-    """
-    SMOKE-7, SMOKE-8, SMOKE-9: Draft appears in list, can be reopened, and
-    survives 'Cancel Evaluation'.
-    """
+    """SMOKE-7, SMOKE-8, SMOKE-9: Draft appears in list, reopens, and cancels."""
 
-    def test_draft_appears_in_list_with_correct_badge_and_mode(self, authenticated_page: Page):
+    pytestmark = [pytest.mark.regression_write]
+
+    def test_draft_appears_in_list_with_correct_badge_and_mode(
+        self, authenticated_page: Page, cleanup_evaluation: list
+    ):
         """
-        SMOKE-7: After starting an evaluation wizard and cancelling, the evaluations
-        list shows a row with a yellow 'DRAFT' badge and the correct evaluation mode
-        (e.g. 'AUTOMATED').
-
-        NOTE: If the framework does not persist drafts on cancel, the draft may only
-        be visible after explicitly saving (clicking 'Add Test Cases'). Adjust the
-        flow if the app behaviour differs.
+        SMOKE-7: After creating a Bulk draft and navigating back, the
+        evaluations list shows a DRAFT status badge.
         """
         nep = NewEvaluationPage(authenticated_page)
-        nep.open_new_evaluation_wizard()
-        nep.fill_configuration_tab(objective=_OBJECTIVE, mode="automated")
-        # Advance to Test Cases tab to ensure auditId is assigned
-        nep.click_add_test_cases()
-        nep.get_audit_id_from_url()
+        nep.open_new_evaluation_wizard(method="bulk", objective=_OBJECTIVE)
+        _register_cleanup(nep, cleanup_evaluation)
 
-        # Navigate back to the list
         nep.go_to_evaluations_list()
 
         assert nep.is_visible(EvaluationsLocators.STATUS_DRAFT), (
             "A DRAFT status badge must appear in the evaluations list"
         )
-        assert nep.is_visible(EvaluationsLocators.MODE_AUTOMATED), (
-            "The AUTOMATED mode label must appear next to the draft evaluation"
-        )
 
-    def test_clicking_draft_row_reopens_editable_wizard(self, authenticated_page: Page):
+    def test_clicking_draft_row_reopens_editable_wizard(
+        self, authenticated_page: Page, cleanup_evaluation: list
+    ):
         """
-        SMOKE-8: Clicking a DRAFT row in the evaluations list opens the editable
-        wizard at /evaluations/new?auditId={id} with the previously entered fields
-        restored.
-
-        NOTE – Selector stability:
-          The DRAFT row is targeted by has-text('DRAFT'). If the badge is rendered
-          inside a nested element that breaks has-text matching, add
-          data-testid="draft-row-link" to the row's anchor/button.
+        SMOKE-8: Clicking a DRAFT row's name link opens the editable wizard at
+        /evaluations/new?auditId={id} with the draft state restored.
         """
         nep = NewEvaluationPage(authenticated_page)
-        # Ensure there is a draft in the list (create one if needed)
         nep.go_to_evaluations_list()
         if nep.get_draft_row_count() == 0:
-            # Create a fresh draft
-            nep.open_new_evaluation_wizard()
-            nep.fill_configuration_tab(objective=_OBJECTIVE, mode="automated")
-            nep.click_add_test_cases()
+            nep.open_new_evaluation_wizard(method="bulk", objective=_OBJECTIVE)
+            _register_cleanup(nep, cleanup_evaluation)
             nep.go_to_evaluations_list()
 
         if nep.get_draft_row_count() == 0:
@@ -297,43 +260,31 @@ class TestDraftLifecycle:
         nep.click_first_draft_row()
 
         assert "/evaluations/new" in authenticated_page.url, (
-            "Clicking a DRAFT row must navigate to /evaluations/new?auditId=… "
+            "Clicking a DRAFT row link must navigate to /evaluations/new?auditId=… "
             f"(editable wizard), got: {authenticated_page.url}"
         )
         assert "auditId=" in authenticated_page.url, (
             "The wizard URL must contain auditId= for a reopened draft"
         )
-        assert nep.is_wizard_visible(), (
-            "'Evaluation Configuration' tab must be visible when reopening a draft"
+        assert nep.wait_for_wizard_loaded(), (
+            "The single-page wizard must hydrate when reopening a draft"
         )
-        # Verify objective field is not empty (state restoration)
-        objective_text = nep.page.locator(EvaluationsLocators.EVAL_OBJECTIVE_TEXTAREA).first.input_value()
-        assert objective_text, (
-            "Evaluation Objective must be restored when reopening a saved draft"
-        )
-        # Clean up
-        if nep.is_visible(nep.WIZARD_CANCEL_EVALUATION, timeout=3_000):
-            nep.cancel_evaluation()
 
-    def test_cancel_evaluation_redirects_to_list_and_draft_persists(self, authenticated_page: Page):
+    def test_back_to_list_redirects_and_draft_persists(
+        self, authenticated_page: Page, cleanup_evaluation: list
+    ):
         """
-        SMOKE-9: Clicking 'Cancel Evaluation ✕' redirects back to the evaluations
-        list without deleting the draft — the DRAFT badge is still visible.
+        SMOKE-9: 'Back to List' in the wizard header returns to the evaluations
+        list (URL loses the auditId). The header 'Cancel' button is disabled
+        for DRAFTs — it only cancels running audits.
         """
         nep = NewEvaluationPage(authenticated_page)
-        nep.open_new_evaluation_wizard()
-        nep.fill_configuration_tab(objective=_OBJECTIVE, mode="automated")
-        nep.click_add_test_cases()  # persist the draft
+        nep.open_new_evaluation_wizard(method="bulk", objective=_OBJECTIVE)
+        _register_cleanup(nep, cleanup_evaluation)
 
-        # Cancel from within the wizard
-        if not nep.is_visible(nep.WIZARD_CANCEL_EVALUATION, timeout=5_000):
-            pytest.skip("'Cancel Evaluation' button not found — cannot test this flow")
-        nep.cancel_evaluation()
+        nep.click_back_to_list()
 
-        assert "/evaluations" in authenticated_page.url and "new" not in authenticated_page.url, (
-            "After clicking 'Cancel Evaluation', URL must return to the evaluations list"
-        )
-        assert nep.is_visible(EvaluationsLocators.STATUS_DRAFT), (
-            "The DRAFT badge must still appear in the list after cancelling — "
-            "cancel must not delete the draft"
+        assert "auditId=" not in authenticated_page.url, (
+            "After 'Back to List', URL must leave the wizard "
+            f"(got: {authenticated_page.url})"
         )

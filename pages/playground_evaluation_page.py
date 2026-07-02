@@ -49,7 +49,7 @@ class PlaygroundEvaluationPage(BasePage):
 
     # ── Navigation ─────────────────────────────────────────────────────────────
 
-    def go_to_draft(self, audit_id: str) -> "PlaygroundEvaluationPage":
+    def go_to_draft(self, audit_id: str) -> PlaygroundEvaluationPage:
         url = Config.url(
             f"/dashboard/ai-maker/{self.org_id}/evaluations/new?auditId={audit_id}"
         )

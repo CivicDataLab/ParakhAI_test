@@ -9,7 +9,6 @@ Covers:
   - Unauthenticated /dashboard redirect UX
 """
 
-import re
 import time
 
 import pytest

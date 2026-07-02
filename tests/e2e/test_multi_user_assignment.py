@@ -20,7 +20,7 @@ import pytest
 from playwright.sync_api import Page
 
 from pages.evaluator_role_page import EvaluatorRolePage
-from tests.data.test_data import TestGraphQL, TestSandbox
+from tests.data.test_data import TestGraphQL
 from utils.config import Config
 
 pytestmark = [
@@ -52,7 +52,7 @@ class TestCrossUserAssignment:
         if not user2_email or user2_email.endswith("@example.com"):
             pytest.skip("TEST_EMAIL_2 not configured")
 
-        # Step 1 — Add USER_2 to the org as an evaluator
+        # Step 1 — Add USER_2 to the org as an evaluator (skip add if already a member)
         add_result = authenticated_graphql_client(
             TestGraphQL.MUTATION_ADD_AUDITOR_TO_ORGANIZATION,
             variables={
@@ -61,51 +61,64 @@ class TestCrossUserAssignment:
             },
             method="POST",
         )
-        add_data = add_result.get("data", {}).get("addAuditorToOrganization", {})
-        if not add_data.get("success"):
+        add_data = ((add_result or {}).get("data") or {}).get("addAuditorToOrganization") or {}
+        already_member = not add_data.get("success") and "already" in (add_data.get("message") or "").lower()
+        if not add_data.get("success") and not already_member:
             pytest.skip(
                 f"Could not add USER_2 to sandbox org: {add_data.get('message')}"
             )
 
-        # Register USER_2 for evaluator-removal cleanup (org_id, user_id).
-        # user_id is not returned by the mutation — look it up from org auditors.
-        org_auditors = authenticated_graphql_client(
+        # Register USER_2 for evaluator-removal cleanup only if we just added them.
+        _aud_resp = authenticated_graphql_client(
             TestGraphQL.QUERY_ORGANIZATION_AUDITORS,
             variables={"organizationId": sandbox_org},
-        ).get("data", {}).get("organizationAuditors") or []
+        ) or {}
+        org_auditors_resp = (_aud_resp.get("data") or {}).get("organizationAuditors") or {}
+        org_auditors = org_auditors_resp.get("auditors") or [] if isinstance(org_auditors_resp, dict) else []
         user2_record = next(
-            (a for a in org_auditors if a.get("email") == user2_email), None
+            (a for a in org_auditors if isinstance(a, dict) and a.get("email") == user2_email), None
         )
-        if user2_record:
+        if user2_record and not already_member:
             cleanup_evaluator.append((sandbox_org, user2_record["id"]))
 
-        # Step 2 — Assign USER_2 to the first available sandbox model version
-        sandbox_model_id = getattr(TestSandbox, "MODEL_ID", None)
-        sandbox_version_id = getattr(TestSandbox, "MODEL_VERSION_ID", None)
+        # Step 2 — Discover first available model+version in the sandbox org
+        _models_resp = authenticated_graphql_client(
+            TestGraphQL.QUERY_AI_MODELS_WITH_VERSIONS,
+            variables={"limit": 10},
+        ) or {}
+        models_resp = (_models_resp.get("data") or {}).get("aiModels") or []
+        sandbox_model_id = None
+        sandbox_model_name = None
+        sandbox_version_id = None
+        for m in models_resp:
+            versions = m.get("versions") or []
+            if versions:
+                sandbox_model_id = m["id"]
+                sandbox_model_name = m.get("name", "")
+                sandbox_version_id = versions[0]["id"]
+                break
         if not sandbox_model_id or not sandbox_version_id:
-            pytest.skip(
-                "SANDBOX_MODEL_ID / SANDBOX_MODEL_VERSION_ID not configured — "
-                "cannot create a version assignment"
-            )
+            pytest.skip("No AI models with versions found in sandbox — cannot create a version assignment")
 
         assign_result = authenticated_graphql_client(
             TestGraphQL.MUTATION_ASSIGN_AUDITOR_TO_VERSION,
             variables={
                 "input": {
                     "modelId": sandbox_model_id,
+                    "modelName": sandbox_model_name,
                     "modelVersionId": sandbox_version_id,
                     "auditorEmail": user2_email,
                 }
             },
             method="POST",
-        )
-        assign_data = assign_result.get("data", {}).get("assignAuditorToVersion", {})
+        ) or {}
+        assign_data = (assign_result.get("data") or {}).get("assignAuditorToVersion") or {}
         if not assign_data.get("success"):
             pytest.skip(
                 f"Could not assign USER_2 to sandbox model version: "
                 f"{assign_data.get('message')}"
             )
-        assignment_id = assign_data.get("assignment", {}).get("id")
+        assignment_id = (assign_data.get("assignment") or {}).get("id")
         if assignment_id:
             cleanup_assignment.append(assignment_id)
 
@@ -128,7 +141,7 @@ class TestCrossUserAssignment:
         USER_1 and USER_2 can both be authenticated simultaneously without
         either session being invalidated or redirected to login.
         """
-        from pages.ai_maker_dashboard_page import AIMakerDashboardPage
+        from pages.ai_maker_page import AIMakerPage as AIMakerDashboardPage
 
         dash_u1 = AIMakerDashboardPage(authenticated_page)
         dash_u1.go_to_dashboard()
