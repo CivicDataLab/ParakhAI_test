@@ -283,8 +283,16 @@ class TestGraphQL:
         query ResultSamples($auditId: ID!, $samplesPerMetric: Int) {
           resultSamples(auditId: $auditId, samplesPerMetric: $samplesPerMetric) {
             __typename
-            ... on ManualModuleSamples { module samples { id } }
-            ... on BulkModuleSamples { module samples { id } }
+            name
+            displayName
+            metrics {
+              name
+              displayName
+              samples {
+                test { id testInput actualOutput }
+                result { id name riskLevel idealOutput }
+              }
+            }
           }
         }
     """
@@ -413,7 +421,10 @@ class TestGraphQL:
     """
     QUERY_MANUAL_TEST_CASES = """
         query ManualTestCases($auditId: ID!) {
-          manualTestCases(auditId: $auditId) { id testInput actualOutput status }
+          manualTestCases(auditId: $auditId) {
+            test { id testInput actualOutput status }
+            result { id name evaluatorSuccess evaluatorRiskLevel idealOutput }
+          }
         }
     """
 

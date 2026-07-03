@@ -197,7 +197,7 @@ class TestAuditSummariesQuery:
 
 
 class TestResultSamplesQuery:
-    """resultSamples returns a union of ManualModuleSamples | BulkModuleSamples."""
+    """resultSamples returns [ModuleSamples] (unified for bulk + playground since Jul 2026)."""
 
     def test_result_samples_invalid_id_returns_empty(self, authenticated_graphql_client):
         result = authenticated_graphql_client(
@@ -221,8 +221,12 @@ class TestResultSamplesQuery:
             samples = result["data"]["resultSamples"]
             assert isinstance(samples, list)
             for s in samples:
-                assert "__typename" in s
-                assert s["__typename"] in ("ManualModuleSamples", "BulkModuleSamples")
+                assert s["__typename"] == "ModuleSamples"
+                assert "name" in s
+                assert isinstance(s.get("metrics"), list)
+                for metric in s["metrics"]:
+                    for sample in metric.get("samples") or []:
+                        assert "test" in sample and "result" in sample
 
     def test_result_samples_samples_per_metric_respected(
         self, authenticated_graphql_client, completed_eval_id
@@ -233,11 +237,13 @@ class TestResultSamplesQuery:
         )
         if result.get("data") and result["data"].get("resultSamples"):
             for module_samples in result["data"]["resultSamples"]:
-                inner = module_samples.get("samples") or []
-                assert len(inner) <= 1, (
-                    f"samplesPerMetric=1 but got {len(inner)} samples for "
-                    f"module '{module_samples.get('module')}'"
-                )
+                for metric in module_samples.get("metrics") or []:
+                    inner = metric.get("samples") or []
+                    assert len(inner) <= 1, (
+                        f"samplesPerMetric=1 but got {len(inner)} samples for "
+                        f"metric '{metric.get('name')}' in module "
+                        f"'{module_samples.get('name')}'"
+                    )
 
     def test_result_samples_without_auth_returns_empty(self, graphql_client):
         result = graphql_client(
