@@ -305,3 +305,94 @@ class TestGraphQLMutationConcurrency:
             f"{BUDGET['success_rate_10_concurrent']:.0%}. "
             f"Errors: {[r['error'] for r in results if r['error']]}"
         )
+
+
+# ── Scenario 4: Unified result endpoints (EvalSample refactor, Jul 2026) ──────
+
+
+@pytest.mark.timeout(300)
+class TestUnifiedResultEndpointsLoad:
+    """Concurrent reads of resultSamples + manualTestCases.
+
+    The Jul 2026 backend refactor (ParakhAPI 308d2b0) unified bulk and
+    playground result shapes into EvalSample/ModuleSamples. These endpoints
+    back the evaluation detail page, so they see burst traffic whenever a
+    report is opened — verify they hold up under light concurrency.
+    """
+
+    def _burst(self, gql, query: str, concurrency: int, label: str) -> list[dict]:
+        results: list[dict] = []
+        with ThreadPoolExecutor(max_workers=concurrency) as ex:
+            futures = {
+                ex.submit(_execute_query, gql, query, f"{label}-{i}"): i
+                for i in range(concurrency)
+            }
+            for fut in as_completed(futures):
+                results.append(fut.result())
+        return results
+
+    def test_5_concurrent_result_samples_queries(
+        self, authenticated_graphql_client, completed_eval_id
+    ):
+        query = (
+            f'{{ resultSamples(auditId: "{completed_eval_id}", samplesPerMetric: 2) '
+            "{ name metrics { name samples { test { id } result { id } } } } }"
+        )
+        results = self._burst(authenticated_graphql_client, query, 5, "resultSamples")
+        _save_metrics("concurrent_result_samples_n5", results)
+
+        failures = [r for r in results if not r["success"]]
+        assert not failures, (
+            f"{len(failures)}/5 concurrent resultSamples queries failed: "
+            f"{[r['error'] for r in failures]}"
+        )
+        p95 = _p95([r["elapsed_s"] for r in results])
+        assert p95 <= BUDGET["concurrent_10_p95_s"], (
+            f"resultSamples p95 {p95:.2f}s exceeds "
+            f"{BUDGET['concurrent_10_p95_s']}s budget"
+        )
+
+    def test_5_concurrent_manual_test_cases_queries(
+        self, authenticated_graphql_client, completed_eval_id
+    ):
+        query = (
+            f'{{ manualTestCases(auditId: "{completed_eval_id}") '
+            "{ test { id } result { id evaluatorSuccess } } }"
+        )
+        results = self._burst(
+            authenticated_graphql_client, query, 5, "manualTestCases"
+        )
+        _save_metrics("concurrent_manual_test_cases_n5", results)
+
+        failures = [r for r in results if not r["success"]]
+        assert not failures, (
+            f"{len(failures)}/5 concurrent manualTestCases queries failed: "
+            f"{[r['error'] for r in failures]}"
+        )
+
+    def test_mixed_detail_page_burst(
+        self, authenticated_graphql_client, completed_eval_id
+    ):
+        """Simulates one detail-page open fan-out: samples + cases + status."""
+        queries = [
+            f'{{ resultSamples(auditId: "{completed_eval_id}") {{ name }} }}',
+            f'{{ manualTestCases(auditId: "{completed_eval_id}") {{ test {{ id }} }} }}',
+            f'{{ playgroundEvaluationStatus(auditId: "{completed_eval_id}") '
+            "{ testCaseCount canFinish auditStatus } }",
+        ]
+        results: list[dict] = []
+        with ThreadPoolExecutor(max_workers=3) as ex:
+            futures = [
+                ex.submit(_execute_query, authenticated_graphql_client, q, f"mixed-{i}")
+                for i, q in enumerate(queries)
+            ]
+            for fut in as_completed(futures):
+                results.append(fut.result())
+        _save_metrics("detail_page_fanout_n3", results)
+
+        success_rate = sum(1 for r in results if r["success"]) / len(results)
+        assert success_rate >= BUDGET["success_rate_mixed"], (
+            f"Detail-page fan-out success rate {success_rate:.0%} < "
+            f"{BUDGET['success_rate_mixed']:.0%}. "
+            f"Errors: {[r['error'] for r in results if r['error']]}"
+        )

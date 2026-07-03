@@ -80,10 +80,19 @@ class TestEvaluationDetailBackNavigation:
     """The Back to List button returns to the evaluations list."""
 
     def test_back_button_removes_eval_id_from_url(self, authenticated_page, completed_eval_id):
+        # 'Back to List' uses router.back() — a deep link with no history
+        # no-ops, so visit the list first to give it somewhere to go back to.
+        from utils.config import Config
+
+        authenticated_page.goto(
+            Config.url("/dashboard/ai-maker/1/evaluations"),
+            wait_until="domcontentloaded",
+        )
         ep = _go(authenticated_page, completed_eval_id)
         if not ep.is_visible(EvaluationDetailLocators.BACK_TO_LIST):
             pytest.skip("'Back to List' button not present on this evaluation page")
         ep.click_back_to_list()
+        authenticated_page.wait_for_timeout(3_000)
         assert str(completed_eval_id) not in authenticated_page.url, (
             "URL still contains the eval ID after clicking Back to List"
         )
@@ -139,36 +148,27 @@ class TestReportGeneration:
         )
 
 
-class TestEvaluationDetailTabSwitching:
-    """The Test Cases and Results tabs — currently broken by bug #7."""
+class TestEvaluationDetailSinglePageLayout:
+    """Jul 2026 redesign: the detail page is a single page with NO tabs.
 
-    @pytest.mark.xfail(reason="App bug #7 — see docs/app_bugs.md", strict=False)
-    def test_test_cases_tab_activates(self, authenticated_page, completed_eval_id):
-        ep = _go(authenticated_page, completed_eval_id)
-        ep.click_test_cases_tab()
-        assert ep.is_test_cases_panel_visible()
+    Replaces the old TestEvaluationDetailTabSwitching class — the Test Cases /
+    Results tabs were removed in the frontend restructure. Deeper coverage of
+    the new layout lives in test_evaluation_detail_redesign.py.
+    """
 
-    @pytest.mark.xfail(reason="App bug #7 — see docs/app_bugs.md", strict=False)
-    def test_test_cases_tab_renders_table(self, authenticated_page, completed_eval_id):
+    def test_detail_page_has_no_tabs(self, authenticated_page, completed_eval_id):
         ep = _go(authenticated_page, completed_eval_id)
-        ep.click_test_cases_tab()
-        assert ep.is_test_cases_panel_visible()
+        ep.is_overview_section_visible()  # wait for hydration
+        assert not ep.has_tabs(), (
+            "[role='tab'] elements found on the evaluation detail page — the "
+            "redesigned layout has no tabs; if tabs returned, restore the old "
+            "tab-switching tests"
+        )
 
-    @pytest.mark.xfail(reason="App bug #7 — see docs/app_bugs.md", strict=False)
-    def test_results_tab_activates(self, authenticated_page, completed_eval_id):
+    def test_results_render_inline_without_tab_click(
+        self, authenticated_page, completed_eval_id
+    ):
         ep = _go(authenticated_page, completed_eval_id)
-        ep.click_results_tab()
-        assert ep.is_results_panel_visible()
-
-    @pytest.mark.xfail(reason="App bug #7 — see docs/app_bugs.md", strict=False)
-    def test_results_tab_shows_module_breakdown(self, authenticated_page, completed_eval_id):
-        ep = _go(authenticated_page, completed_eval_id)
-        ep.click_results_tab()
-        assert ep.is_results_panel_visible()
-
-    @pytest.mark.xfail(reason="App bug #7 — see docs/app_bugs.md", strict=False)
-    def test_results_row_expand_does_not_crash(self, authenticated_page, completed_eval_id):
-        """Expanding a results row must not throw — open/close behaviour only."""
-        ep = _go(authenticated_page, completed_eval_id)
-        ep.click_results_tab()
-        ep.expand_first_results_row()
+        assert ep.is_results_section_visible(), (
+            "'Evaluation Results' must render inline on the single-page layout"
+        )

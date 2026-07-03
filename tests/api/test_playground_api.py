@@ -72,9 +72,12 @@ class TestPlaygroundQueryContract:
         if result.get("data") and result["data"].get("manualTestCases") is not None:
             cases = result["data"]["manualTestCases"]
             assert isinstance(cases, list)
+            # Since the Jul 2026 refactor, each entry is an EvalSample
+            # ({ test, result }) rather than the old flat ManualTestCaseType.
             for case in cases[:3]:
-                assert "id" in case
-                assert "status" in case
+                assert "test" in case
+                assert "result" in case
+                assert "id" in (case["test"] or {})
 
 
 # ── Mutation input-shape contracts (no writes — all use invalid IDs) ──────────

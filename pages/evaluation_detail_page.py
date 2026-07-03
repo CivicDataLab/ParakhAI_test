@@ -47,7 +47,23 @@ class EvaluationDetailPage(BasePage):
         url = Config.url(f"/dashboard/ai-maker/{self.org_id}/evaluations/{eval_id}")
         self.navigate(url)
         self.wait_for_load("domcontentloaded")
+        self.wait_for_detail_hydrated()
         return self
+
+    def wait_for_detail_hydrated(self, timeout_s: int = 90) -> bool:
+        """Wait for the detail page to hydrate (dev takes ~20s, worse under load).
+
+        Polls for the 'Evaluation Overview' heading — a positive condition.
+        (Polling for the absence of 'Loading evaluation…' is unreliable: there
+        is a brief pre-hydration window where neither the curtain text nor the
+        content is in the DOM yet.) Non-fatal on timeout so callers can still
+        make their own assertions.
+        """
+        for _ in range(timeout_s // 2):
+            if self.page.locator(self.OVERVIEW_HEADING).count() > 0:
+                return True
+            self.page.wait_for_timeout(2_000)
+        return False
 
     # ── State checks ───────────────────────────────────────────────────────────
 
@@ -81,6 +97,73 @@ class EvaluationDetailPage(BasePage):
         triggers = self.page.locator(self.ISSUE_EXPAND_TRIGGER)
         if triggers.count() > 0:
             triggers.first.click()
+
+    # ── Redesigned single-page layout (Jul 2026) ──────────────────────────────
+
+    NAME_INPUT = EvaluationDetailLocators.NAME_INPUT
+    RECOMMENDATIONS_HEADING = EvaluationDetailLocators.RECOMMENDATIONS_HEADING
+    RESULTS_HEADING = EvaluationDetailLocators.RESULTS_HEADING
+    RESULTS_SORT_SELECT = EvaluationDetailLocators.RESULTS_SORT_SELECT
+    RESULT_INPUT_BLOCK = EvaluationDetailLocators.RESULT_INPUT_BLOCK
+
+    def has_tabs(self) -> bool:
+        """True when any [role='tab'] renders — the redesign has none."""
+        return self.page.locator("[role='tab']").count() > 0
+
+    def is_name_input_visible(self) -> bool:
+        return self.is_visible(self.NAME_INPUT, timeout=5_000)
+
+    def get_eval_name(self) -> str:
+        return self.page.locator(self.NAME_INPUT).first.input_value()
+
+    def is_results_section_visible(self) -> bool:
+        return self.is_visible(self.RESULTS_HEADING, timeout=5_000)
+
+    def is_recommendations_visible(self) -> bool:
+        return self.is_visible(self.RECOMMENDATIONS_HEADING, timeout=3_000)
+
+    def get_overview_field(self, label: str) -> str:
+        """Parse an Overview line of the form 'Label : value' (exact key match)."""
+        body = self.page.locator("body").inner_text()
+        for line in body.splitlines():
+            key, sep, value = line.partition(":")
+            if sep and key.strip().lower() == label.lower():
+                return value.strip()
+        return ""
+
+    def get_summary_stat(self, label: str) -> str:
+        """Return the value rendered directly below a summary-card label.
+
+        The summary/risk cards render as 'LABEL\\n<value>' in innerText,
+        e.g. 'TOTAL PASS RATE\\n100.00%' or 'HIGH RISK\\n0'.
+        """
+        import re
+
+        body = self.page.locator("body").inner_text()
+        m = re.search(
+            re.escape(label) + r"\s*:?\s*\n\s*([\d.,]+\s*%?|\d+)", body, re.IGNORECASE
+        )
+        return m.group(1).strip() if m else ""
+
+    def get_results_sort_options(self) -> list[str]:
+        sel = self.page.locator(self.RESULTS_SORT_SELECT).first
+        if not sel.count():
+            return []
+        if sel.evaluate("el => el.tagName") != "SELECT":
+            return []
+        return sel.locator("option").all_inner_texts()
+
+    def select_results_sort(self, label: str) -> bool:
+        """Select a sort option by visible label. Returns False when no select."""
+        sel = self.page.locator(self.RESULTS_SORT_SELECT).first
+        if not sel.count() or sel.evaluate("el => el.tagName") != "SELECT":
+            return False
+        sel.select_option(label=label)
+        self.page.wait_for_timeout(1_000)
+        return True
+
+    def get_result_input_block_count(self) -> int:
+        return self.page.locator(self.RESULT_INPUT_BLOCK).count()
 
     # ── Tab switching ──────────────────────────────────────────────────────────
 

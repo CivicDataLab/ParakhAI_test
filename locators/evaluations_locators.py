@@ -34,6 +34,15 @@ class EvaluationsLocators:
     STATUS_TAB_FAILED = "button:has-text('Failed'), [role='tab']:has-text('Failed')"
     STATUS_TAB_CANCELLED = "button:has-text('Cancelled'), [role='tab']:has-text('Cancelled')"
 
+    # ── List table controls (verified live 03 Jul 2026) ──────────────────────
+    # Column headers are sort buttons (accessible text includes
+    # "Sorted in descending order"). Rows-per-page is a select next to "Rows:".
+    SORT_HEADER_NAME = "th button:has-text('Evaluation Name')"
+    SORT_HEADER_STATUS = "th button:has-text('Status')"
+    ROWS_PER_PAGE_SELECT = "select:has(option:text-is('25')):has(option:text-is('50'))"
+    TABLE_BODY_ROW = "table tbody tr"
+    PAGE_X_OF_Y = "text=/Page \\d+ of \\d+/"
+
     # ── Pagination controls (Jun 2026) ────────────────────────────────────────
     PAGINATION_NEXT = (
         "button:has-text('Next'), [aria-label='Go to next page'], [class*='pagination'] button:last-child"

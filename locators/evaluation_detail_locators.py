@@ -19,9 +19,28 @@ class EvaluationDetailLocators:
     RISK_MEDIUM = "text=MEDIUM RISK"
     RISK_LOW = "text=LOW RISK"
 
+    # ── Redesigned single-page layout (Jul 2026 frontend restructure) ─────────
+    # The detail page no longer has Test Cases / Results tabs: everything
+    # renders on one page (header → overview → recommendations → summary →
+    # risk counters → "Evaluation Results" list with a sort dropdown).
+    NAME_INPUT = "input[name='evaluationName']"
+    RECOMMENDATIONS_HEADING = "text=Evaluator's Recommendations"
+    RESULTS_HEADING = "text=Evaluation Results"
+    RESULTS_SORT_SELECT = (
+        "select[name='audit-results-sort'], "
+        "input[name='audit-results-sort'], "
+        "select:has(option:has-text('No. of Issues'))"
+    )
+    SUMMARY_TOTAL_TESTS = "text=TOTAL TEST CASES"
+    SUMMARY_PASSED = "text=PASSED TESTS"
+    SUMMARY_FAILED = "text=FAILED TESTS"
+    SUMMARY_SKIPPED = "text=SKIPPED TESTS"
+    TOTAL_ISSUES_HEADING = "text=Total Issues Identified"
+    RESULT_INPUT_BLOCK = "text=/^Input \\d+$/"
+
     # Top-level page tabs (Overview / Test Cases / Results)
-    # TODO: verify selector via Playwright MCP — opub-ui Tabs typically render
-    # as role='tab'; matching by accessible name covers most variants.
+    # DEPRECATED (Jul 2026): the redesigned detail page has no tabs at all —
+    # kept only so old references fail visibly instead of silently matching.
     TAB_OVERVIEW = (
         "[role='tab']:has-text('Overview'), "
         "button:has-text('Overview'):not(:has-text('Module'))"

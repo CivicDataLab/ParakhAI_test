@@ -67,15 +67,112 @@ class EvaluationsPage(BasePage):
             "All": EvaluationsLocators.STATUS_TAB_ALL,
             "Draft": EvaluationsLocators.STATUS_TAB_DRAFT,
             "Pending": EvaluationsLocators.STATUS_TAB_PENDING,
+            "Queued": EvaluationsLocators.STATUS_TAB_QUEUED,
+            "In Progress": EvaluationsLocators.STATUS_TAB_IN_PROGRESS,
+            "Pending Review": EvaluationsLocators.STATUS_TAB_PENDING_REVIEW,
             "Running": EvaluationsLocators.STATUS_TAB_RUNNING,
             "Completed": EvaluationsLocators.STATUS_TAB_COMPLETED,
             "Failed": EvaluationsLocators.STATUS_TAB_FAILED,
+            "Cancelled": EvaluationsLocators.STATUS_TAB_CANCELLED,
         }
-        self.click(tab_map[status])
+        # .first: 'Completed' also matches the 'Completed on' sort header, and
+        # count badges make exact-text matching brittle — the filter tab is
+        # always the first match in DOM order.
+        self.page.locator(tab_map[status]).first.click()
         self.page.wait_for_timeout(500)
 
     def is_pagination_visible(self) -> bool:
         return self.is_visible(EvaluationsLocators.PAGINATION_CONTAINER)
+
+    # ── List controls (status counts / sort / rows-per-page — Jul 2026) ───────
+
+    _STATUS_TAB_LABELS = (
+        "All",
+        "Draft",
+        "Queued",
+        "In Progress",
+        "Pending Review",
+        "Completed",
+        "Failed",
+        "Cancelled",
+    )
+
+    def wait_for_list_loaded(self, timeout_s: int = 90) -> bool:
+        """Wait until the hydrated list renders (positive condition).
+
+        Polling for the absence of 'Loading evaluations…' is unreliable —
+        there is a pre-hydration window where neither the curtain nor the
+        content is in the DOM. Instead wait for a status-count button
+        ('Draft(N)') or a table row to appear.
+        """
+        import re as _re
+
+        for _ in range(timeout_s // 2):
+            body = self.page.locator("body").inner_text()
+            if _re.search(r"\w\(\d+\)", body) or self.get_table_row_count() > 0:
+                return True
+            self.page.wait_for_timeout(2_000)
+        return False
+
+    def get_status_tab_counts(self) -> dict[str, int]:
+        """Parse the status filter buttons into {'Draft': 1, 'Completed': 5, ...}.
+
+        The 'All' tab renders without a count; tabs with counts render as
+        'Label(N)'. Longer labels are matched first so 'Pending Review' isn't
+        consumed by a hypothetical 'Pending'.
+        """
+        import re
+
+        counts: dict[str, int] = {}
+        body = self.page.locator("body").inner_text()
+        for label in self._STATUS_TAB_LABELS:
+            if label == "All":
+                continue
+            m = re.search(re.escape(label) + r"\s*\((\d+)\)", body)
+            if m:
+                counts[label] = int(m.group(1))
+        return counts
+
+    def get_table_row_count(self) -> int:
+        return self.page.locator(EvaluationsLocators.TABLE_BODY_ROW).count()
+
+    def get_first_column_texts(self) -> list[str]:
+        return [
+            t.strip()
+            for t in self.page.locator(
+                f"{EvaluationsLocators.TABLE_BODY_ROW} td:first-child"
+            ).all_inner_texts()
+        ]
+
+    def get_row_statuses(self) -> list[str]:
+        """Uppercase status badge text per visible row (4th column)."""
+        cells = self.page.locator(
+            f"{EvaluationsLocators.TABLE_BODY_ROW} td:nth-child(4)"
+        ).all_inner_texts()
+        return [c.strip() for c in cells]
+
+    def click_sort_header(self, header: str = "Evaluation Name") -> bool:
+        loc = self.page.locator(f"th button:has-text('{header}')").first
+        if not loc.count():
+            return False
+        loc.click()
+        self.page.wait_for_timeout(1_500)
+        return True
+
+    def set_rows_per_page(self, value: str) -> bool:
+        sel = self.page.locator(EvaluationsLocators.ROWS_PER_PAGE_SELECT).first
+        if not sel.count():
+            return False
+        sel.select_option(value)
+        self.page.wait_for_timeout(1_500)
+        return True
+
+    def get_page_x_of_y(self) -> tuple[int, int] | None:
+        import re
+
+        # Parse from body text — the indicator may be split across elements.
+        m = re.search(r"Page\s+0?(\d+)\s+of\s+0?(\d+)", self.page.locator("body").inner_text())
+        return (int(m.group(1)), int(m.group(2))) if m else None
 
     def get_evaluation_row_count(self) -> int:
         return self.page.locator(EvaluationsLocators.EVAL_TABLE_ROW).count()

@@ -38,11 +38,19 @@ _FRONTEND_ORIGIN = Config.BASE_URL.rstrip("/")
 
 class TestCookieSecurity:
     def test_session_cookies_have_httponly_flag(self, authenticated_page_fast):
-        """Session cookies must have HttpOnly to prevent XSS session theft."""
+        """App session cookies must have HttpOnly to prevent XSS session theft.
+
+        Keycloak's own KEYCLOAK_SESSION* cookies are non-HttpOnly BY DESIGN
+        (the session-status iframe reads them from JS), so the check is scoped
+        to cookies set on the app domain.
+        """
+        app_host = BASE.split("//", 1)[-1]
         cookies = authenticated_page_fast.context.cookies()
         session_cookies = [
             c for c in cookies
             if any(k in c.get("name", "").lower() for k in ("session", "next-auth", "token", "auth"))
+            and app_host.endswith(c.get("domain", "").lstrip("."))
+            and not c.get("name", "").upper().startswith("KEYCLOAK_SESSION")
         ]
         if not session_cookies:
             pytest.skip("No session/auth cookies found — cannot verify HttpOnly flag")
@@ -76,6 +84,9 @@ class TestCookieSecurity:
 
     def test_no_access_token_in_localstorage(self, authenticated_page_fast):
         """Raw JWT access_token must not be stored in localStorage."""
+        # localStorage is inaccessible on about:blank — land on the app first.
+        if authenticated_page_fast.url.startswith("about:"):
+            authenticated_page_fast.goto(BASE + "/", wait_until="domcontentloaded")
         keys = authenticated_page_fast.evaluate("Object.keys(localStorage)")
         sensitive_keys = [k for k in keys if any(
             word in k.lower() for word in ("access_token", "accesstoken", "jwt", "secret")
@@ -87,6 +98,8 @@ class TestCookieSecurity:
 
     def test_no_password_in_localstorage(self, authenticated_page_fast):
         """Passwords must never be stored in localStorage."""
+        if authenticated_page_fast.url.startswith("about:"):
+            authenticated_page_fast.goto(BASE + "/", wait_until="domcontentloaded")
         for key in authenticated_page_fast.evaluate("Object.keys(localStorage)"):
             value = authenticated_page_fast.evaluate(f"localStorage.getItem({key!r})") or ""
             assert Config.TEST_PASSWORD_1 not in value, (
@@ -561,9 +574,11 @@ class TestInputSanitisation:
             "Without CSP, injected scripts execute without restriction."
         )
 
-    @pytest.mark.xfail(reason="SEC-003: nginx version disclosed in Server response header — known bug")
     def test_sec003_server_header_does_not_disclose_version(self, api_client: requests.Session):
-        """SEC-003: The Server response header must not include the nginx version string."""
+        """SEC-003: The Server response header must not include the nginx version string.
+
+        Fixed upstream (verified 03 Jul 2026) — was xfailed as a known bug.
+        """
         try:
             resp = api_client.get(BASE + "/", timeout=15, allow_redirects=True)
         except requests.exceptions.ConnectionError:
@@ -769,3 +784,108 @@ class TestPlaygroundMutationSecurity:
             assert mutation_data.get("success") is not True, (
                 "generatePlaygroundReason with nonexistent auditId must not return success=True"
             )
+
+
+# ── Playground/result read authorization (EvalSample refactor, Jul 2026) ─────
+
+
+class TestPlaygroundReadAuthz:
+    """Auth boundaries for the unified read endpoints added/reshaped by the
+    Jul 2026 backend refactor: manualTestCases, resultSamples and
+    playgroundEvaluationStatus must never leak evaluation content to
+    anonymous callers or to a forged organization context.
+    """
+
+    _MANUAL_CASES_QUERY = (
+        '{ manualTestCases(auditId: "1") { test { id testInput } result { id } } }'
+    )
+    _STATUS_QUERY = (
+        '{ playgroundEvaluationStatus(auditId: "1") '
+        "{ testCaseCount canFinish auditStatus } }"
+    )
+    _SAMPLES_QUERY = '{ resultSamples(auditId: "1") { name metrics { name } } }'
+
+    def _anon_post(self, api_client, query, headers=None):
+        base_headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Origin": _FRONTEND_ORIGIN,
+            "Referer": _FRONTEND_ORIGIN + "/",
+        }
+        base_headers.update(headers or {})
+        try:
+            return api_client.post(
+                GRAPHQL, json={"query": query}, headers=base_headers, timeout=15
+            )
+        except requests.exceptions.ConnectionError:
+            pytest.skip("GraphQL endpoint unreachable")
+
+    def test_manual_test_cases_unauthenticated_returns_no_content(self, api_client):
+        resp = self._anon_post(api_client, self._MANUAL_CASES_QUERY)
+        if resp.status_code != 200:
+            return  # 401/403 — correct
+        body = resp.json()
+        if body.get("errors"):
+            return  # error envelope — correct
+        cases = (body.get("data") or {}).get("manualTestCases") or []
+        assert cases == [], (
+            "Anonymous manualTestCases query returned evaluation content — "
+            "test inputs/outputs must require authentication"
+        )
+
+    def test_playground_status_unauthenticated_returns_no_content(self, api_client):
+        resp = self._anon_post(api_client, self._STATUS_QUERY)
+        if resp.status_code != 200:
+            return
+        body = resp.json()
+        if body.get("errors"):
+            return
+        status = (body.get("data") or {}).get("playgroundEvaluationStatus")
+        assert not status or status.get("testCaseCount") in (0, None), (
+            f"Anonymous playgroundEvaluationStatus leaked audit state: {status}"
+        )
+
+    def test_result_samples_unauthenticated_returns_empty(self, api_client):
+        resp = self._anon_post(api_client, self._SAMPLES_QUERY)
+        if resp.status_code != 200:
+            return
+        body = resp.json()
+        if body.get("errors"):
+            return
+        samples = (body.get("data") or {}).get("resultSamples") or []
+        assert samples == [], (
+            "Anonymous resultSamples query returned module samples"
+        )
+
+    def test_manual_test_cases_with_forged_org_header(self, api_client):
+        """A bogus organization header must not unlock evaluation content."""
+        resp = self._anon_post(
+            api_client, self._MANUAL_CASES_QUERY, headers={"organization": "999999"}
+        )
+        if resp.status_code != 200:
+            return
+        body = resp.json()
+        if body.get("errors"):
+            return
+        cases = (body.get("data") or {}).get("manualTestCases") or []
+        assert cases == [], (
+            "manualTestCases returned content for a forged organization header"
+        )
+
+    def test_ideal_output_field_requires_auth(self, api_client):
+        """idealOutput (new AuditResultType field, Jul 2026) is part of the
+        evaluator's judgment — it must not be readable anonymously."""
+        query = (
+            '{ manualTestCases(auditId: "1") { result { idealOutput } } }'
+        )
+        resp = self._anon_post(api_client, query)
+        if resp.status_code != 200:
+            return
+        body = resp.json()
+        if body.get("errors"):
+            return
+        cases = (body.get("data") or {}).get("manualTestCases") or []
+        leaked = [
+            c for c in cases if (c.get("result") or {}).get("idealOutput")
+        ]
+        assert not leaked, "Anonymous query read idealOutput content"
