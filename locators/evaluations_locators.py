@@ -130,6 +130,15 @@ class EvaluationsLocators:
     WIZARD_PREMADE_LIBRARIES_LABEL = "text=Select from pre-made prompt libraries"
     WIZARD_MAX_TEST_CASES_NOTE = "text=Maximum test cases for your current selection"
     WIZARD_SUBMODULE_PROMPT = "text=Select sub-modules from dropdown"
+    # The sub-module picker is a cmdk-style combobox: a trigger button (labelled
+    # "open combobox"/"close combobox" depending on state) that reveals a list
+    # of [role='option']/[cmdk-item] entries (e.g. "Hallucination", "Misinformation").
+    WIZARD_SUBMODULE_COMBOBOX_TRIGGER = "text=open combobox"
+    WIZARD_SUBMODULE_OPTION = "[role='option'], [cmdk-item]"
+    # Each prompt-library row renders a radio input as the real selection
+    # target — the dataset title is a plain <a> that navigates to CivicDataSpace
+    # in a new tab, NOT a selection control. Always click the radio, not the link.
+    WIZARD_PROMPT_LIBRARY_RADIO = "input[type='radio'][name='promptLibrary']"
     # Error under the Run Evaluation button when no prompt library is selected
     RUN_EVALUATION_LIBRARY_ERROR = "text=Please select a prompt library"
 

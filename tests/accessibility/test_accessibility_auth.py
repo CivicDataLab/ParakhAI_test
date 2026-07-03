@@ -220,6 +220,12 @@ class TestModelsPageAccessibility:
         count = authenticated_page_fast.locator("h1").count()
         assert count == 1, f"Expected 1 <h1> on models page, found {count}"
 
+    @pytest.mark.xfail(
+        reason="A11Y-002 (03 Jul 2026): AI model cards render the model name as "
+        "plain text with no heading (h2/h3) or title element — screen readers "
+        "can't navigate between cards by heading. Flips to XPASS when fixed.",
+        strict=False,
+    )
     def test_model_cards_have_accessible_headings_or_labels(self, authenticated_page_fast: Page):
         """Each visible model card must be identifiable by a heading or label."""
         _nav_to(authenticated_page_fast, "/dashboard/ai-maker/1/ai-models")

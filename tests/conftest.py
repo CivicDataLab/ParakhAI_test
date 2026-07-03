@@ -10,6 +10,8 @@ Authenticated fixtures:
   authenticated_page_u2 — page logged in as the secondary test user (USER_2)
 """
 
+import os
+
 import pytest
 import requests
 from playwright.sync_api import Browser, BrowserContext, Page
@@ -368,6 +370,42 @@ def authenticated_storage_state(browser: Browser, tmp_path_factory) -> str:
     return str(state_path)
 
 
+# Keycloak access tokens on dev live ~5 minutes. Refresh the cached storage
+# state a little before that so no test ever starts on an expired session.
+# Without this, any suite running longer than the TTL silently degrades into
+# auth-redirect skips — 137 tests were lost this way in the 03 Jul 2026 full
+# run (TEST-001 in reports/ParakhAI_QA_Report_2026-07-03.html).
+_STORAGE_STATE_TTL_S = 240
+
+
+def _refresh_storage_state_if_stale(browser: Browser, state_path: str) -> None:
+    """Re-login and overwrite the cached storage state when it has outlived
+    the access-token TTL. No-op while the state is fresh, so the per-test
+    cost is a single mtime check. Runs serially within each xdist worker
+    (each worker owns its own state file), so there is no write race.
+    """
+    import os
+    import time as _time
+
+    if _time.time() - os.path.getmtime(state_path) < _STORAGE_STATE_TTL_S:
+        return
+
+    user = Config.active_test_user()
+    context = browser.new_context(
+        viewport={"width": Config.VIEWPORT_WIDTH, "height": Config.VIEWPORT_HEIGHT},
+        ignore_https_errors=True,
+        locale="en-US",
+    )
+    context.set_default_timeout(Config.TIMEOUT)
+    pg = context.new_page()
+    pg.set_default_timeout(Config.TIMEOUT)
+    try:
+        _do_login(pg, user["email"], user["password"])
+        context.storage_state(path=state_path)
+    finally:
+        context.close()
+
+
 @pytest.fixture(scope="function")
 def authenticated_page_fast(
     browser: Browser, authenticated_storage_state: str, request
@@ -377,7 +415,11 @@ def authenticated_page_fast(
     Use this for tests that only need *some* logged-in session (the vast
     majority). Tests that exercise the actual login flow should use the
     existing `authenticated_page` fixture which logs in fresh.
+
+    The cached session is transparently re-established whenever it is older
+    than the Keycloak token TTL (see _refresh_storage_state_if_stale).
     """
+    _refresh_storage_state_if_stale(browser, authenticated_storage_state)
     context = browser.new_context(
         viewport={"width": Config.VIEWPORT_WIDTH, "height": Config.VIEWPORT_HEIGHT},
         ignore_https_errors=True,
@@ -540,33 +582,56 @@ def completed_eval_id(request) -> int:
           }
         }
     """
-    wrapper = graphql(
-        token, org_id, list_q,
-        variables={"filters": [{"field": "status", "condition": "exact", "value": "COMPLETED"}]}
-    ).get("audits") or {}
-    audits = wrapper.get("data") or []
-    if not audits:
-        pytest.skip("No COMPLETED evaluation found on this environment")
+    def _first_real_completed() -> int | None:
+        wrapper = graphql(
+            token, org_id, list_q,
+            variables={"filters": [{"field": "status", "condition": "exact", "value": "COMPLETED"}]}
+        ).get("audits") or {}
+        # The list endpoint stamps `status=COMPLETED` even for evals that never
+        # actually finished (progressPercentage=0, no test data). The detail
+        # page for those renders as a DRAFT — wrong shape for the
+        # Summary/Risk/Modules assertions. Walk newest-first and pick the first
+        # one with progress=100 + totalTests>0 + completedAt set.
+        for a in wrapper.get("data") or []:
+            d = graphql(token, org_id, detail_q, variables={"auditId": a["id"]}).get("audit") or {}
+            if (
+                d.get("progressPercentage") == 100
+                and (d.get("totalTests") or 0) > 0
+                and d.get("completedAt")
+            ):
+                return int(d["id"])
+        return None
 
-    # The list endpoint stamps `status=COMPLETED` even for evals that never
-    # actually finished (progressPercentage=0, no test data). The detail page
-    # for those renders as a DRAFT — wrong shape for the Summary/Risk/Modules
-    # assertions. Walk the list newest-first and pick the first one with
-    # progress=100 + totalTests>0 + completedAt set.
-    for a in audits:
-        d = graphql(token, org_id, detail_q, variables={"auditId": a["id"]}).get("audit") or {}
-        if (
-            d.get("progressPercentage") == 100
-            and (d.get("totalTests") or 0) > 0
-            and d.get("completedAt")
-        ):
-            return int(d["id"])
+    found = _first_real_completed()
+    if found is not None:
+        return found
 
-    pytest.skip(
-        "No COMPLETED evaluation with run results found on this environment "
-        "(all candidates are 0% progress). Trigger a real run via the wizard "
-        "or scripts/seed_test_data.py."
-    )
+    # None on this environment. When the sandbox is enabled (SANDBOX_ORG_SLUG),
+    # self-heal by seeding one real COMPLETED evaluation through the UI wizard
+    # rather than skipping ~30 dependent tests. Gated on the sandbox flag so a
+    # read-only environment never triggers a write. Opt out with
+    # SEED_COMPLETED_EVAL=0 (e.g. to keep CI fast).
+    seed_enabled = Config.SANDBOX_ORG_SLUG and os.getenv("SEED_COMPLETED_EVAL", "1") != "0"
+    if not seed_enabled:
+        pytest.skip(
+            "No COMPLETED evaluation with run results found. Set SANDBOX_ORG_SLUG "
+            "(and leave SEED_COMPLETED_EVAL unset) to auto-seed one, or run "
+            "scripts/seed_completed_evaluation.py manually."
+        )
+
+    try:
+        from scripts.seed_completed_evaluation import seed_completed_evaluation
+    except Exception as exc:  # noqa: BLE001
+        pytest.skip(f"Could not import seeding helper: {exc}")
+
+    seeded = seed_completed_evaluation(org_id=int(org_id), poll_budget_s=360, headless=True)
+    if seeded is None:
+        pytest.skip(
+            "No COMPLETED evaluation found and auto-seeding did not reach "
+            "COMPLETED (sandbox model backend may be slow). Retry, or run "
+            "scripts/seed_completed_evaluation.py manually."
+        )
+    return seeded
 
 
 # ── Cleanup helpers for write-side tests ──────────────────────────────────────

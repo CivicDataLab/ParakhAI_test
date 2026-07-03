@@ -226,3 +226,53 @@ class TestPlaygroundMutationsWithoutAuth:
         assert has_errors or not success_returned, (
             f"{mutation_name} without auth must not return success=True; got: {body}"
         )
+
+
+class TestAuditStatusEnumContract:
+    """The AuditStatus GraphQL enum should expose every status the audit model
+    can hold. As of 03 Jul 2026 it only defines DRAFT and CANCELLED, while the
+    Django model's STATUS_CHOICES has 7 (QUEUED, IN_PROGRESS, PENDING_REVIEW,
+    COMPLETED, FAILED are missing) — so `updateAudit(status: COMPLETED)` and
+    friends are rejected at schema-validation time.
+
+    Tracked as API-001 in reports/ParakhAI_QA_Report_2026-07-03.html. The
+    completeness test is strict-xfail: it flips to XPASS (failing the suite,
+    forcing this doc to be updated) the moment the backend enum is fixed.
+    """
+
+    _INTROSPECT = """
+        query { __type(name: "AuditStatus") { enumValues { name } } }
+    """
+    _EXPECTED = {
+        "DRAFT",
+        "QUEUED",
+        "IN_PROGRESS",
+        "PENDING_REVIEW",
+        "COMPLETED",
+        "FAILED",
+        "CANCELLED",
+    }
+
+    def _enum_values(self, graphql_client) -> set[str]:
+        result = graphql_client(self._INTROSPECT)
+        t = (result.get("data") or {}).get("__type") or {}
+        return {v["name"] for v in (t.get("enumValues") or [])}
+
+    def test_auditstatus_enum_is_introspectable(self, graphql_client):
+        values = self._enum_values(graphql_client)
+        assert values, "AuditStatus enum must be present in the schema"
+        # These two have always existed and must never regress.
+        assert {"DRAFT", "CANCELLED"} <= values, (
+            f"AuditStatus must at least expose DRAFT + CANCELLED; got {sorted(values)}"
+        )
+
+    @pytest.mark.xfail(
+        reason="API-001: AuditStatus enum is missing QUEUED/IN_PROGRESS/"
+        "PENDING_REVIEW/COMPLETED/FAILED (present in the Django model's "
+        "STATUS_CHOICES). Blocks updateAudit(status: <those>) via the API.",
+        strict=True,
+    )
+    def test_auditstatus_enum_matches_model_status_choices(self, graphql_client):
+        values = self._enum_values(graphql_client)
+        missing = self._EXPECTED - values
+        assert not missing, f"AuditStatus enum is missing {sorted(missing)}"

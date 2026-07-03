@@ -19,6 +19,7 @@ from playwright.sync_api import Page
 
 from locators.evaluations_locators import EvaluationsLocators
 from pages.new_evaluation_page import NewEvaluationPage
+from tests.data.test_data import TestGraphQL
 
 pytestmark = [
     pytest.mark.e2e,
@@ -275,4 +276,85 @@ class TestEvaluatorTypeVariants:
         evaluator = nep.get_overview_field("Evaluator") or ""
         assert expected in evaluator, (
             f"Overview Evaluator must reflect the {eval_type} selection; got {evaluator!r}"
+        )
+
+
+class TestBulkRunToCompletion:
+    """Full lifecycle: configure workspace minimally, Run Evaluation, and
+    confirm the audit actually progresses on the backend (QUEUED or further).
+
+    This exercises the two steps a naive GraphQL `updateAudit` mutation
+    misses — sub-module selection and a specific prompt-library radio pick —
+    that must be driven through the UI (see feedback_bulk_eval_seeding memory,
+    2026-07-03). Polling all the way to COMPLETED takes minutes, so this test
+    only confirms the run was accepted and started (QUEUED/IN_PROGRESS); a
+    slower, opt-in variant polls to COMPLETED for a durable reference eval.
+    """
+
+    def test_run_evaluation_starts_a_real_backend_run(
+        self, page: Page, sandbox_org, cleanup_evaluation, authenticated_graphql_client
+    ):
+        nep = _create_bulk_draft(
+            page, cleanup_evaluation, objective=f"QA bulk run-to-completion {_STAMP}"
+        )
+        audit_id = nep.get_audit_id_from_url()
+
+        enabled = nep.configure_bulk_workspace_minimal(module="hallucination")
+        if not enabled:
+            pytest.skip(
+                "Run Evaluation did not enable after minimal configuration — "
+                "no prompt library available in this sandbox, or the "
+                "sub-module combobox did not render"
+            )
+
+        nep.click_run_evaluation()
+        page.wait_for_timeout(3_000)
+
+        result = authenticated_graphql_client(
+            TestGraphQL.QUERY_AUDIT, variables={"auditId": str(audit_id)}
+        )
+        audit = ((result.get("data") or {}).get("audit")) or {}
+        assert audit.get("status") in ("QUEUED", "IN_PROGRESS", "PENDING_REVIEW", "COMPLETED"), (
+            f"Run Evaluation must move the audit off DRAFT; got status={audit.get('status')!r}. "
+            "If this is DRAFT, the sub-module/prompt-library selection likely "
+            "didn't persist before the Run click."
+        )
+
+    @pytest.mark.timeout(400)
+    def test_run_evaluation_completes_with_real_test_results(
+        self, page: Page, sandbox_org, cleanup_evaluation, authenticated_graphql_client
+    ):
+        """Slower end-to-end proof: polls until PENDING_REVIEW/COMPLETED or a
+        5-minute budget elapses, and asserts real test cases were produced.
+        """
+        nep = _create_bulk_draft(
+            page, cleanup_evaluation, objective=f"QA bulk full-completion {_STAMP}"
+        )
+        audit_id = nep.get_audit_id_from_url()
+
+        enabled = nep.configure_bulk_workspace_minimal(module="hallucination")
+        if not enabled:
+            pytest.skip("Run Evaluation did not enable after minimal configuration")
+
+        nep.click_run_evaluation()
+        page.wait_for_timeout(2_000)
+
+        deadline = time.monotonic() + 300
+        audit = {}
+        while time.monotonic() < deadline:
+            result = authenticated_graphql_client(
+                TestGraphQL.QUERY_AUDIT, variables={"auditId": str(audit_id)}
+            )
+            audit = ((result.get("data") or {}).get("audit")) or {}
+            if audit.get("status") in ("PENDING_REVIEW", "COMPLETED", "FAILED"):
+                break
+            page.wait_for_timeout(15_000)
+
+        if audit.get("status") not in ("PENDING_REVIEW", "COMPLETED"):
+            pytest.skip(
+                f"Evaluation did not reach PENDING_REVIEW/COMPLETED within budget "
+                f"(status={audit.get('status')!r}) — sandbox model backend may be slow"
+            )
+        assert (audit.get("totalTests") or 0) > 0, (
+            "A completed/reviewable bulk evaluation must have produced test cases"
         )

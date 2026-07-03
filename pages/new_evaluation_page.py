@@ -343,7 +343,7 @@ class NewEvaluationPage(BasePage):
 
     def start_evaluation_from_modal(
         self,
-        model_index: int = 1,
+        model_index: int | None = None,
         method: str = "bulk",
         eval_type: str = "technical",
         objective: str = "Automated test evaluation objective",
@@ -352,8 +352,16 @@ class NewEvaluationPage(BasePage):
         """Complete both modal steps and land on the single-page wizard.
 
         Precondition: the modal is already open (call click_new_evaluation()).
+
+        `model_index`: pass an explicit dropdown index to pin a specific model
+        (e.g. for a test asserting on a particular model's name). Leave as
+        None (default) to pick a random valid model, excluding the 'New AI
+        Model' placeholder and deprecated 'xAI: Grok 4.1 Fast'.
         """
-        self.select_model_by_index(model_index)
+        if model_index is None:
+            self.select_random_valid_model_and_version()
+        else:
+            self.select_model_by_index(model_index)
         if name is not None:
             self.set_modal_eval_name(name)
         self.select_evaluation_method(method)
@@ -466,6 +474,54 @@ class NewEvaluationPage(BasePage):
     def is_submodule_prompt_visible(self) -> bool:
         """Return True if 'Select sub-modules from dropdown' is shown (module checked)."""
         return self.is_visible(EvaluationsLocators.WIZARD_SUBMODULE_PROMPT, timeout=3_000)
+
+    def select_submodules(self, count: int = 1) -> int:
+        """Open the sub-module combobox and select up to `count` options.
+
+        Required before Run Evaluation can be enabled — checking a top-level
+        module alone is not enough. Returns the number of options actually
+        selected (0 if the combobox never appeared, e.g. no module checked yet).
+        """
+        trigger = self.page.locator(EvaluationsLocators.WIZARD_SUBMODULE_COMBOBOX_TRIGGER).first
+        if not trigger.count():
+            return 0
+        trigger.click(timeout=10_000)
+        self.page.wait_for_timeout(800)
+        options = self.page.locator(EvaluationsLocators.WIZARD_SUBMODULE_OPTION)
+        n = min(options.count(), count)
+        for i in range(n):
+            options.nth(i).click()
+            self.page.wait_for_timeout(300)
+        self.page.keyboard.press("Escape")
+        self.page.wait_for_timeout(300)
+        return n
+
+    def select_first_prompt_library(self) -> bool:
+        """Click the first prompt-library row's radio input (not its title link).
+
+        Must be called after `select_prompt_library_source()`. Returns False if
+        no library rows are available (e.g. still loading, or none exist).
+        """
+        radio = self.page.locator(EvaluationsLocators.WIZARD_PROMPT_LIBRARY_RADIO).first
+        if not radio.count():
+            return False
+        radio.click(timeout=10_000)
+        self.page.wait_for_timeout(1_000)
+        return True
+
+    def configure_bulk_workspace_minimal(self, module: str = "hallucination") -> bool:
+        """Configure the minimum required to enable Run Evaluation: check a
+        module, pick a sub-module, choose the prompt-library source, and
+        select the first available library. Returns True if Run Evaluation
+        ends up enabled.
+        """
+        self.check_module(module)
+        self.page.wait_for_timeout(500)
+        self.select_submodules(count=1)
+        self.select_prompt_library_source()
+        self.page.wait_for_timeout(1_500)
+        self.select_first_prompt_library()
+        return self.is_run_evaluation_button_enabled()
 
     def is_run_evaluation_library_error_visible(self) -> bool:
         """Return True if 'Please select a prompt library…' error is shown."""
