@@ -182,9 +182,34 @@ class NewEvaluationPage(BasePage):
                 model_select.select_option(value=val)
                 self.page.wait_for_timeout(500)
 
+    # Excluded from random selection: 'New AI Model' is the ghost placeholder
+    # created by the CDS-002 "Add New AI Model" bug (empty metadata, no working
+    # access method); 'xAI: Grok 4.1 Fast' is deprecated on the platform.
+    EXCLUDED_MODEL_NAMES = {"New AI Model", "xAI: Grok 4.1 Fast"}
+
+    def select_random_valid_model_and_version(self) -> str:
+        """Select a random model, excluding 'New AI Model' and deprecated 'xAI: Grok 4.1 Fast'.
+
+        Returns the selected model's display text (useful for logging/assertions).
+        Falls back to index 1 if every option is excluded or the list is empty.
+        """
+        import random
+
+        options = self.get_modal_model_options()
+        valid = [
+            i for i, (_, text) in enumerate(options)
+            if text.strip() not in self.EXCLUDED_MODEL_NAMES
+        ]
+        if not valid:
+            self.select_model_by_index(1)
+            return options[1][1] if len(options) > 1 else ""
+        idx = random.choice(valid)
+        self.select_model_by_index(idx)
+        return options[idx][1]
+
     def select_first_model_and_version(self) -> None:
-        """Select the first real model (skip 'New AI Model' at index 0) and first version."""
-        self.select_model_by_index(1)
+        """Select a random valid model (skips 'New AI Model' and deprecated 'xAI: Grok 4.1 Fast')."""
+        self.select_random_valid_model_and_version()
 
     def get_modal_eval_name(self) -> str:
         """Return the current value of the evaluation-name input in the modal."""
