@@ -55,7 +55,10 @@ jobs:
       - name: Run ruff linter
         run: ruff check locators/ pages/ utils/ tests/ --output-format=github
 
-  # ────────────────────────────────────────────── API tests (no browser)
+  # ────────────────────────────────────────────── API tests
+  # Most tests hit the GraphQL/REST layer directly, but auth-token
+  # acquisition (scripts/_api_client.get_access_token) and a few
+  # cookie-security tests drive a real headless Chromium via Playwright.
   api-tests:
     name: API Tests
     runs-on: ubuntu-latest
@@ -71,6 +74,9 @@ jobs:
 
       - name: Install dependencies
         run: pip install -r requirements.txt
+
+      - name: Install Playwright browsers
+        run: playwright install --with-deps chromium
 
       - name: Run API tests
         continue-on-error: true
