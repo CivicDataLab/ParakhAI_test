@@ -139,7 +139,6 @@ class TestEvaluationsListFunctionality:
         # Either completed rows are shown or empty state
         completed_badge = authenticated_page_fast.locator(EvaluationsLocators.STATUS_COMPLETED)
         draft_badge = authenticated_page_fast.locator(EvaluationsLocators.STATUS_DRAFT)
-        empty_state = authenticated_page_fast.locator("text=/no evaluations|empty/i")
 
         # Draft badges should NOT appear when Completed filter is active
         if draft_badge.count() > 0 and completed_badge.count() == 0:
