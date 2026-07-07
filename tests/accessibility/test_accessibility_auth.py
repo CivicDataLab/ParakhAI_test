@@ -6,7 +6,6 @@ Complements test_accessibility.py (which covers the public homepage and login pa
 All tests here use `authenticated_page_fast` (cached storage state, no per-test login).
 """
 
-import json
 
 import pytest
 from playwright.sync_api import Page
@@ -373,7 +372,6 @@ class TestDialogAccessibility:
         MCP found the Radix DialogTitle renders twice — once for accessibility and once
         visually — without aria-hidden on the duplicate.
         """
-        from utils.config import Config
 
         _nav_to(authenticated_page_fast, "/dashboard/ai-maker/1/auditors")
         add_btn = authenticated_page_fast.locator(

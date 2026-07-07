@@ -203,7 +203,7 @@ class TestGraphQLSecurity:
             pytest.skip("GraphQL endpoint unreachable")
 
         assert resp.status_code != 500, (
-            f"Server returned 500 for a malformed GraphQL query — "
+            "Server returned 500 for a malformed GraphQL query — "
             "internal errors must not be exposed to clients."
         )
         if resp.status_code == 200:
@@ -231,7 +231,7 @@ class TestGraphQLSecurity:
             pytest.skip("Request timed out — server may be throttling oversized inputs")
 
         assert resp.status_code != 500, (
-            f"Server returned 500 for an oversized query variable — "
+            "Server returned 500 for an oversized query variable — "
             "the server should validate input size and return 400/200+error, not crash."
         )
 
@@ -507,7 +507,7 @@ class TestInputSanitisation:
             pytest.skip("GraphQL endpoint unreachable")
 
         assert resp.status_code != 500, (
-            f"Server returned 500 for XSS payload in filter — "
+            "Server returned 500 for XSS payload in filter — "
             "input must be validated, not passed directly to the backend"
         )
 
@@ -539,7 +539,6 @@ class TestInputSanitisation:
                 # The filter should match nothing (literal string match)
                 # A huge count would suggest injection worked
                 count = body["data"]["audits"].get("totalItemsCount", 0)
-                audit_list = body["data"]["audits"].get("data") or []
                 # Cannot assert exact count without knowing DB state, just verify no crash
                 assert isinstance(count, int) and count >= 0
 

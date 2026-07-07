@@ -207,6 +207,7 @@ class TestPlaygroundMutationsWithoutAuth:
     )
     def test_mutation_rejected_without_auth(self, mutation_name, mutation_gql):
         import requests as _requests
+
         from utils.config import Config
 
         resp = _requests.get(

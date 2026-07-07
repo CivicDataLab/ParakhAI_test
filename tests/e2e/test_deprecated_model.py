@@ -47,7 +47,7 @@ class TestDeprecatedVersionControls:
     def test_deprecated_version_shows_disabled_start_button(
         self, authenticated_page_fast: Page
     ):
-        mp = _go_to_model_detail(authenticated_page_fast)
+        _go_to_model_detail(authenticated_page_fast)
         disabled_btn = authenticated_page_fast.locator(
             ModelsLocators.START_EVALUATION_BUTTON_DISABLED
         )
@@ -63,7 +63,7 @@ class TestDeprecatedVersionControls:
     def test_deprecated_version_start_button_shows_toast_on_click(
         self, authenticated_page_fast: Page
     ):
-        mp = _go_to_model_detail(authenticated_page_fast)
+        _go_to_model_detail(authenticated_page_fast)
         disabled_btn = authenticated_page_fast.locator(
             ModelsLocators.START_EVALUATION_BUTTON_DISABLED
         )

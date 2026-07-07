@@ -154,7 +154,7 @@ class TestDatabaseConnectionPool:
             pytest.skip("Frontend unreachable")
 
         assert resp.status_code != 503, (
-            f"AI models RSC route returned 503 Service Unavailable. "
+            "AI models RSC route returned 503 Service Unavailable. "
             "Backend is likely overloaded or the DB connection pool is exhausted."
         )
 
@@ -175,5 +175,5 @@ class TestDatabaseConnectionPool:
             pytest.skip("Frontend unreachable")
 
         assert resp.status_code != 503, (
-            f"Prompt libraries RSC route returned 503 Service Unavailable."
+            "Prompt libraries RSC route returned 503 Service Unavailable."
         )

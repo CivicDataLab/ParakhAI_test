@@ -163,7 +163,6 @@ class TestConcurrentGraphQLReads:
 
     def test_concurrent_mixed_queries(self, authenticated_graphql_client):
         """10 mixed concurrent queries (5 aiModels + 5 audits): ≥85% success rate."""
-        import itertools
 
         queries = (
             [(authenticated_graphql_client, _QUERY_AI_MODELS, f"mixed-models-{i}") for i in range(5)]

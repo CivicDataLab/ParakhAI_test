@@ -168,9 +168,10 @@ class TestAddAuditorMutation:
             assert "message" in resp
 
     def test_add_auditor_without_auth_returns_failure(self, graphql_client):
+
         import requests as _requests
+
         from utils.config import Config
-        import json
 
         mutation = TestGraphQL.MUTATION_ADD_AUDITOR_TO_ORGANIZATION
         try:
@@ -247,6 +248,7 @@ class TestAssignAuditorToVersionMutation:
 
     def test_assign_auditor_without_auth_returns_failure(self, graphql_client):
         import requests as _requests
+
         from utils.config import Config
 
         try:

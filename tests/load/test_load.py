@@ -622,7 +622,7 @@ class TestWizardInitializationLatency:
         unbounded event listeners, etc.).
         """
         results = []
-        for i in range(3):
+        for _i in range(3):
             r = self._open_wizard_and_measure(authenticated_page_fast, cleanup_evaluation)
             results.append(r)
             authenticated_page_fast.wait_for_timeout(500)  # brief settle between sessions
