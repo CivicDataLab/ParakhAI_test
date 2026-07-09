@@ -17,10 +17,11 @@ class EvaluatorRoleLocators:
 
     # ── Home dashboard ─────────────────────────────────────────────────────────
     OVERVIEW_HEADING = "text=Overview"
-    STAT_INVITATIONS_RECEIVED = ":has-text('Invitations Received')"
-    STAT_EVALUATION_RUNS = ":has-text('Evaluation Runs')"
-    STAT_TEST_CASES = ":has-text('Test Cases')"
-    STAT_ISSUES_FLAGGED = ":has-text('Issues Flagged')"
+    # text= engine does exact/normalized match; works when labels are stable
+    STAT_INVITATIONS_RECEIVED = "text=Invitations Received"
+    STAT_EVALUATION_RUNS = "text=Evaluations Completed"   # renamed from "Evaluation Runs"
+    STAT_TEST_CASES = "text=Test Cases Evaluated"         # renamed from "Test Cases"
+    STAT_ISSUES_FLAGGED = "text=Issues Flagged"
 
     PENDING_INVITATIONS_HEADING = (
         "h2:has-text('Pending Invitations'), h3:has-text('Pending Invitations'), "
