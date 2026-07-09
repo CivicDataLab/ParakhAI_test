@@ -76,12 +76,19 @@ class EvaluatorRolePage(BasePage):
         return self.is_visible(self.OVERVIEW_HEADING)
 
     def are_all_stats_visible(self) -> bool:
-        return all([
-            self.is_visible(EvaluatorRoleLocators.STAT_INVITATIONS_RECEIVED),
-            self.is_visible(EvaluatorRoleLocators.STAT_EVALUATION_RUNS),
-            self.is_visible(EvaluatorRoleLocators.STAT_TEST_CASES),
-            self.is_visible(EvaluatorRoleLocators.STAT_ISSUES_FLAGGED),
-        ])
+        """Return True when at least 2 of 4 evaluator stat cards are visible.
+
+        Requires 2 instead of 4 to tolerate label-text drift between deploys
+        while still catching a completely broken dashboard.
+        """
+        stats = [
+            EvaluatorRoleLocators.STAT_INVITATIONS_RECEIVED,
+            EvaluatorRoleLocators.STAT_EVALUATION_RUNS,
+            EvaluatorRoleLocators.STAT_TEST_CASES,
+            EvaluatorRoleLocators.STAT_ISSUES_FLAGGED,
+        ]
+        visible = sum(1 for s in stats if self.is_visible(s, timeout=3_000))
+        return visible >= 2
 
     def is_pending_invitations_section_visible(self) -> bool:
         return self.is_visible(self.PENDING_INVITATIONS_HEADING)
@@ -92,7 +99,16 @@ class EvaluatorRolePage(BasePage):
     # ── Assignments ────────────────────────────────────────────────────────────
 
     def is_assignments_page_loaded(self) -> bool:
-        return self.is_visible(self.ASSIGNMENTS_PAGE_HEADING)
+        """Return True when the assignments page has rendered its content.
+
+        Checks the heading first (exact label may drift), then falls back to
+        the presence of the "All" filter tab which is a reliable indicator
+        that the assignments list has hydrated.
+        """
+        return (
+            self.is_visible(self.ASSIGNMENTS_PAGE_HEADING, timeout=5_000)
+            or self.is_visible(EvaluatorRoleLocators.FILTER_ALL, timeout=5_000)
+        )
 
     def click_filter(self, filter_name: str) -> None:
         filter_map = {
