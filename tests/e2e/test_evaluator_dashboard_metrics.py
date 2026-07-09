@@ -78,10 +78,16 @@ class TestEvaluatorStatCards:
         non_numeric = []
         for sel in stats:
             container = ev_page.page.locator(sel).locator("..")
-            texts = [t.strip() for t in container.all_inner_texts() if t.strip()]
-            has_num = any(
-                t.replace(",", "").isdigit() for t in texts
-            )
+            # all_inner_texts() returns one concatenated string per matched element
+            # (e.g. "Invitations Received\n0"). Split on newlines to isolate the number.
+            raw_texts = container.all_inner_texts()
+            tokens = [
+                token.strip()
+                for raw in raw_texts
+                for token in raw.split("\n")
+                if token.strip()
+            ]
+            has_num = any(t.replace(",", "").isdigit() for t in tokens)
             if not has_num:
                 non_numeric.append(sel)
 
