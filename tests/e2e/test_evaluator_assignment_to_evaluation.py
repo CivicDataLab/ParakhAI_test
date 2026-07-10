@@ -191,11 +191,20 @@ class TestAssignmentAcceptAndEvaluate:
         if audit_id:
             cleanup_evaluation.append(str(audit_id))
 
-        enabled = nep.configure_bulk_workspace_minimal(module="hallucination")
-        if not enabled:
+        nep.select_submodules(count=1)
+        if not nep.is_visible(EvaluationsLocators.WIZARD_PROMPT_LIBRARY_OPTION, timeout=15_000):
             pytest.skip(
-                "Run Evaluation did not enable after minimal configuration — "
-                "no prompt library available in this sandbox"
+                "Prompt-library test-case source not rendered on the auditor "
+                "entry point — sandbox may have no datasets, or this route "
+                "does not surface it the same way as the AI Maker flow"
+            )
+        nep.select_prompt_library_source()
+        authenticated_page_u2.wait_for_timeout(1_500)
+        if not nep.select_first_prompt_library():
+            pytest.skip("No prompt library rows available to select")
+        if not nep.is_run_evaluation_button_enabled():
+            pytest.skip(
+                "Run Evaluation did not enable after minimal configuration"
             )
 
         nep.click_run_evaluation()
