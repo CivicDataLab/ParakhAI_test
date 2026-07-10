@@ -9,6 +9,7 @@ Each row links to the WCAG criterion and the axe rule id (helpful when filing ti
 | a1 | bypass / region | 2.4.1 (A) | serious | `/` (homepage, anonymous) | `<body>` (missing element) | No skip-to-main-content link. Keyboard users cannot bypass nav. Linked to bug #4. | open | 2026-05-08 |
 | a2 | color-contrast | 1.4.3 (AA) | serious | Keycloak login (`opub-kc.civicdatalab.in/auth/realms/DataSpace/...`) | form labels / placeholder text | Foreground/background contrast below 4.5:1 for body text. Third-party (Keycloak) — see bug #5. | open (third-party) | 2026-05-08 |
 | a3 | link-name | 4.1.2 (A) / 2.4.4 (A) | serious | Keycloak login (footer) | `<a>` containing only `<svg>` (4 social media links) | Icon-only links with no `aria-label` or visible text. Affects GitHub, LinkedIn, Twitter, Facebook links. Third-party — see bug #5. | open (third-party) | 2026-05-08 |
+| a4 | heading-order / page-has-heading-one | 1.3.1 (A) | serious | `/dashboard/ai-maker/1` (auth) | `<main>` (no h1/h2/h3 anywhere) | No heading elements at all — the Overview widget that would host the page heading never mounts because its data fetch hangs indefinitely. Linked to bug #14 (and bug #13's backend root cause). | open | 2026-07-10 |
 
 ## How to interpret
 
@@ -21,3 +22,4 @@ Each row links to the WCAG criterion and the axe rule id (helpful when filing ti
 ## Phase log
 
 - **Phase 2 run 2026-05-08:** 11 a11y tests → 3 fail (1 flake fixed in test code, 2 real bugs filed → bugs #4, #5). 4 pass / 5 skip (env / no-creds) / 2 xfail / 0 fail after fixes.
+- **Phase 7 run 2026-07-10:** 34 a11y tests (public + authenticated) → 1 fail, reproduced consistently (not flaky). Root-caused to dashboard overview widget hang; filed bug #14 / finding a4 and xfailed. 14 pass / 9 skip / 10 xfail / 0 fail after triage.
