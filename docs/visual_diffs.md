@@ -80,3 +80,26 @@ Two fixes landed:
 | AI Maker → prompt libraries | `auth_prompt_libraries_desktop_1440x900.png` |
 
 Baselines now total **21 / 21** for the visual suite. Phase 4 baseline capture is complete; subsequent runs will pixel-diff against these and surface DIFFs to review here.
+
+### Run 2026-07-10 — Phase 7: re-run in fresh worktree, bug #15 filed (env: dev)
+
+All 21 baselines present at run start (`snapshots/` is gitignored in this repo — the worktree doesn't get it from `git worktree add`; copied from the main checkout's local `snapshots/` dir, which matches this file's inventory exactly).
+
+Result: **13 passed / 8 xfailed / 0 failed**, reproduced twice back-to-back. No baselines needed regenerating and no test-framework bugs were found — the suite is functioning as designed.
+
+The 8 xfails are all under the pre-existing `VISUAL-002` classification (`_NON_DETERMINISTIC_VISUAL` in `tests/visual/test_visual_regression.py`, added in an earlier phase — see commit "Classify data-driven auth pages as non-deterministic visual (VISUAL-002)"). Four of them showed unusually large diffs (~43%), well beyond what "live stats / model dropdown ordering" would explain, so before accepting them as routine noise this run dug into the diff images and cross-checked against manual captures:
+
+| diff file | baseline | diff % | investigation | decision |
+|---|---|---|---|---|
+| `screenshots/DIFF_auth_models_list_desktop_1440x900.png` | `snapshots/auth_models_list_desktop_1440x900.png` | 43.263% | Diff shows homepage hero/CTA/footer content bleeding through where the models-list page should be. Manual scripted repro (6 fresh authenticated loads) reproduced the same "homepage instead of dashboard page" failure in 1/6 trials. Baseline itself is correct (light theme, matches current UI when the bug doesn't fire). | **App bug, not baseline drift** — filed as bug #15 in `docs/app_bugs.md`. Left as `xfail`; baseline untouched. |
+| `screenshots/DIFF_auth_new_evaluation_wizard_desktop_1440x900.png` | `snapshots/auth_new_evaluation_wizard_desktop_1440x900.png` | 43.107% | Same pattern — homepage content visible under the wizard's "Loading models…" panel. Reproduced twice on consecutive pytest re-runs of just this test. | Same as above — bug #15. No baseline change. |
+| `screenshots/DIFF_auth_auditors_management_desktop_1440x900.png` | `snapshots/auth_auditors_management_desktop_1440x900.png` | 43.076% | Same pattern (Evaluators page chrome partially visible over homepage content). | Same as above — bug #15. No baseline change. |
+| `screenshots/DIFF_auth_auditor_dashboard_desktop_1440x900.png` | `snapshots/auth_auditor_dashboard_desktop_1440x900.png` | 42.637% | Same pattern (auditor Home sidebar/avatar over homepage content). | Same as above — bug #15. No baseline change. |
+| `screenshots/DIFF_auth_prompt_libraries_desktop_1440x900.png` | `snapshots/auth_prompt_libraries_desktop_1440x900.png` | 12.758% | Diff shows two stacked partial renderings (Prompt Libraries page chrome + homepage CTA/footer) — a mid-transition capture of the same underlying bug. Manual repro reproduced full homepage-fallback in 1/4 trials on this route. | Same root cause as bug #15 (lower diff % because the capture caught a partial/transitional state rather than a full homepage render). No baseline change. |
+| `screenshots/DIFF_auth_evaluations_list_desktop_1440x900.png` | `snapshots/auth_evaluations_list_desktop_1440x900.png` | 0.887% | Small diff, localized to "Loading evaluations…" spinner vs. empty-state text — consistent with genuine live/async data timing, not the homepage-fallback bug (magnitude is 50x smaller than the bug #15 cases). | Genuine minor async noise — no action, `xfail` classification is correct as-is. |
+| `screenshots/DIFF_auth_auditor_assignments_desktop_1440x900.png` | `snapshots/auth_auditor_assignments_desktop_1440x900.png` | 0.630% | Small diff, live assignment list ordering/count. | Genuine minor async noise — no action. |
+| `screenshots/DIFF_auth_auditor_evaluations_desktop_1440x900.png` | `snapshots/auth_auditor_evaluations_desktop_1440x900.png` | 1.000% | Small diff, live evaluations list. | Genuine minor async noise — no action. |
+
+**Follow-up worth doing (not done this run, flagged for review):** the `VISUAL-002` xfail reason string in `tests/visual/test_visual_regression.py` (~line 366) currently blames "model dropdown / live stats / variable list ordering" for all 8 routes — that's accurate for the 3 low-diff routes but understates what's happening on the 5 high-diff ones (see bug #15). Consider splitting the xfail message or diff-magnitude threshold so a ~43% diff (wrong page) is distinguishable in CI output from a ~1% diff (live data noise), since they currently read identically in the test summary.
+
+Baselines remain **21 / 21**, unchanged this run.
