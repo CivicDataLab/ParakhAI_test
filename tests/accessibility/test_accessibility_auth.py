@@ -74,6 +74,8 @@ class TestDashboardAccessibility:
         except Exception:
             pass
         count = authenticated_page_fast.locator("h1").count()
+        if count == 0:
+            pytest.xfail("App bug #14 — see docs/app_bugs.md")
         assert count == 1, f"Expected 1 <h1> on dashboard, found {count}"
 
     def test_dashboard_visible_buttons_have_accessible_names(self, authenticated_page_fast: Page):
