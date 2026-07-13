@@ -15,6 +15,8 @@ Run with:
     pytest tests/e2e/test_functional.py -m regression -v
 """
 
+import re
+
 import pytest
 from playwright.sync_api import Page
 
@@ -333,9 +335,8 @@ class TestDashboardMetrics:
         _goto(authenticated_page_fast, _DASHBOARD_URL)
 
         welcome = authenticated_page_fast.locator(
-            "text=/welcome|overview|dashboard/i, "
             "[class*='welcome' i], [class*='overview' i]"
-        )
+        ).or_(authenticated_page_fast.get_by_text(re.compile(r"welcome|overview|dashboard", re.I)))
         # At minimum a heading should be there
         headings = authenticated_page_fast.locator("h1, h2, h3")
         has_content = welcome.count() > 0 or headings.count() > 0
@@ -348,8 +349,11 @@ class TestDashboardMetrics:
         # Metric cards typically contain number + label patterns
         metric_indicators = authenticated_page_fast.locator(
             "[class*='metric' i], [class*='stat' i], "
-            "[class*='card' i]:has(p):has(h2), "
-            "text=/Evaluation Runs|Test Cases|Models|Issues Flagged/"
+            "[class*='card' i]:has(p):has(h2)"
+        ).or_(
+            authenticated_page_fast.get_by_text(
+                re.compile(r"Evaluation Runs|Test Cases|Models|Issues Flagged")
+            )
         )
         if metric_indicators.count() == 0:
             pytest.xfail(
