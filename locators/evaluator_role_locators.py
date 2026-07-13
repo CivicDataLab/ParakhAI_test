@@ -26,7 +26,10 @@ class EvaluatorRoleLocators:
     ACTIVE_ASSIGNMENTS_HEADING = "text=Active Assignments"
 
     # ── Assigned Models (My Assignments) ──────────────────────────────────────
-    ASSIGNMENTS_PAGE_HEADING = "text=My Assignments"
+    # Live heading is "Assigned Models", not "My Assignments" — confirmed via
+    # DOM dump 2026-07-13 (page shows "Assigned Models / All your evaluation
+    # invitations across organisations / All / Accepted(0) / Declined(0)").
+    ASSIGNMENTS_PAGE_HEADING = "text=Assigned Models"
     # `:text()` is case-sensitive strict-substring on the text engine and
     # misses the styled tab button. `[class*='filter']` is CSS-modules
     # case-sensitive too. Drop both parent gates and use `:has-text()` on the
