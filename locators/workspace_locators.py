@@ -7,8 +7,13 @@ URL: /dashboard
 class WorkspaceLocators:
     # ── Role selection page ────────────────────────────────────────────────────
     ROLE_SELECTION_HEADING = "h2, h3, [class*='heading'], [class*='title']"
-    AI_MAKER_CARD = "text=AI Maker"
-    EVALUATOR_CARD = "text=Evaluator"
+    # Role cards render a heading span (e.g. "Evaluator") AND a body-copy span
+    # (e.g. "For expert as evaluator") inside the same <a>. Plain `text=Evaluator`
+    # substring-matches BOTH spans independently (case-insensitive: "evaluator" in
+    # the body copy too) -> Locator strict-mode violation on click(). Scope to the
+    # single containing <a> instead (2026-07-13).
+    AI_MAKER_CARD = "a:has-text('AI Maker')"
+    EVALUATOR_CARD = "a:has-text('Evaluator')"
     ROLE_CARD = "[class*='card'], [class*='Card'], [class*='role']"
 
     # ── Global nav ─────────────────────────────────────────────────────────────
