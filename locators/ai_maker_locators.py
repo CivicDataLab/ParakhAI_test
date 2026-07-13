@@ -25,7 +25,7 @@ class AIMakerLocators:
 
     # ── Overview stat cards ────────────────────────────────────────────────────
     OVERVIEW_HEADING = "text=Overview"
-    STAT_EVALUATION_RUNS = "text=Evaluation Runs"
+    STAT_EVALUATION_RUNS = "text=Evaluations Completed"
     STAT_TEST_CASES = "text=Test Cases"
     STAT_MODELS = "text=Models"
     STAT_ISSUES_FLAGGED = "text=Issues Flagged"

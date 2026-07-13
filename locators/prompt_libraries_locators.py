@@ -29,9 +29,9 @@ class PromptLibrariesLocators:
     UPLOAD_FILES_TOGGLE = "text=Upload files, text=Upload Files"
 
     # Known library names
-    LIBRARY_KCC_ENGLISH = "text=KCC English Queries"
+    LIBRARY_KCC_ENGLISH = "text=KCC) - English Queries"
     LIBRARY_PARIKSHA = "text=Microsoft: PARIKSHA"
     LIBRARY_PUBLIC_INTEREST_ENGLISH = "text=Public Interest English"
     LIBRARY_PUBLIC_INTEREST_HINDI = "text=Public Interest Hindi"
-    LIBRARY_KCC_HINDI = "text=KCC: Hindi Queries"
+    LIBRARY_KCC_HINDI = "text=KCC): Hindi Queries"
     LIBRARY_KISAN_CALL = "text=Kisan Call Centre"

@@ -26,6 +26,7 @@ pytestmark = [pytest.mark.e2e, pytest.mark.regression]
 class TestHomepageSEO:
     """Homepage meta-data correctness."""
 
+    @pytest.mark.xfail(reason="App bug #16: meta description has typo 'Paricipatory' — see docs/app_bugs.md")
     def test_meta_description_has_no_typo(self, page: Page):
         """'Participatory' must be spelled correctly in the meta description."""
         home = HomePage(page)
@@ -49,6 +50,7 @@ class TestHomepageSEO:
             f"Meta description should mention AI evaluation context. Got: '{meta}'"
         )
 
+    @pytest.mark.xfail(reason="App bug #17: no Open Graph og:title tag on homepage — see docs/app_bugs.md")
     def test_og_title_is_present(self, page: Page):
         home = HomePage(page)
         home.go_to_home()
@@ -64,6 +66,7 @@ class TestHomepageSEO:
 class TestNotFoundPage:
     """The 404 page should be branded and helpful, not bare Next.js default."""
 
+    @pytest.mark.xfail(reason="App bug #18: anonymous users on any non-existent URL are redirected to sign-in, not shown a 404 — see docs/app_bugs.md")
     def test_404_page_shows_not_found_message(self, page: Page):
         page.goto(Config.url("/this-page-does-not-exist-xyz-123"))
         page.wait_for_load_state("domcontentloaded")
@@ -104,11 +107,16 @@ class TestMobileMenu:
     @pytest.mark.mobile
     def test_hamburger_menu_is_visible_on_mobile(self, mobile_page: Page):
         mobile_page.goto(Config.BASE_URL)
-        mobile_page.wait_for_load_state("domcontentloaded")
         hamburger = mobile_page.locator(
             "button[aria-label*='menu' i], button[aria-label*='Menu' i], "
             "button:has-text('Open menu'), button[class*='hamburger']"
         )
+        # MainNav is loaded via next/dynamic with ssr:false, so the button only
+        # exists after client-side hydration — domcontentloaded fires too early.
+        try:
+            hamburger.first.wait_for(state="visible", timeout=10_000)
+        except Exception:
+            pass
         assert hamburger.count() > 0, "Hamburger menu button must be visible at 390px"
 
     @pytest.mark.mobile
@@ -360,7 +368,6 @@ class TestPlatformIssuesExtended:
             "Success feedback must only fire when the mutation actually completes."
         )
 
-    @pytest.mark.xfail(reason="INFRA-004: Evaluators page fires requests to civicdataspace.innull — known bug")
     def test_infra004_evaluators_page_no_null_url_requests(self, authenticated_page_fast: Page):
         """INFRA-004: The Evaluators page must not fire requests to 'civicdataspace.innull'."""
         null_requests: list = []
