@@ -166,8 +166,8 @@ class TestAuthenticatedSmoke:
         page.wait_for_timeout(2_500)
 
         ai_maker_indicator = page.locator(
-            "text=/AI Maker/i, a[href*='ai-maker'], [class*='ai-maker' i]"
-        )
+            "a[href*='ai-maker'], [class*='ai-maker' i]"
+        ).or_(page.get_by_text("AI Maker", exact=False))
         assert ai_maker_indicator.first.is_visible(timeout=8_000), (
             "AI Maker section/link not visible on dashboard — primary workflow entry point missing"
         )

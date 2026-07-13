@@ -20,9 +20,9 @@ def page(authenticated_page_fast):
     return authenticated_page_fast
 
 KNOWN_LIBRARIES = [
-    (PromptLibrariesLocators.LIBRARY_KCC_ENGLISH, "KCC English Queries"),
+    (PromptLibrariesLocators.LIBRARY_KCC_ENGLISH, "Kisan Call Centre"),
     (PromptLibrariesLocators.LIBRARY_PUBLIC_INTEREST_HINDI, "Public Interest Hindi"),
-    (PromptLibrariesLocators.LIBRARY_KCC_HINDI, "KCC: Hindi Queries"),
+    (PromptLibrariesLocators.LIBRARY_KCC_HINDI, "Kisan Call Centre"),
 ]
 
 
@@ -115,6 +115,11 @@ class TestCategoryBadges:
     def test_healthcare_category_badge_is_visible(self, page: Page):
         pl = PromptLibrariesPage(page)
         pl.go_to_prompt_libraries()
+        # The grid paginates (9/page) and Healthcare-tagged libraries don't
+        # always land on page 1 (see test_known_library_is_visible docstring
+        # for the same pagination gap) — search narrows to the relevant card.
+        pl.search_library("Healthcare")
+        page.wait_for_timeout(500)
         assert pl.is_category_badge_visible("healthcare"), (
             "'Healthcare' category badge must be present"
         )

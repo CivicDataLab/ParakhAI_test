@@ -8,7 +8,10 @@ class WorkspaceLocators:
     # ── Role selection page ────────────────────────────────────────────────────
     ROLE_SELECTION_HEADING = "h2, h3, [class*='heading'], [class*='title']"
     AI_MAKER_CARD = "text=AI Maker"
-    EVALUATOR_CARD = "text=Evaluator"
+    # Exact match (quoted) — the card's description text ("For expert as
+    # evaluator") also contains "evaluator", which a substring match picks up
+    # as a second, strict-mode-violating hit.
+    EVALUATOR_CARD = 'text="Evaluator"'
     ROLE_CARD = "[class*='card'], [class*='Card'], [class*='role']"
 
     # ── Global nav ─────────────────────────────────────────────────────────────

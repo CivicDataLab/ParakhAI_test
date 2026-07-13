@@ -242,7 +242,7 @@ class TestModelDetailPage:
         for col_sel in [
             ModelsLocators.PAST_EVAL_NAME_COL,
             ModelsLocators.PAST_EVAL_TIME_COL,
-            ModelsLocators.PAST_EVAL_ID_COL,
+            ModelsLocators.PAST_EVAL_STATUS_COL,
             ModelsLocators.PAST_EVAL_TYPE_COL,
         ]:
             assert mp.is_visible(col_sel, timeout=3_000), (
