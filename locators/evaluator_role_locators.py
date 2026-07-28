@@ -36,9 +36,14 @@ class EvaluatorRoleLocators:
     )
 
     # ── Assigned Models (My Assignments) ──────────────────────────────────────
+    # Live heading is "Assigned Models", not "My Assignments" — confirmed via
+    # DOM dump 2026-07-13 (page shows "Assigned Models / All your evaluation
+    # invitations across organisations / All / Accepted(0) / Declined(0)").
+    # Old "My Assignments"/"Assignments" text kept as a fallback in case of
+    # further drift.
     ASSIGNMENTS_PAGE_HEADING = (
-        "h1:has-text('Assignments'), h2:has-text('Assignments'), "
-        ":has-text('My Assignments'):not(nav):not(a)"
+        "text=Assigned Models, h1:has-text('Assignments'), "
+        "h2:has-text('Assignments'), :has-text('My Assignments'):not(nav):not(a)"
     )
     # `:text()` is case-sensitive strict-substring on the text engine and
     # misses the styled tab button. `[class*='filter']` is CSS-modules

@@ -106,6 +106,7 @@ class TestCDSAddModelEditor:
     def check_cds_reachable(self):
         skip_if_cds_unreachable()
 
+    @pytest.mark.xfail(reason="CDS-001: JS SyntaxError 'appendChild missing )' fires on every load — known bug")
     def test_cds001_no_js_syntax_error_on_editor_page_load(self, page: Page):
         """CDS-001: The model editor must not throw a JS SyntaxError on load.
 
@@ -123,9 +124,19 @@ class TestCDSAddModelEditor:
 
     @pytest.mark.xfail(reason="CDS-001: JS SyntaxError 'appendChild missing )' fires on every load — known bug")
     def test_cds001_editor_has_no_console_errors_on_load(self, page: Page):
-        """CDS-001: Editor page should load without any JS console errors."""
+        """CDS-001: Editor page should load without any JS console errors.
+
+        Uncaught JS exceptions (like the CDS-001 SyntaxError) surface via Playwright's
+        `pageerror` event, not `console` — `page.on("console", ...)` only fires for
+        explicit console.* calls, so it never observes a thrown SyntaxError. A real user
+        with DevTools open would see both in the Console panel, so both are captured here.
+        Verified 2026-07-13: probing this route directly shows 0 `console` errors but 1
+        `pageerror` (the CDS-001 SyntaxError) on every load — the console-only version of
+        this assertion falsely XPASSed every run without observing the real bug.
+        """
         console_errors = []
         page.on("console", lambda msg: console_errors.append(msg.text) if msg.type == "error" else None)
+        page.on("pageerror", lambda e: console_errors.append(str(e)))
         page.goto(Config.cds_url("/en/manage/ai-models"), wait_until="domcontentloaded", timeout=20000)
         page.wait_for_timeout(3000)
         assert not console_errors, f"Console errors on CDS editor load: {console_errors}"
@@ -242,6 +253,12 @@ class TestCDSAddModelEditor:
         page.on("console", lambda msg: console_errors.append(msg.text) if msg.type == "error" else None)
         page.goto(Config.cds_url("/en/manage/ai-models/new"), wait_until="domcontentloaded", timeout=25000)
         page.wait_for_timeout(3000)
+        bullet_btn = page.locator(AddModelFlowLocators.CDS_QUILL_BULLET_BTN)
+        if bullet_btn.count() == 0:
+            pytest.skip(
+                "Quill editor not reached — page (uses anonymous `page` fixture, no CDS auth) "
+                "redirected to Keycloak login before the editor loaded"
+            )
         quill_errors = [e for e in console_errors if "bullet" in e.lower() and "register" in e.lower()]
         assert not quill_errors, f"CDS-005: Quill bullet registration error: {quill_errors}"
 

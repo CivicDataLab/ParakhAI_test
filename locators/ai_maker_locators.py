@@ -24,12 +24,21 @@ class AIMakerLocators:
     SWITCH_ROLES_LINK = "text=Switch Roles"
 
     # ── Overview stat cards ────────────────────────────────────────────────────
+    # Cards now render as `.metric-card > .metric-card-label + .metric-card-value`
+    # (confirmed via live DOM dump 2026-07-13). Labels were renamed at some point:
+    # "Evaluation Runs" -> "Evaluations Completed", "Test Cases" -> "Test Cases
+    # Evaluated", "Models" -> "Models Added". Anchor on `.metric-card-label` with
+    # `:has-text` (substring, tolerates the exact wording drifting again) scoped to
+    # the `.metric-card` container so a card can be found + its value read in one
+    # locator, without colliding with sidebar links or other page text that happens
+    # to share a word (e.g. "Models").
     OVERVIEW_HEADING = "text=Overview"
-    STAT_EVALUATION_RUNS = "text=Evaluations Completed"
-    STAT_TEST_CASES = "text=Test Cases"
-    STAT_MODELS = "text=Models"
-    STAT_ISSUES_FLAGGED = "text=Issues Flagged"
+    STAT_EVALUATION_RUNS = ".metric-card:has(.metric-card-label:has-text('Evaluations Completed'))"
+    STAT_TEST_CASES = ".metric-card:has(.metric-card-label:has-text('Test Cases'))"
+    STAT_MODELS = ".metric-card:has(.metric-card-label:has-text('Models Added'))"
+    STAT_ISSUES_FLAGGED = ".metric-card:has(.metric-card-label:has-text('Issues Flagged'))"
     STAT_CARD = "[class*='stat'], [class*='card'], [class*='Card']"
+    STAT_CARD_VALUE = ".metric-card-value"
 
     # ── Org selection page: Add Organisation button (Jun 2026) ───────────────
     ADD_ORGANISATION_BUTTON = (
