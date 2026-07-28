@@ -47,13 +47,22 @@ class TestModalSmoke:
         assert nep.get_modal_step() == "1", "Modal must open on step 1"
 
     def test_model_dropdown_populates_with_real_models(self, open_modal: NewEvaluationPage):
+        """The 'New AI Model' ghost placeholder option is gone (confirmed 2026-07-13
+        via live dropdown dump — options are now real registered models only, e.g.
+        [('133', 'xAI: Grok 4.3'), ('129', 'Google: Gemma 4 26B A4B'), ...], no
+        'New AI Model' entry anywhere in the list). This matches the standalone
+        'Add A New Model' cross-platform redirect flow (test_add_model_flow.py)
+        taking over that responsibility. Assert real options are present instead
+        of asserting a specific placeholder that no longer exists.
+        """
         nep = open_modal
         assert nep.modal_model_dropdown_has_options(), (
-            "Model dropdown must list at least one real model besides 'New AI Model'"
+            "Model dropdown must list at least one real model option"
         )
         options = nep.get_modal_model_options()
-        assert options[0][1] == "New AI Model", (
-            f"First model option should be 'New AI Model'; got {options[0][1]!r}"
+        assert options, "Model dropdown must have at least one option"
+        assert all(text.strip() for _, text in options), (
+            f"All model options must have non-empty display text: {options}"
         )
 
     def test_version_dropdown_has_at_least_one_option(self, open_modal: NewEvaluationPage):

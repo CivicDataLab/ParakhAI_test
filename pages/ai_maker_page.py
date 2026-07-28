@@ -93,16 +93,19 @@ class AIMakerPage(BasePage):
     def is_stat_issues_flagged_visible(self) -> bool:
         return self.is_visible(self.STAT_ISSUES_FLAGGED)
 
-    def get_stat_value(self, stat_label_selector: str) -> str:
-        """Return the numeric text of a stat card adjacent to the given label."""
-        container = self.page.locator(stat_label_selector).locator("..")
-        # The number is usually in a sibling/child element
-        texts = container.all_inner_texts()
-        for t in texts:
-            stripped = t.strip()
-            if stripped.isdigit() or stripped.replace(",", "").isdigit():
-                return stripped
-        return ""
+    def get_stat_value(self, stat_card_selector: str) -> str:
+        """Return the numeric text of a stat card (`.metric-card`) value element.
+
+        `stat_card_selector` (e.g. `STAT_TEST_CASES`) matches the whole
+        `.metric-card` container, not just the label — read the sibling
+        `.metric-card-value` directly instead of walking one level up and
+        parsing the container's combined innerText (which mixes label +
+        value into one un-parseable string and always returned "").
+        """
+        value_locator = self.page.locator(stat_card_selector).locator(AIMakerLocators.STAT_CARD_VALUE)
+        if value_locator.count() == 0:
+            return ""
+        return value_locator.first.inner_text().strip()
 
     # ── Sidebar ────────────────────────────────────────────────────────────────
 
