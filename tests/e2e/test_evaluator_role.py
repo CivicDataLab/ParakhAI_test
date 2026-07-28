@@ -122,21 +122,25 @@ class TestEvaluatorAssignedModels:
         )
 
     def test_all_filter_tabs_are_visible(self, page: Page):
-        """Assignment status filter tabs are present (at least 3 of 6 expected tabs)."""
+        """The 3 implemented assignment status filter tabs (All, Accepted, Declined)
+        are present. 'Pending', 'In Progress', and 'Completed' are NOT asserted here:
+        confirmed via frontend source (ParakhAI-frontend `.../auditor/assignments/page.tsx`
+        `statusOptions`, ~line 72) that only All/Accepted/Declined are wired up —
+        'In Progress'/'Completed' are commented out and 'Pending' was never added.
+        This is a deliberately narrower feature scope, not app breakage, so it isn't
+        filed in docs/app_bugs.md. A prior version of this test asserted all 6 and
+        intermittently false-passed on Pending/In Progress/Completed because the
+        loose `has-text('Pending')`-style locator matched unrelated text elsewhere
+        on the page whenever a real assignment happened to exist at that moment."""
         er = EvaluatorRolePage(page)
         er.go_to_assignments()
-        tabs = [
+        required_tabs = [
             EvaluatorRoleLocators.FILTER_ALL,
-            EvaluatorRoleLocators.FILTER_PENDING,
             EvaluatorRoleLocators.FILTER_ACCEPTED,
-            EvaluatorRoleLocators.FILTER_IN_PROGRESS,
-            EvaluatorRoleLocators.FILTER_COMPLETED,
             EvaluatorRoleLocators.FILTER_DECLINED,
         ]
-        missing = [t for t in tabs if not er.is_visible(t, timeout=3_000)]
-        assert len(missing) < 4, (
-            f"Expected at least 3 filter tabs, but {len(missing)} not found: {missing}"
-        )
+        missing = [t for t in required_tabs if not er.is_visible(t, timeout=5_000)]
+        assert not missing, f"Missing required assignment filter tabs: {missing}"
 
     def test_all_tab_is_active_by_default(self, page: Page):
         """'All' tab is selected by default on the assignments page."""
@@ -167,8 +171,9 @@ class TestEvaluatorAssignedModels:
         """Clicking the Pending filter tab does not cause an error."""
         er = EvaluatorRolePage(page)
         er.go_to_assignments()
-        if not er.is_visible(EvaluatorRoleLocators.FILTER_PENDING, timeout=3_000):
-            pytest.skip("Pending filter not visible")
+        if not er.is_visible(EvaluatorRoleLocators.FILTER_PENDING, timeout=5_000):
+            # Not implemented in current UI — see test_all_filter_tabs_are_visible docstring.
+            pytest.skip("Pending filter not visible — not implemented in current UI")
         er.click_filter("pending")
         page.wait_for_timeout(300)
         assert page.url, "Page must still be accessible after clicking Pending filter"
@@ -186,8 +191,12 @@ class TestEvaluatorAssignedModels:
             "declined": EvaluatorRoleLocators.FILTER_DECLINED,
         }
         sel = filter_map.get(filter_name)
-        if not er.is_visible(sel, timeout=3_000):
-            pytest.skip(f"'{filter_name}' filter tab not visible — may have been renamed")
+        if not er.is_visible(sel, timeout=5_000):
+            # 'pending'/'in_progress'/'completed' are expected to skip: confirmed via
+            # frontend source (statusOptions in .../auditor/assignments/page.tsx) that
+            # only All/Accepted/Declined are implemented — not a bug, see
+            # test_all_filter_tabs_are_visible docstring above for the full root cause.
+            pytest.skip(f"'{filter_name}' filter tab not visible — not implemented in current UI")
         er.click_filter(filter_name)
         page.wait_for_timeout(300)
         assert page.url, f"Page accessible after clicking '{filter_name}' filter"
