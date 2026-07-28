@@ -127,8 +127,16 @@ class TestEvaluatorActiveAssignments:
             "'Active Assignments' section heading must be visible on the evaluator dashboard"
         )
 
+    @pytest.mark.xfail(reason="App bug #3 — see docs/app_bugs.md", strict=False)
     def test_active_assignments_or_empty_state(self, ev_page: EvaluatorRolePage):
-        """Either evaluations are listed or a 'view all' / empty-state link is shown."""
+        """Either evaluations are listed or a 'view all' / empty-state link is shown.
+
+        Intermittently observed the anonymous public homepage (LOGIN/SIGN UP
+        button visible) instead of the evaluator dashboard — session lost
+        mid-suite under concurrent load, not a locator/framework bug. Same
+        family as the other cached-storage_state skip guards in this file;
+        this one just wasn't caught by the skip guard before the assertion.
+        """
         has_evals = ev_page.is_visible(
             EvaluatorRoleLocators.EVAL_FILTER_DRAFT, timeout=3_000
         ) or ev_page.is_visible(

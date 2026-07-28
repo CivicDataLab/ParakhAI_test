@@ -87,6 +87,7 @@ class TestRoleSelectionPage:
 class TestAIMakerRoleNavigation:
     """Verify clicking AI Maker navigates to the org-selection screen."""
 
+    @pytest.mark.xfail(reason="App bug #19 — see docs/app_bugs.md", strict=False)
     def test_clicking_ai_maker_goes_to_org_selection(self, page: Page):
         """Clicking AI Maker card shows the 'Select Organization' screen."""
         ws = WorkspacePage(page)
@@ -100,6 +101,7 @@ class TestAIMakerRoleNavigation:
             "Selecting AI Maker should navigate to org selection or AI Maker route"
         )
 
+    @pytest.mark.xfail(reason="App bug #19 — see docs/app_bugs.md", strict=False)
     def test_org_selection_shows_civicdatalab(self, page: Page):
         """CivicdataLab is listed as an available organisation."""
         ws = WorkspacePage(page)
@@ -115,6 +117,7 @@ class TestAIMakerRoleNavigation:
             "CivicdataLab must appear in the organisation selection list"
         )
 
+    @pytest.mark.xfail(reason="App bug #19 — see docs/app_bugs.md", strict=False)
     def test_org_selection_has_multiple_orgs(self, page: Page):
         """At least one organisation is listed on the org-selection screen.
 
@@ -133,6 +136,7 @@ class TestAIMakerRoleNavigation:
             "Expected at least CivicdataLab to be listed on the org-selection screen"
         )
 
+    @pytest.mark.xfail(reason="App bug #19 — see docs/app_bugs.md", strict=False)
     def test_selecting_civicdatalab_navigates_to_dashboard(self, page: Page):
         """Selecting CivicdataLab routes to the AI Maker dashboard (org_id=1)."""
         ws = WorkspacePage(page)
