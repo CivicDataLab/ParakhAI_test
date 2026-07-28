@@ -36,8 +36,20 @@ class WorkspacePage(BasePage):
     def is_role_selection_visible(self) -> bool:
         return self.is_visible(self.AI_MAKER_CARD) or self.is_visible(self.EVALUATOR_CARD)
 
+    def _wait_for_role_card_hydrated(self) -> None:
+        """Role cards are visible in the server-rendered HTML before the SPA
+        finishes hydrating and attaching click handlers — clicking immediately
+        after `is_visible()` can silently no-op or fall through to a default
+        navigation (observed: click landed on `/` instead of `/dashboard/auditor`).
+        A short settle wait avoids the race. Confirmed 2026-07-13 via repro:
+        inserting any extra round-trip (e.g. reading `href`/`innerText` first)
+        before the click made it reliably reach the correct destination.
+        """
+        self.page.wait_for_timeout(1500)
+
     def select_ai_maker(self) -> None:
         """Click the AI Maker role card and wait for the org list to populate."""
+        self._wait_for_role_card_hydrated()
         self.click(self.AI_MAKER_CARD)
         self.wait_for_app_ready()
         try:
@@ -49,6 +61,7 @@ class WorkspacePage(BasePage):
 
     def select_evaluator(self) -> None:
         """Click the Evaluator role card and wait for the auditor URL."""
+        self._wait_for_role_card_hydrated()
         self.click(self.EVALUATOR_CARD)
         # Role-switch is an SPA navigation — content updates first, URL follows.
         # Without the explicit URL wait, page.url assertions race the router.

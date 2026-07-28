@@ -185,9 +185,15 @@ class TestEvaluatorRoleNavigation:
         )
         ws.select_civicdatalab()
 
-        switch_roles = page.locator("text=Switch Roles")
-        assert switch_roles.is_visible(), "Switch Roles link not found on dashboard"
-
+        # Raw `Locator.is_visible()` does not auto-wait (no timeout param) — it
+        # returns instantly, racing the AI-Maker dashboard's slow curtain
+        # ("Loading..." can take 15-30s+ on dev, see tasks/lessons.md). Use the
+        # page object's `is_visible`, which wraps `wait_for(state="visible")`.
+        switch_roles_selector = "text=Switch Roles"
+        assert ws.is_visible(switch_roles_selector, timeout=20_000), (
+            "Switch Roles link not found on dashboard"
+        )
+        switch_roles = page.locator(switch_roles_selector)
         switch_roles.click()
         # SPA navigation uses history.pushState — wait_for_load_state alone
         # returns instantly because no full document reload occurs. Wait for
