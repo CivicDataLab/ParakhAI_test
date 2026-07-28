@@ -172,7 +172,9 @@ class NewEvaluationPage(BasePage):
         return [o.inner_text().strip() for o in opts]
 
     def select_model_by_index(self, index: int = 1) -> None:
-        """Select a model by option index (index 0 is 'New AI Model'; real models from 1)."""
+        """Select a model by option index. All options are real registered models —
+        the 'New AI Model' ghost placeholder that used to occupy index 0 is gone
+        (confirmed 2026-07-13)."""
         model_select = self.page.locator(EvaluationsLocators.MODAL_MODEL_DROPDOWN)
         model_select.wait_for(state="visible", timeout=self.timeout)
         opts = model_select.locator("option")
@@ -182,9 +184,10 @@ class NewEvaluationPage(BasePage):
                 model_select.select_option(value=val)
                 self.page.wait_for_timeout(500)
 
-    # Excluded from random selection: 'New AI Model' is the ghost placeholder
+    # Excluded from random selection: 'New AI Model' was the ghost placeholder
     # created by the CDS-002 "Add New AI Model" bug (empty metadata, no working
-    # access method); 'xAI: Grok 4.1 Fast' is deprecated on the platform.
+    # access method) — no longer appears in the dropdown as of 2026-07-13, kept
+    # here defensively; 'xAI: Grok 4.1 Fast' is deprecated on the platform.
     EXCLUDED_MODEL_NAMES = {"New AI Model", "xAI: Grok 4.1 Fast"}
 
     def select_random_valid_model_and_version(self) -> str:

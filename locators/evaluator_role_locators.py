@@ -11,34 +11,54 @@ class EvaluatorRoleLocators:
     # marker alone is reliable enough. See tasks/lessons.md (2026-05-18).
     SIDEBAR_HOME = "a:has-text('Home')"
     SIDEBAR_ASSIGNED_MODELS = "text=Assigned Models"
-    SIDEBAR_EVALUATIONS = "text=Evaluations"
+    # Use anchor selector to avoid strict-mode conflict with EVALUATIONS_PAGE_HEADING
+    SIDEBAR_EVALUATIONS = "a:has-text('Evaluations')"
     SIDEBAR_SWITCH_ROLES = "text=Switch Roles"
 
     # ── Home dashboard ─────────────────────────────────────────────────────────
     OVERVIEW_HEADING = "text=Overview"
+    # text= engine does exact/normalized match; works when labels are stable
     STAT_INVITATIONS_RECEIVED = "text=Invitations Received"
-    STAT_EVALUATION_RUNS = "text=Evaluation Runs"
-    STAT_TEST_CASES = "text=Test Cases"
+    STAT_EVALUATION_RUNS = "text=Evaluations Completed"   # renamed from "Evaluation Runs"
+    STAT_TEST_CASES = "text=Test Cases Evaluated"         # renamed from "Test Cases"
     STAT_ISSUES_FLAGGED = "text=Issues Flagged"
 
-    PENDING_INVITATIONS_HEADING = "text=Pending Invitations"
-    NO_PENDING_INVITATIONS = "text=No pending invitations"
-    ACTIVE_ASSIGNMENTS_HEADING = "text=Active Assignments"
+    PENDING_INVITATIONS_HEADING = (
+        "h2:has-text('Pending Invitations'), h3:has-text('Pending Invitations'), "
+        ":has-text('Pending Invitations'):not(button):not(a)"
+    )
+    NO_PENDING_INVITATIONS = (
+        ":has-text('No pending invitations'), :has-text('no pending')"
+    )
+    ACTIVE_ASSIGNMENTS_HEADING = (
+        "h2:has-text('Active Assignments'), h3:has-text('Active Assignments'), "
+        ":has-text('Active Assignments'):not(button):not(a)"
+    )
 
     # ── Assigned Models (My Assignments) ──────────────────────────────────────
-    ASSIGNMENTS_PAGE_HEADING = "text=My Assignments"
+    # Live heading is "Assigned Models", not "My Assignments" — confirmed via
+    # DOM dump 2026-07-13 (page shows "Assigned Models / All your evaluation
+    # invitations across organisations / All / Accepted(0) / Declined(0)").
+    # Old "My Assignments"/"Assignments" text kept as a fallback in case of
+    # further drift.
+    ASSIGNMENTS_PAGE_HEADING = (
+        "text=Assigned Models, h1:has-text('Assignments'), "
+        "h2:has-text('Assignments'), :has-text('My Assignments'):not(nav):not(a)"
+    )
     # `:text()` is case-sensitive strict-substring on the text engine and
     # misses the styled tab button. `[class*='filter']` is CSS-modules
     # case-sensitive too. Drop both parent gates and use `:has-text()` on the
     # button — substring is fine because the only short-"All" button on the
     # page is the filter tab.
     FILTER_ALL = "button:has-text('All'), [role='tab']:has-text('All')"
-    FILTER_PENDING = "text=Pending"
-    FILTER_ACCEPTED = "text=Accepted"
-    FILTER_IN_PROGRESS = "text=In Progress"
-    FILTER_COMPLETED = "text=Completed"
-    FILTER_DECLINED = "text=Declined"
-    NO_ASSIGNMENTS_MESSAGE = "text=No assignments found"
+    FILTER_PENDING = "button:has-text('Pending'), [role='tab']:has-text('Pending')"
+    FILTER_ACCEPTED = "button:has-text('Accepted'), [role='tab']:has-text('Accepted')"
+    FILTER_IN_PROGRESS = (
+        "button:has-text('In Progress'), [role='tab']:has-text('In Progress')"
+    )
+    FILTER_COMPLETED = "button:has-text('Completed'), [role='tab']:has-text('Completed')"
+    FILTER_DECLINED = "button:has-text('Declined'), [role='tab']:has-text('Declined')"
+    NO_ASSIGNMENTS_MESSAGE = ":has-text('No assignments found'), :has-text('No assignments')"
 
     # ── Evaluations (Evaluator) ────────────────────────────────────────────────
     EVALUATIONS_PAGE_HEADING = "text=Evaluations"
