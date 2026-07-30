@@ -37,6 +37,9 @@ Format: append-only. When a bug is fixed in the app, mark `status: fixed` and th
 
 ## Phase log
 
+- **Phase 9 — CI failure triage: evaluation detail cluster** (2026-07-30): placeholder — in progress, findings to follow.
+
+
 - **Phase 0 — smoke** (2026-05-07): 4 fail → 17 pass / 1 xfail / 2 skip after fixes. Bugs filed: #1, #2, #3.
 - **Phase 1 — api + performance** (2026-05-08): 43 pass / 9 skip / 2 xfail / 0 fail in 20s. Skips all attributed to bug #3. No app bugs filed; suite is healthy.
 - **Phase 2 — accessibility** (2026-05-08): 3 fail → 1 flake fixed (`test_heading_hierarchy` race), 2 real bugs filed (#4 missing skip link, #5 Keycloak axe violations) and xfailed. Result after fixes: 4 pass / 5 skip / 2 xfail / 0 fail.
