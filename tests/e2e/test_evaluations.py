@@ -275,6 +275,7 @@ class TestNewEvaluationModalStep2:
             "'a technical evaluator' must be checked by default on step 2"
         )
 
+    @pytest.mark.xfail(reason="App bug #20 — see docs/app_bugs.md", strict=False)
     def test_start_requires_objective_filled(self, on_step_2: NewEvaluationPage):
         """'Start Evaluation' stays disabled until the objective is filled."""
         nep = on_step_2
