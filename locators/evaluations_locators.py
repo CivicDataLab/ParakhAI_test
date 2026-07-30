@@ -328,12 +328,30 @@ class EvaluationsLocators:
     # ── Evaluation detail ──────────────────────────────────────────────────────
     DETAIL_EVAL_NAME = "[class*='eval-name'], [class*='title'], h1, h2"
     DETAIL_STATUS_COMPLETED = "text=COMPLETED"
-    DETAIL_MODE_AUTOMATED = "text=AUTOMATED"
+    # Live UI shows "Bulk Evaluation" for the mode badge, not "AUTOMATED"
+    # (confirmed 2026-07-28) — keep the old value as a fallback. A bare
+    # `:has-text(...)` with no element in front of it is invalid CSS and
+    # throws when Playwright parses it; `is_visible()` (base_page.py)
+    # swallows *all* exceptions and reports "not visible", silently masking
+    # the parse error as a missing element — same failure shape as the
+    # text=/regex/,css comma bug fixed in test_functional.py. Per this repo's
+    # own selector convention (CLAUDE.md "Selector conventions"), fallbacks
+    # must be comma-separated valid CSS, each with an explicit tag/wildcard.
+    DETAIL_MODE_AUTOMATED = (
+        "span:has-text('Bulk Evaluation'), div:has-text('Bulk Evaluation'), "
+        "span:has-text('AUTOMATED'), div:has-text('AUTOMATED')"
+    )
     BACK_TO_LIST_BUTTON = "button:has-text('Back to List'), a:has-text('Back to List')"
 
     # Overview card
     OVERVIEW_HEADING = "text=Evaluation Overview"
-    OVERVIEW_EVAL_ID = "text=Evaluation ID"
+    # Live label is "Eval ID :" not "Evaluation ID" (confirmed 2026-07-28) —
+    # keep the old value as a fallback. Same bare-`:has-text()`-throws issue
+    # as DETAIL_MODE_AUTOMATED above; fixed the same way.
+    OVERVIEW_EVAL_ID = (
+        "span:has-text('Eval ID'), div:has-text('Eval ID'), "
+        "span:has-text('Evaluation ID'), div:has-text('Evaluation ID')"
+    )
     OVERVIEW_CREATED = "text=Created"
     OVERVIEW_COMPLETED = "text=Completed"
     OVERVIEW_DURATION = "text=Duration"

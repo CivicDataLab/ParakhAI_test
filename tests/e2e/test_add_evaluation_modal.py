@@ -217,15 +217,7 @@ class TestStartEvaluationValidation:
             "A whitespace-only objective must not enable 'Start Evaluation'"
         )
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "PLATFORM BUG (intermittent, dev): 'Start Evaluation' sometimes "
-            "never enables despite a valid form — verified live 2026-07-02 "
-            "~16:55 IST: identical keystroke input enabled the button in one "
-            "session and not the next. Server-side validation state suspected."
-        ),
-    )
+    @pytest.mark.xfail(reason="App bug #20 — see docs/app_bugs.md", strict=False)
     def test_start_enables_with_objective_and_disables_when_cleared(
         self, on_step_2: NewEvaluationPage
     ):

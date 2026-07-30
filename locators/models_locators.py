@@ -71,6 +71,7 @@ class ModelsLocators:
 
     # Past evaluations table
     PAST_EVALUATIONS_HEADING = "text=Past Evaluations"
+    NO_PAST_EVALUATIONS = "text=No evaluations yet for this model"
     PAST_EVAL_TABLE = "table, [class*='table'], [role='table']"
     PAST_EVAL_ROW = "tr[class*='row'], tbody tr"
     PAST_EVAL_NAME_COL = "text=Evaluation Name"
