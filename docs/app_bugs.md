@@ -37,7 +37,7 @@ Format: append-only. When a bug is fixed in the app, mark `status: fixed` and th
 
 ## Phase log
 
-- **Phase 9 — CI failure triage: evaluation detail cluster** (2026-07-30): placeholder — in progress, findings to follow.
+- **Phase 9 — CI failure triage: evaluation detail cluster** (2026-07-31): re-ran all 21 shard-1 failures from `test_evaluation_detail.py` + `test_evaluation_detail_redesign.py` in isolation (`-n 1`, `--reruns 0`, `--tb=long`, no other heavy suites running concurrently). **100% were pure CI-concurrency noise** — every single test passed or skipped-as-designed (the one skip, `test_generate_report_button_visible_on_completed_eval`, is a working-as-intended data-state guard) once the shared dev backend wasn't being hammered by 3 concurrent E2E shards + API tests. No shared root cause needed chasing because there was nothing broken to chase — no code changes, no new bugs filed. This strongly confirms the CI run's `TestEvaluationDetail`/`TestDetailOverviewCard`/etc. failures were entirely a symptom of the concurrent-CI-load problem (bug #3 family), not a regression from anything merged this session.
 
 
 - **Phase 0 — smoke** (2026-05-07): 4 fail → 17 pass / 1 xfail / 2 skip after fixes. Bugs filed: #1, #2, #3.
