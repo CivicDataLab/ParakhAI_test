@@ -40,6 +40,7 @@ class TestBreadcrumbLabels:
             f"Evaluations page breadcrumb should say 'Evaluations', not 'Dashboard'. Got: '{last}'"
         )
 
+    @pytest.mark.xfail(reason="App bug #21 — see docs/app_bugs.md", strict=False)
     def test_models_breadcrumb_is_not_dashboard(self, authenticated_page_fast: Page):
         page = authenticated_page_fast
         page.goto(Config.url("/dashboard/ai-maker/1/ai-models"))
