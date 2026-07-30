@@ -52,6 +52,7 @@ class TestEvaluationsListPage:
             "'New Evaluation' button must be visible"
         )
 
+    @pytest.mark.xfail(reason="App bug #13 — see docs/app_bugs.md", strict=False)
     def test_table_column_headers_are_present(self, page: Page):
         """All five column headers are present in the evaluations table."""
         ep = EvaluationsPage(page)

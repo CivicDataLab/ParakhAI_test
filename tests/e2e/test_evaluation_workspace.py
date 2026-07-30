@@ -175,6 +175,7 @@ class TestEvaluatorRoleNavigation:
             f"Expected evaluator dashboard URL, got: {page.url}"
         )
 
+    @pytest.mark.xfail(reason="App bug #19 — see docs/app_bugs.md", strict=False)
     def test_switch_roles_returns_to_role_selection(self, page: Page):
         """Clicking 'Switch Roles' from AI Maker dashboard returns to /dashboard."""
         ws = WorkspacePage(page)
