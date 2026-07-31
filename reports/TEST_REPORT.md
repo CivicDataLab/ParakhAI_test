@@ -1,6 +1,6 @@
 # Parakh Test Framework — Test Report
 
-**Generated:** 2026-07-31 06:09 UTC  
+**Generated:** 2026-07-31 06:10 UTC  
 **Environment:** `staging` — https://dev.parakh.civicdataspace.in  
 **Browser:** `chromium`  
 **Overall result:** ✅ PASSED
@@ -10,22 +10,22 @@
 | Metric | Value |
 | ------ | ----- |
 | Total tests | 6 |
-| Passed | 0 ✅ |
+| Passed | 3 ✅ |
 | Failed | 0 ❌ |
-| Skipped | 6 ⏭️ |
+| Skipped | 3 ⏭️ |
 | Errors | 0 💥 |
-| Pass rate | 0.0% |
+| Pass rate | 50.0% |
 | Duration | 0.00s |
 
 ## Results by Suite
 
-### E2E (6 tests — ✅ 0 / ❌ 0 / ⏭️ 6)
+### E2E (6 tests — ✅ 3 / ❌ 0 / ⏭️ 3)
 
 | Test | Result | Duration |
 | ---- | ------ | -------- |
-| `test_model_cards_are_displayed[chromium]` | ⏭️ skipped | 0.00s |
-| `test_models_displayed_for_civicdatalab[chromium]` | ⏭️ skipped | 0.00s |
-| `test_text_generation_badge_present[chromium]` | ⏭️ skipped | 0.00s |
+| `test_model_cards_are_displayed[chromium]` | ✅ passed | 0.00s |
+| `test_models_displayed_for_civicdatalab[chromium]` | ✅ passed | 0.00s |
+| `test_text_generation_badge_present[chromium]` | ✅ passed | 0.00s |
 | `test_card_grid_is_visible[chromium]` | ⏭️ skipped | 0.00s |
 | `test_evaluator_cards_are_present[chromium]` | ⏭️ skipped | 0.00s |
 | `test_at_least_two_evaluators_listed[chromium]` | ⏭️ skipped | 0.00s |
