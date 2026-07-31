@@ -1,6 +1,6 @@
 # Parakh Test Framework — Test Report
 
-**Generated:** 2026-07-31 05:56 UTC  
+**Generated:** 2026-07-31 06:04 UTC  
 **Environment:** `staging` — https://dev.parakh.civicdataspace.in  
 **Browser:** `chromium`  
 **Overall result:** ✅ PASSED
@@ -23,7 +23,7 @@
 
 | Test | Result | Duration |
 | ---- | ------ | -------- |
-| `test_models_displayed_for_civicdatalab[chromium]` | ✅ passed | 0.00s |
+| `test_all_six_tabs_are_present[chromium]` | ✅ passed | 0.00s |
 
 ---
 
