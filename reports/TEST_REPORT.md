@@ -1,62 +1,30 @@
 # Parakh Test Framework — Test Report
 
-**Generated:** 2026-07-31 05:45 UTC  
+**Generated:** 2026-07-31 05:47 UTC  
 **Environment:** `staging` — https://dev.parakh.civicdataspace.in  
 **Browser:** `chromium`  
-**Overall result:** ❌ FAILED
+**Overall result:** ✅ PASSED
 
 ## Summary
 
 | Metric | Value |
 | ------ | ----- |
-| Total tests | 8 |
-| Passed | 6 ✅ |
-| Failed | 1 ❌ |
-| Skipped | 1 ⏭️ |
+| Total tests | 2 |
+| Passed | 2 ✅ |
+| Failed | 0 ❌ |
+| Skipped | 0 ⏭️ |
 | Errors | 0 💥 |
-| Pass rate | 75.0% |
+| Pass rate | 100.0% |
 | Duration | 0.00s |
 
 ## Results by Suite
 
-### E2E (8 tests — ✅ 6 / ❌ 1 / ⏭️ 1)
+### E2E (2 tests — ✅ 2 / ❌ 0 / ⏭️ 0)
 
 | Test | Result | Duration |
 | ---- | ------ | -------- |
-| `test_overview_section_is_present[chromium]` | ✅ passed | 0.00s |
-| `test_summary_section_is_present[chromium]` | ✅ passed | 0.00s |
-| `test_overview_shows_evaluation_id[chromium]` | ✅ passed | 0.00s |
-| `test_pass_rate_is_displayed[chromium]` | ❌ failed | 0.00s |
-| `test_three_risk_levels_are_shown[chromium]` | ✅ passed | 0.00s |
-| `test_passed_failed_skipped_counts_visible[chromium]` | ✅ passed | 0.00s |
-| `test_module_tab_switching_works[chromium]` | ⏭️ skipped | 0.00s |
-| `test_risk_level_section_is_present[chromium]` | ✅ passed | 0.00s |
-
-## Failure Details
-
-### ❌ `tests/e2e/test_evaluations.py::TestEvaluationDetail::test_pass_rate_is_displayed[chromium]`
-
-```
-[gw0] darwin -- Python 3.11.15 /Users/home/CivicDataSpace/ParakhAI_test/.venv/bin/python
-
-self = <tests.e2e.test_evaluations.TestEvaluationDetail object at 0x1077e8690>
-page = <Page url='https://dev.parakh.civicdataspace.in/dashboard/ai-maker/1/evaluations/1654'>
-completed_eval_id = 1654
-
-    def test_pass_rate_is_displayed(self, page: Page, completed_eval_id):
-        """Total Pass Rate is shown in the summary section."""
-        ep = EvaluationsPage(page)
-        ep.go_to_evaluation_detail(completed_eval_id)
->       assert ep.is_pass_rate_visible(), "'TOTAL PASS RATE' must be visible"
-E       AssertionError: 'TOTAL PASS RATE' must be visible
-E       assert False
-E        +  where False = is_pass_rate_visible()
-E        +    where is_pass_rate_visible = <pages.evaluations_page.EvaluationsPage object at 0x107fe0210>.is_pass_rate_visible
-
-tests/e2e/test_evaluations.py:371: AssertionError
-```
-
-**Screenshot:** `/Users/home/CivicDataSpace/ParakhAI_test/.claude/worktrees/agent-a6e239ae127b1eba9/screenshots/20260731_111411_FAIL_FAST_test_pass_rate_is_displayed[chromium].png`
+| `test_pass_rate_is_displayed[chromium]` | ✅ passed | 0.00s |
+| `test_download_report_button_is_visible[chromium]` | ✅ passed | 0.00s |
 
 ---
 
