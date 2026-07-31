@@ -1,54 +1,29 @@
 # Parakh Test Framework — Test Report
 
-**Generated:** 2026-07-31 05:54 UTC  
+**Generated:** 2026-07-31 05:56 UTC  
 **Environment:** `staging` — https://dev.parakh.civicdataspace.in  
 **Browser:** `chromium`  
-**Overall result:** ❌ FAILED
+**Overall result:** ✅ PASSED
 
 ## Summary
 
 | Metric | Value |
 | ------ | ----- |
-| Total tests | 2 |
+| Total tests | 1 |
 | Passed | 1 ✅ |
-| Failed | 1 ❌ |
+| Failed | 0 ❌ |
 | Skipped | 0 ⏭️ |
 | Errors | 0 💥 |
-| Pass rate | 50.0% |
+| Pass rate | 100.0% |
 | Duration | 0.00s |
 
 ## Results by Suite
 
-### E2E (2 tests — ✅ 1 / ❌ 1 / ⏭️ 0)
+### E2E (1 tests — ✅ 1 / ❌ 0 / ⏭️ 0)
 
 | Test | Result | Duration |
 | ---- | ------ | -------- |
-| `test_models_displayed_for_civicdatalab[chromium]` | ❌ failed | 0.00s |
-| `test_evaluator_cards_are_present[chromium]` | ✅ passed | 0.00s |
-
-## Failure Details
-
-### ❌ `tests/e2e/test_models.py::TestModelsListPage::test_models_displayed_for_civicdatalab[chromium]`
-
-```
-[gw0] darwin -- Python 3.11.15 /Users/home/CivicDataSpace/ParakhAI_test/.venv/bin/python
-
-self = <tests.e2e.test_models.TestModelsListPage object at 0x10be4b390>
-authenticated_page_fast = <Page url='https://dev.parakh.civicdataspace.in/dashboard/ai-maker/1/ai-models'>
-
-    def test_models_displayed_for_civicdatalab(self, authenticated_page_fast: Page):
-        """At least one model is listed for CivicdataLab."""
-        mp = ModelsPage(authenticated_page_fast)
-        mp.go_to_models_list()
-        count = mp.get_model_card_count()
->       assert count >= 1, f"Expected at least 1 model card, found {count}"
-E       AssertionError: Expected at least 1 model card, found 0
-E       assert 0 >= 1
-
-tests/e2e/test_models.py:70: AssertionError
-```
-
-**Screenshot:** `/Users/home/CivicDataSpace/ParakhAI_test/.claude/worktrees/agent-a6e239ae127b1eba9/screenshots/20260731_112347_FAIL_FAST_test_models_displayed_for_civicdatalab[chromium].png`
+| `test_models_displayed_for_civicdatalab[chromium]` | ✅ passed | 0.00s |
 
 ---
 
