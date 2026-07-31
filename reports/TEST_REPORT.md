@@ -1,29 +1,68 @@
 # Parakh Test Framework — Test Report
 
-**Generated:** 2026-07-31 06:04 UTC  
+**Generated:** 2026-07-31 06:07 UTC  
 **Environment:** `staging` — https://dev.parakh.civicdataspace.in  
 **Browser:** `chromium`  
-**Overall result:** ✅ PASSED
+**Overall result:** ❌ FAILED
 
 ## Summary
 
 | Metric | Value |
 | ------ | ----- |
-| Total tests | 1 |
-| Passed | 1 ✅ |
-| Failed | 0 ❌ |
-| Skipped | 0 ⏭️ |
+| Total tests | 9 |
+| Passed | 6 ✅ |
+| Failed | 2 ❌ |
+| Skipped | 1 ⏭️ |
 | Errors | 0 💥 |
-| Pass rate | 100.0% |
+| Pass rate | 66.7% |
 | Duration | 0.00s |
 
 ## Results by Suite
 
-### E2E (1 tests — ✅ 1 / ❌ 0 / ⏭️ 0)
+### E2E (9 tests — ✅ 6 / ❌ 2 / ⏭️ 1)
 
 | Test | Result | Duration |
 | ---- | ------ | -------- |
-| `test_all_six_tabs_are_present[chromium]` | ✅ passed | 0.00s |
+| `test_overview_section_is_present[chromium]` | ✅ passed | 0.00s |
+| `test_summary_section_is_present[chromium]` | ✅ passed | 0.00s |
+| `test_overview_shows_evaluation_id[chromium]` | ❌ failed | 0.00s |
+| `test_pass_rate_is_displayed[chromium]` | ❌ failed | 0.00s |
+| `test_three_risk_levels_are_shown[chromium]` | ✅ passed | 0.00s |
+| `test_passed_failed_skipped_counts_visible[chromium]` | ✅ passed | 0.00s |
+| `test_module_tab_switching_works[chromium]` | ⏭️ skipped | 0.00s |
+| `test_risk_level_section_is_present[chromium]` | ✅ passed | 0.00s |
+| `test_page_indicator_present[chromium]` | ✅ passed | 0.00s |
+
+## Failure Details
+
+### ❌ `tests/e2e/test_evaluations.py::TestEvaluationDetail::test_overview_shows_evaluation_id[chromium]`
+
+```
+[gw0] darwin -- Python 3.11.15 /Users/home/CivicDataSpace/ParakhAI_test/.venv/bin/python
+tests/e2e/test_evaluations.py:335: in test_overview_shows_evaluation_id
+    assert ep.is_visible(EvaluationsLocators.OVERVIEW_EVAL_ID), (
+E   AssertionError: 'Evaluation ID' label must be visible in overview
+E   assert False
+E    +  where False = is_visible("span:has-text('Eval ID'), div:has-text('Eval ID'), span:has-text('Evaluation ID'), div:has-text('Evaluation ID')")
+E    +    where is_visible = <pages.evaluations_page.EvaluationsPage object at 0x1086ed310>.is_visible
+E    +    and   "span:has-text('Eval ID'), div:has-text('Eval ID'), span:has-text('Evaluation ID'), div:has-text('Evaluation ID')" = EvaluationsLocators.OVERVIEW_EVAL_ID
+```
+
+**Screenshot:** `/Users/home/CivicDataSpace/ParakhAI_test/.claude/worktrees/agent-a6e239ae127b1eba9/screenshots/20260731_113602_FAIL_FAST_test_overview_shows_evaluation_id[chromium].png`
+
+### ❌ `tests/e2e/test_evaluations.py::TestEvaluationDetail::test_pass_rate_is_displayed[chromium]`
+
+```
+[gw0] darwin -- Python 3.11.15 /Users/home/CivicDataSpace/ParakhAI_test/.venv/bin/python
+tests/e2e/test_evaluations.py:371: in test_pass_rate_is_displayed
+    assert ep.is_pass_rate_visible(), "'TOTAL PASS RATE' must be visible"
+E   AssertionError: 'TOTAL PASS RATE' must be visible
+E   assert False
+E    +  where False = is_pass_rate_visible()
+E    +    where is_pass_rate_visible = <pages.evaluations_page.EvaluationsPage object at 0x10c815fd0>.is_pass_rate_visible
+```
+
+**Screenshot:** `/Users/home/CivicDataSpace/ParakhAI_test/.claude/worktrees/agent-a6e239ae127b1eba9/screenshots/20260731_113617_FAIL_FAST_test_pass_rate_is_displayed[chromium].png`
 
 ---
 
