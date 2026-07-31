@@ -1,6 +1,6 @@
 # Parakh Test Framework — Test Report
 
-**Generated:** 2026-07-31 06:11 UTC  
+**Generated:** 2026-07-31 06:13 UTC  
 **Environment:** `staging` — https://dev.parakh.civicdataspace.in  
 **Browser:** `chromium`  
 **Overall result:** ✅ PASSED
@@ -9,21 +9,20 @@
 
 | Metric | Value |
 | ------ | ----- |
-| Total tests | 3 |
-| Passed | 1 ✅ |
+| Total tests | 2 |
+| Passed | 0 ✅ |
 | Failed | 0 ❌ |
 | Skipped | 2 ⏭️ |
 | Errors | 0 💥 |
-| Pass rate | 33.3% |
+| Pass rate | 0.0% |
 | Duration | 0.00s |
 
 ## Results by Suite
 
-### E2E (3 tests — ✅ 1 / ❌ 0 / ⏭️ 2)
+### E2E (2 tests — ✅ 0 / ❌ 0 / ⏭️ 2)
 
 | Test | Result | Duration |
 | ---- | ------ | -------- |
-| `test_card_grid_is_visible[chromium]` | ✅ passed | 0.00s |
 | `test_evaluator_cards_are_present[chromium]` | ⏭️ skipped | 0.00s |
 | `test_at_least_two_evaluators_listed[chromium]` | ⏭️ skipped | 0.00s |
 
