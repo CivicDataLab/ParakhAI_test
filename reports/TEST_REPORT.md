@@ -1,6 +1,6 @@
 # Parakh Test Framework — Test Report
 
-**Generated:** 2026-07-31 05:47 UTC  
+**Generated:** 2026-07-31 05:48 UTC  
 **Environment:** `staging` — https://dev.parakh.civicdataspace.in  
 **Browser:** `chromium`  
 **Overall result:** ✅ PASSED
@@ -9,8 +9,8 @@
 
 | Metric | Value |
 | ------ | ----- |
-| Total tests | 2 |
-| Passed | 2 ✅ |
+| Total tests | 6 |
+| Passed | 6 ✅ |
 | Failed | 0 ❌ |
 | Skipped | 0 ⏭️ |
 | Errors | 0 💥 |
@@ -19,12 +19,16 @@
 
 ## Results by Suite
 
-### E2E (2 tests — ✅ 2 / ❌ 0 / ⏭️ 0)
+### E2E (6 tests — ✅ 6 / ❌ 0 / ⏭️ 0)
 
 | Test | Result | Duration |
 | ---- | ------ | -------- |
-| `test_pass_rate_is_displayed[chromium]` | ✅ passed | 0.00s |
-| `test_download_report_button_is_visible[chromium]` | ✅ passed | 0.00s |
+| `test_status_filter_tabs_are_present[chromium]` | ✅ passed | 0.00s |
+| `test_all_six_tabs_are_present[chromium]` | ✅ passed | 0.00s |
+| `test_nine_status_tabs_are_present[chromium]` | ✅ passed | 0.00s |
+| `test_column_header_completed_is_present[chromium]` | ✅ passed | 0.00s |
+| `test_all_tab_shows_evaluations[chromium]` | ✅ passed | 0.00s |
+| `test_page_indicator_present[chromium]` | ✅ passed | 0.00s |
 
 ---
 
