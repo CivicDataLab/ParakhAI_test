@@ -59,6 +59,18 @@ jobs:
   # Most tests hit the GraphQL/REST layer directly, but auth-token
   # acquisition (scripts/_api_client.get_access_token) and a few
   # cookie-security tests drive a real headless Chromium via Playwright.
+  #
+  # api-tests / accessibility-tests / visual-tests / e2e-tests run in a
+  # serial chain (via `needs:`) rather than all firing at once after lint.
+  # They all hit the same shared dev backend (dev.parakh.civicdataspace.in),
+  # which has known slow-query issues (docs/app_bugs.md #13/#14) — running
+  # them concurrently was overwhelming it and producing widespread transient
+  # ReadTimeouts / stuck "Loading..." states that looked like test failures
+  # but were pure infra flakiness (confirmed by re-running the same failures
+  # in isolation, where they passed cleanly). Lighter/faster suites go first
+  # so e2e-tests (the heaviest, most concurrency-sensitive suite) gets the
+  # backend to itself. This trades total pipeline wall-clock time for
+  # reliability.
   api-tests:
     name: API Tests
     runs-on: ubuntu-latest
@@ -97,10 +109,15 @@ jobs:
           retention-days: 30
 
   # ────────────────────────────────────────────── E2E tests (3-shard matrix)
+  # Runs last in the chain (needs: visual-tests) so it has the shared dev
+  # backend uncontested — see the note above api-tests for why. The 3 shards
+  # still run in parallel with each other via the matrix; only the four
+  # top-level suites are serialized relative to one another.
   e2e-tests:
     name: E2E Tests (shard ${{ matrix.shard }}/${{ strategy.job-total }})
     runs-on: ubuntu-latest
-    needs: lint
+    needs: visual-tests
+    if: always()
     strategy:
       fail-fast: false
       matrix:
@@ -152,7 +169,8 @@ jobs:
   accessibility-tests:
     name: Accessibility Tests (axe)
     runs-on: ubuntu-latest
-    needs: lint
+    needs: api-tests
+    if: always()
     steps:
       - uses: actions/checkout@v6
 
@@ -193,7 +211,8 @@ jobs:
   visual-tests:
     name: Visual Regression Tests
     runs-on: ubuntu-latest
-    needs: lint
+    needs: accessibility-tests
+    if: always()
     steps:
       - uses: actions/checkout@v6
 
