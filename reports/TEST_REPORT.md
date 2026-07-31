@@ -1,6 +1,6 @@
 # Parakh Test Framework — Test Report
 
-**Generated:** 2026-07-31 05:42 UTC  
+**Generated:** 2026-07-31 05:45 UTC  
 **Environment:** `staging` — https://dev.parakh.civicdataspace.in  
 **Browser:** `chromium`  
 **Overall result:** ❌ FAILED
@@ -10,58 +10,53 @@
 | Metric | Value |
 | ------ | ----- |
 | Total tests | 8 |
-| Passed | 7 ✅ |
+| Passed | 6 ✅ |
 | Failed | 1 ❌ |
-| Skipped | 0 ⏭️ |
+| Skipped | 1 ⏭️ |
 | Errors | 0 💥 |
-| Pass rate | 87.5% |
+| Pass rate | 75.0% |
 | Duration | 0.00s |
 
 ## Results by Suite
 
-### E2E (8 tests — ✅ 7 / ❌ 1 / ⏭️ 0)
+### E2E (8 tests — ✅ 6 / ❌ 1 / ⏭️ 1)
 
 | Test | Result | Duration |
 | ---- | ------ | -------- |
-| `test_sample_issues_accordion_items_present[chromium]` | ✅ passed | 0.00s |
-| `test_download_report_button_is_visible[chromium]` | ❌ failed | 0.00s |
-| `test_back_to_list_button_navigates_correctly[chromium]` | ✅ passed | 0.00s |
-| `test_evaluation_detail_page_loads[chromium]` | ✅ passed | 0.00s |
-| `test_automated_mode_badge_is_visible[chromium]` | ✅ passed | 0.00s |
-| `test_overview_shows_model_name[chromium]` | ✅ passed | 0.00s |
-| `test_back_to_list_button_is_visible[chromium]` | ✅ passed | 0.00s |
-| `test_overview_shows_modules_used[chromium]` | ✅ passed | 0.00s |
+| `test_overview_section_is_present[chromium]` | ✅ passed | 0.00s |
+| `test_summary_section_is_present[chromium]` | ✅ passed | 0.00s |
+| `test_overview_shows_evaluation_id[chromium]` | ✅ passed | 0.00s |
+| `test_pass_rate_is_displayed[chromium]` | ❌ failed | 0.00s |
+| `test_three_risk_levels_are_shown[chromium]` | ✅ passed | 0.00s |
+| `test_passed_failed_skipped_counts_visible[chromium]` | ✅ passed | 0.00s |
+| `test_module_tab_switching_works[chromium]` | ⏭️ skipped | 0.00s |
+| `test_risk_level_section_is_present[chromium]` | ✅ passed | 0.00s |
 
 ## Failure Details
 
-### ❌ `tests/e2e/test_evaluations.py::TestEvaluationDetail::test_download_report_button_is_visible[chromium]`
+### ❌ `tests/e2e/test_evaluations.py::TestEvaluationDetail::test_pass_rate_is_displayed[chromium]`
 
 ```
 [gw0] darwin -- Python 3.11.15 /Users/home/CivicDataSpace/ParakhAI_test/.venv/bin/python
 
-self = <tests.e2e.test_evaluations.TestEvaluationDetail object at 0x10bf4cd10>
+self = <tests.e2e.test_evaluations.TestEvaluationDetail object at 0x1077e8690>
 page = <Page url='https://dev.parakh.civicdataspace.in/dashboard/ai-maker/1/evaluations/1654'>
 completed_eval_id = 1654
 
-    def test_download_report_button_is_visible(self, page: Page, completed_eval_id):
-        """'Download Report' button is present at the bottom of the detail page."""
+    def test_pass_rate_is_displayed(self, page: Page, completed_eval_id):
+        """Total Pass Rate is shown in the summary section."""
         ep = EvaluationsPage(page)
         ep.go_to_evaluation_detail(completed_eval_id)
-        page.keyboard.press("End")
-        page.wait_for_timeout(300)
->       assert ep.is_visible(EvaluationsLocators.DOWNLOAD_REPORT_BUTTON), (
-            "'Download Report' button must be visible"
-        )
-E       AssertionError: 'Download Report' button must be visible
+>       assert ep.is_pass_rate_visible(), "'TOTAL PASS RATE' must be visible"
+E       AssertionError: 'TOTAL PASS RATE' must be visible
 E       assert False
-E        +  where False = is_visible("button:has-text('Download Report'), a:has-text('Download Report')")
-E        +    where is_visible = <pages.evaluations_page.EvaluationsPage object at 0x10c5ad410>.is_visible
-E        +    and   "button:has-text('Download Report'), a:has-text('Download Report')" = EvaluationsLocators.DOWNLOAD_REPORT_BUTTON
+E        +  where False = is_pass_rate_visible()
+E        +    where is_pass_rate_visible = <pages.evaluations_page.EvaluationsPage object at 0x107fe0210>.is_pass_rate_visible
 
-tests/e2e/test_evaluations.py:455: AssertionError
+tests/e2e/test_evaluations.py:371: AssertionError
 ```
 
-**Screenshot:** `/Users/home/CivicDataSpace/ParakhAI_test/.claude/worktrees/agent-a6e239ae127b1eba9/screenshots/20260731_111011_FAIL_FAST_test_download_report_button_is_visible[chromium].png`
+**Screenshot:** `/Users/home/CivicDataSpace/ParakhAI_test/.claude/worktrees/agent-a6e239ae127b1eba9/screenshots/20260731_111411_FAIL_FAST_test_pass_rate_is_displayed[chromium].png`
 
 ---
 
