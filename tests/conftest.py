@@ -161,6 +161,40 @@ def _do_login(page: Page, email: str, password: str) -> None:
     page.wait_for_timeout(2_000)
 
 
+def _fetch_access_token_sync(browser: Browser, storage_state: str) -> str:
+    """Extract the NextAuth access token using the suite's own sync browser.
+
+    Deliberately avoids `scripts._api_client.get_access_token()`: when called
+    from inside pytest-asyncio's running event loop, that helper spins up a
+    second, independent async Playwright driver in a background thread,
+    concurrent with this suite's main sync Playwright driver. Two Playwright
+    driver contexts torn down independently from different threads is a
+    plausible source of `assert not self._finalizers` fixture-teardown
+    corruption at session end (investigated 2026-08-03 — see app_bugs.md).
+    Reusing the already-running `browser` fixture and a cached storage state
+    avoids spinning up that second driver at all.
+    """
+    context = browser.new_context(
+        viewport={"width": Config.VIEWPORT_WIDTH, "height": Config.VIEWPORT_HEIGHT},
+        ignore_https_errors=True,
+        locale="en-US",
+        storage_state=storage_state,
+    )
+    context.set_default_timeout(Config.TIMEOUT)
+    page = context.new_page()
+    try:
+        page.goto(Config.BASE_URL, wait_until="domcontentloaded")
+        session = page.evaluate(
+            "async () => fetch('/api/auth/session').then(r => r.json())"
+        )
+        token = session.get("access_token")
+        if not token:
+            raise RuntimeError(f"No access_token in session payload: keys={list(session)}")
+        return token
+    finally:
+        context.close()
+
+
 def _make_auth_page(
     browser_context: BrowserContext,
     request,
@@ -445,15 +479,15 @@ def authenticated_page_fast(
 
 
 @pytest.fixture(scope="session")
-def authenticated_graphql_client():
+def authenticated_graphql_client(browser: Browser, authenticated_storage_state: str):
     """Session-scoped GraphQL client authenticated with a Keycloak bearer token.
 
-    Acquires the token via `scripts/_api_client.get_access_token()` — the same
-    path that proved to work in `completed_eval_id`. The previous version of
-    this fixture tried to scrape a JWT out of the cached storage_state's
-    localStorage, but NextAuth doesn't store the access token there → the
-    session silently authenticated as anonymous and every org-scoped query
-    returned empty data. See lessons.md (2026-05-20, "P2 #13").
+    Acquires the token via `_fetch_access_token_sync()` — reads it from the
+    live `/api/auth/session` endpoint (NextAuth doesn't store the access
+    token in localStorage, so scraping storage_state directly silently
+    authenticates as anonymous — see lessons.md 2026-05-20, "P2 #13") using
+    the suite's own sync browser rather than a second async Playwright
+    driver (see `_fetch_access_token_sync` docstring for why that matters).
 
     Exposes a callable that supports both GET (queries) and POST (mutations)
     and returns the full GraphQL payload (``{"data": ..., "errors": ...}``)
@@ -471,10 +505,8 @@ def authenticated_graphql_client():
     """
     import json as _json
 
-    from scripts._api_client import get_access_token
-
     try:
-        token = get_access_token(headless=True)
+        token = _fetch_access_token_sync(browser, authenticated_storage_state)
     except Exception as exc:  # noqa: BLE001 — surface as a skip, not an error
         pytest.skip(f"Could not acquire access token for authenticated GraphQL client: {exc}")
 
@@ -528,7 +560,7 @@ def authenticated_graphql_client():
             and "token" in resp.text.lower()
         ):
             try:
-                token = get_access_token(headless=True)
+                token = _fetch_access_token_sync(browser, authenticated_storage_state)
                 session.headers.update({"Authorization": f"Bearer {token}"})
                 resp = _do_request()
             except Exception:
@@ -546,7 +578,7 @@ def authenticated_graphql_client():
 
 
 @pytest.fixture(scope="session")
-def completed_eval_id(request) -> int:
+def completed_eval_id(request, browser: Browser, authenticated_storage_state: str) -> int:
     """ID of an existing COMPLETED evaluation, discovered via GraphQL.
 
     Replaces the brittle `COMPLETED_EVAL_ID = 288` constant pattern that drifts
@@ -555,18 +587,17 @@ def completed_eval_id(request) -> int:
     COMPLETED)` once per session and returns the first ID. Skips dependent
     tests cleanly when no COMPLETED eval exists on the current environment.
 
-    Uses `scripts/_api_client` rather than `authenticated_graphql_client`
-    because the latter extracts a JWT from localStorage — which NextAuth on
-    this app does not populate. The script helper fetches the token from
-    `/api/auth/session` (the working path) and adds the required
-    `organization` header. See lessons.md 2026-05-20.
+    Uses `_fetch_access_token_sync()` (same as `authenticated_graphql_client`)
+    to fetch the token from `/api/auth/session` and adds the required
+    `organization` header via `scripts._api_client.graphql()`. See
+    lessons.md 2026-05-20.
     """
-    from scripts._api_client import get_access_token, graphql
+    from scripts._api_client import graphql
 
     org_id = str(getattr(Config, "CIVICDATALAB_ORG_ID", 1))
 
     try:
-        token = get_access_token(headless=True)
+        token = _fetch_access_token_sync(browser, authenticated_storage_state)
     except Exception as exc:  # noqa: BLE001 — surface as a skip, not an error
         pytest.skip(f"Could not acquire access token for COMPLETED eval lookup: {exc}")
 
