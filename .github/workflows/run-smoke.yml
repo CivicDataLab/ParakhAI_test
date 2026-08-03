@@ -1,0 +1,66 @@
+name: Smoke Tests
+
+on:
+  workflow_dispatch: {}
+  workflow_call:
+    secrets:
+      TEST_EMAIL_1:
+        required: false
+      TEST_PASSWORD_1:
+        required: false
+      TEST_EMAIL_2:
+        required: false
+      TEST_PASSWORD_2:
+        required: false
+      SANDBOX_ORG_SLUG:
+        required: false
+
+jobs:
+  smoke:
+    name: Smoke Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      BASE_URL: ${{ vars.BASE_URL || 'https://dev.parakh.civicdataspace.in' }}
+      GRAPHQL_URL: ${{ vars.GRAPHQL_URL || 'https://dev.api.parakh.civicdataspace.in/graphql/' }}
+      ENVIRONMENT: development
+      BROWSER: chromium
+      HEADLESS: "true"
+      TEST_EMAIL_1: ${{ secrets.TEST_EMAIL_1 }}
+      TEST_PASSWORD_1: ${{ secrets.TEST_PASSWORD_1 }}
+      TEST_EMAIL_2: ${{ secrets.TEST_EMAIL_2 }}
+      TEST_PASSWORD_2: ${{ secrets.TEST_PASSWORD_2 }}
+      TEST_USER_INDEX: "1"
+      SANDBOX_ORG_SLUG: ${{ secrets.SANDBOX_ORG_SLUG }}
+      PYTHON_VERSION: "3.11"
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install Playwright browsers
+        run: playwright install --with-deps chromium
+
+      - name: Run smoke tests
+        run: |
+          pytest -m smoke \
+            -v \
+            --tb=short \
+            --html=reports/smoke_report.html \
+            --self-contained-html
+
+      - name: Upload smoke test report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: smoke-test-report
+          path: reports/smoke_report.html
+          retention-days: 30
