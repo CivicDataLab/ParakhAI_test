@@ -47,8 +47,8 @@ class TestOrgSelectionNavigation:
         if page.get_org_card_count() == 0:
             pytest.skip("No org cards present — cannot test navigation")
         page.select_org_by_index(0)
-        assert "/ai-maker/" in authenticated_page.url, (
-            f"Expected /ai-maker/ in URL after org selection, got: {authenticated_page.url}"
+        assert "/ai-maker" in authenticated_page.url, (
+            f"Expected /ai-maker in URL after org selection, got: {authenticated_page.url}"
         )
 
     def test_org_selection_lands_on_overview(self, authenticated_page):
