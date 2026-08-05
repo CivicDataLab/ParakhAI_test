@@ -89,56 +89,83 @@ def _login(page) -> None:
     page.wait_for_timeout(2_000)
 
 
+def _drive_wizard(page, org_id: int) -> str | None:
+    from pages.new_evaluation_page import NewEvaluationPage
+
+    _login(page)
+    nep = NewEvaluationPage(page, org_id=org_id)
+    nep.go_to_evaluations_list()
+    nep.click_new_evaluation()
+    if not nep.is_modal_visible():
+        print("Modal did not open.", file=sys.stderr)
+        return None
+    nep.start_evaluation_from_modal(
+        method="bulk",
+        eval_type="technical",
+        objective="Seeded COMPLETED reference evaluation (automation)",
+    )
+    if not nep.wait_for_wizard_loaded():
+        print("Wizard did not hydrate.", file=sys.stderr)
+        return None
+    audit_id = nep.get_audit_id_from_url()
+    if not audit_id:
+        print("No auditId in URL after Start.", file=sys.stderr)
+        return None
+
+    if not nep.configure_bulk_workspace_minimal(module="hallucination"):
+        print(
+            "Run Evaluation never enabled — no prompt library available?",
+            file=sys.stderr,
+        )
+        return None
+    nep.click_run_evaluation()
+    page.wait_for_timeout(2_000)
+    return audit_id
+
+
 def seed_completed_evaluation(
     org_id: int = 1,
     poll_budget_s: int = 360,
     headless: bool = True,
+    browser=None,
+    token: str | None = None,
 ) -> int | None:
-    """Drive the wizard to create a COMPLETED bulk evaluation. Returns its id."""
-    from pages.new_evaluation_page import NewEvaluationPage
+    """Drive the wizard to create a COMPLETED bulk evaluation. Returns its id.
 
+    `browser`/`token`: optionally reuse an already-running sync Playwright
+    `Browser` and an already-acquired access token instead of spinning up a
+    second driver. Needed when called from `completed_eval_id`'s self-heal
+    path, which runs inside pytest-asyncio's already-running event loop —
+    calling `sync_playwright()` (this function's own default path) or the
+    async `get_access_token()` from inside that loop throws "Playwright Sync
+    API inside the asyncio loop" (2026-08-05). Standalone CLI usage (no
+    `browser`/`token` passed) is unaffected and keeps the original behavior.
+    """
     if not EMAIL or not PASSWORD:
         print("TEST_EMAIL_1 / TEST_PASSWORD_1 not set — cannot seed.", file=sys.stderr)
         return None
 
-    with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=headless)
+    if browser is not None:
         ctx = browser.new_context(viewport={"width": 1440, "height": 900})
-        page = ctx.new_page()
         try:
-            _login(page)
-            nep = NewEvaluationPage(page, org_id=org_id)
-            nep.go_to_evaluations_list()
-            nep.click_new_evaluation()
-            if not nep.is_modal_visible():
-                print("Modal did not open.", file=sys.stderr)
-                return None
-            nep.start_evaluation_from_modal(
-                method="bulk",
-                eval_type="technical",
-                objective="Seeded COMPLETED reference evaluation (automation)",
-            )
-            if not nep.wait_for_wizard_loaded():
-                print("Wizard did not hydrate.", file=sys.stderr)
-                return None
-            audit_id = nep.get_audit_id_from_url()
-            if not audit_id:
-                print("No auditId in URL after Start.", file=sys.stderr)
-                return None
-
-            if not nep.configure_bulk_workspace_minimal(module="hallucination"):
-                print(
-                    "Run Evaluation never enabled — no prompt library available?",
-                    file=sys.stderr,
-                )
-                return None
-            nep.click_run_evaluation()
-            page.wait_for_timeout(2_000)
+            audit_id = _drive_wizard(ctx.new_page(), org_id)
         finally:
-            browser.close()
+            ctx.close()
+    else:
+        with sync_playwright() as pw:
+            standalone_browser = pw.chromium.launch(headless=headless)
+            try:
+                ctx = standalone_browser.new_context(viewport={"width": 1440, "height": 900})
+                audit_id = _drive_wizard(ctx.new_page(), org_id)
+            finally:
+                standalone_browser.close()
+
+    if not audit_id:
+        return None
 
     # Poll to a reviewable/terminal state via the API (faster + survives UI close).
-    token = get_access_token(headless=True)
+    if token is None:
+        token = get_access_token(headless=True)
     deadline = time.monotonic() + poll_budget_s
     status = None
     while time.monotonic() < deadline:
