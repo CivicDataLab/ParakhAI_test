@@ -93,6 +93,31 @@ class EvaluatorRolePage(BasePage):
     def is_pending_invitations_section_visible(self) -> bool:
         return self.is_visible(self.PENDING_INVITATIONS_HEADING)
 
+    # ── "Know More" info modal ──────────────────────────────────────────────────
+
+    def is_know_more_link_visible(self) -> bool:
+        return self.is_visible(EvaluatorRoleLocators.KNOW_MORE_LINK, timeout=3_000)
+
+    def click_know_more(self) -> None:
+        self.click(EvaluatorRoleLocators.KNOW_MORE_LINK)
+        # Radix dialog open transition briefly intercepts pointer events on
+        # its own content (same class of issue as the "Start an Evaluation"
+        # modal — see new_evaluation_page.py:click_modal_start docstring);
+        # settle before any further interaction with the dialog.
+        self.page.wait_for_timeout(500)
+
+    def is_know_more_dialog_visible(self) -> bool:
+        return self.is_visible(EvaluatorRoleLocators.KNOW_MORE_DIALOG, timeout=5_000)
+
+    def close_know_more_dialog(self) -> None:
+        self.click(EvaluatorRoleLocators.KNOW_MORE_DIALOG_GOT_IT_BUTTON)
+        try:
+            self.page.locator(EvaluatorRoleLocators.KNOW_MORE_DIALOG).first.wait_for(
+                state="hidden", timeout=5_000
+            )
+        except Exception:
+            pass  # let the caller's own assertion surface a real failure
+
     def is_no_pending_invitations_message_visible(self) -> bool:
         return self.is_visible(self.NO_PENDING_INVITATIONS)
 

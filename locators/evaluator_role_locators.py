@@ -35,6 +35,12 @@ class EvaluatorRoleLocators:
         ":has-text('Active Assignments'):not(button):not(a)"
     )
 
+    # "Know More" info modal — only rendered inside the empty pending-
+    # invitations state (added 2026-07-31, commit 90f38dc).
+    KNOW_MORE_LINK = "button:has-text('Know More')"
+    KNOW_MORE_DIALOG = "[role='dialog']:has-text('How the Evaluator Dashboard works')"
+    KNOW_MORE_DIALOG_GOT_IT_BUTTON = "[role='dialog'] button:has-text('Got it')"
+
     # ── Assigned Models (My Assignments) ──────────────────────────────────────
     # Live heading is "Assigned Models", not "My Assignments" — confirmed via
     # DOM dump 2026-07-13 (page shows "Assigned Models / All your evaluation
