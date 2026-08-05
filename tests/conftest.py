@@ -655,7 +655,9 @@ def completed_eval_id(request, browser: Browser, authenticated_storage_state: st
     except Exception as exc:  # noqa: BLE001
         pytest.skip(f"Could not import seeding helper: {exc}")
 
-    seeded = seed_completed_evaluation(org_id=int(org_id), poll_budget_s=360, headless=True)
+    seeded = seed_completed_evaluation(
+        org_id=int(org_id), poll_budget_s=360, headless=True, browser=browser, token=token
+    )
     if seeded is None:
         pytest.skip(
             "No COMPLETED evaluation found and auto-seeding did not reach "
