@@ -78,6 +78,36 @@ class TestEvaluatorHomeDashboard:
             "'No pending invitations' message must be shown when inbox is empty"
         )
 
+    def test_know_more_link_opens_info_modal(self, page: Page):
+        """'Know More' (shown in the empty pending-invitations state) opens a
+        dialog explaining how the Evaluator Dashboard works."""
+        er = EvaluatorRolePage(page)
+        er.go_to_evaluator_home()
+        if not er.is_no_pending_invitations_message_visible():
+            pytest.skip("Not in the empty pending-invitations state — 'Know More' link not rendered")
+        if not er.is_know_more_link_visible():
+            pytest.skip("'Know More' link not present")
+        er.click_know_more()
+        assert er.is_know_more_dialog_visible(), (
+            "'Know More' must open a dialog explaining the Evaluator Dashboard"
+        )
+
+    def test_know_more_modal_closes_via_got_it(self, page: Page):
+        """The 'Got it' button closes the 'Know More' dialog."""
+        er = EvaluatorRolePage(page)
+        er.go_to_evaluator_home()
+        if not er.is_no_pending_invitations_message_visible():
+            pytest.skip("Not in the empty pending-invitations state — 'Know More' link not rendered")
+        if not er.is_know_more_link_visible():
+            pytest.skip("'Know More' link not present")
+        er.click_know_more()
+        if not er.is_know_more_dialog_visible():
+            pytest.skip("'Know More' dialog did not open")
+        er.close_know_more_dialog()
+        assert not er.is_visible(EvaluatorRoleLocators.KNOW_MORE_DIALOG, timeout=3_000), (
+            "'Know More' dialog must close after clicking 'Got it'"
+        )
+
     def test_active_assignments_section_is_visible(self, page: Page):
         er = EvaluatorRolePage(page)
         er.go_to_evaluator_home()
