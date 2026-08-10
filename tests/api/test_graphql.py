@@ -18,6 +18,7 @@ from tests.data.test_data import TestGraphQL
 pytestmark = [pytest.mark.api]
 
 
+@pytest.mark.smoke
 class TestGraphQLEndpointHealth:
     """Endpoint is reachable and returns well-formed JSON responses."""
 
@@ -74,6 +75,7 @@ class TestPublicAIModelsQuery:
         assert not unexpected, f"Unexpected top-level keys in response: {unexpected}"
 
 
+@pytest.mark.smoke
 class TestPublicQueryStructure:
     """Introspection — verify the schema exposes the expected query fields."""
 
@@ -117,6 +119,7 @@ class TestPublicQueryStructure:
         assert "aiModels" in names
 
 
+@pytest.mark.smoke
 class TestAuthRequiredBehavior:
     """Auth-required queries and mutations fail gracefully without a token."""
 
