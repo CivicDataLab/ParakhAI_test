@@ -5,6 +5,40 @@ on:
     branches: [main]
   workflow_dispatch: {}
   workflow_call:
+    # Every input is optional with a default so existing callers that pass only
+    # `secrets:` (and the standalone push/dispatch triggers, where the `inputs`
+    # context is empty) keep working unchanged.
+    inputs:
+      marker_expr:
+        description: "pytest -m expression selecting which tests to run."
+        type: string
+        required: false
+        default: smoke
+      base_url:
+        description: "Frontend base URL. Falls back to vars.BASE_URL, then the dev default."
+        type: string
+        required: false
+        default: ""
+      graphql_url:
+        description: "Backend GraphQL endpoint. Falls back to vars.GRAPHQL_URL, then the dev default."
+        type: string
+        required: false
+        default: ""
+      install_browsers:
+        description: "Install Playwright browsers. Set false for browserless (API-only) runs."
+        type: boolean
+        required: false
+        default: true
+      min_passed:
+        description: "Fail the job if fewer than this many tests passed."
+        type: number
+        required: false
+        default: 1
+      deployed_sha:
+        description: "Commit SHA the backend is expected to report. Empty disables the check."
+        type: string
+        required: false
+        default: ""
     secrets:
       TEST_EMAIL_1:
         required: false
@@ -23,8 +57,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      BASE_URL: ${{ vars.BASE_URL || 'https://dev.parakh.civicdataspace.in' }}
-      GRAPHQL_URL: ${{ vars.GRAPHQL_URL || 'https://dev.api.parakh.civicdataspace.in/graphql/' }}
+      BASE_URL: ${{ inputs.base_url || vars.BASE_URL || 'https://dev.parakh.civicdataspace.in' }}
+      GRAPHQL_URL: ${{ inputs.graphql_url || vars.GRAPHQL_URL || 'https://dev.api.parakh.civicdataspace.in/graphql/' }}
       ENVIRONMENT: development
       BROWSER: chromium
       HEADLESS: "true"
@@ -35,6 +69,15 @@ jobs:
       TEST_USER_INDEX: "1"
       SANDBOX_ORG_SLUG: ${{ secrets.SANDBOX_ORG_SLUG }}
       PYTHON_VERSION: "3.11"
+      # `inputs` is empty on the push/dispatch triggers, so every input needs an
+      # explicit fallback here — `pytest -m ""` would otherwise collect the
+      # entire 800-test suite instead of the smoke subset.
+      MARKER_EXPR: ${{ inputs.marker_expr || 'smoke' }}
+      MIN_PASSED: ${{ inputs.min_passed || 1 }}
+      DEPLOYED_SHA: ${{ inputs.deployed_sha }}
+      # nginx rejects curl's default User-Agent with a 403, so the probes below
+      # must send their own.
+      PROBE_UA: ParakhSmokeGate/1.0
 
     steps:
       - uses: actions/checkout@v6
@@ -52,11 +95,15 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Install Playwright browsers
+        # `format()` distinguishes an explicit `false` from an absent input:
+        # a null input renders as '' and still installs, so push/dispatch runs
+        # (which have no `inputs` context) keep their browsers.
+        if: ${{ format('{0}', inputs.install_browsers) != 'false' }}
         run: playwright install --with-deps chromium
 
       - name: Run smoke tests
         run: |
-          pytest -m smoke \
+          pytest -m "$MARKER_EXPR" \
             -v \
             --tb=short \
             --html=reports/smoke_report.html \
