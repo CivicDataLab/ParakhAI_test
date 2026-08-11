@@ -9,6 +9,8 @@ Coverage targets:
 - TestAuthenticatedQueries — authenticated read queries (myOrganizations,
   myModels, myAudits, myAssignments, myEvaluations, auditMetrics).
 - TestAuditQueries — audit list/detail/tests/tasks/results/summaries.
+- TestAuditsSortAndPagination — audits.passedTests field + sortOptions
+  allowlist (model_name remap, passed_tests ordering; Aug 2026 addition).
 - TestAuditDomainOptions — new audit_domain_options query (Feb 2026 addition).
 - TestAuditorAssignmentQueries — organization auditors and assignment lookups.
 - TestPublicQueries — anonymous-allowed registry data (modules, metrics,
@@ -191,6 +193,71 @@ class TestAuditsPagination:
         d1 = (page1.get("data") or {}).get("audits", {}).get("data") or []
         if len(d0) == 1 and len(d1) == 1:
             assert d0[0]["id"] != d1[0]["id"], "Page 0 and page 1 should return different audit IDs"
+
+
+# ── Audits sort + passedTests (new — Aug 2026, ParakhAPI dev) ─────────────────
+
+
+class TestAuditsSortAndPagination:
+    """audits query exposes passedTests and honours sortOptions (server-side allowlist)."""
+
+    def test_audits_passed_tests_is_nonnegative_int_or_null(self, authenticated_graphql_client):
+        result = authenticated_graphql_client(TestGraphQL.QUERY_AUDITS, variables={"limit": 10})
+        assert "data" in result or "errors" in result
+        rows = ((result.get("data") or {}).get("audits") or {}).get("data") or []
+        for row in rows:
+            passed_tests = row.get("passedTests")
+            assert passed_tests is None or (
+                isinstance(passed_tests, int) and passed_tests >= 0
+            ), f"passedTests must be null or a non-negative int, got {passed_tests!r}"
+
+    def test_audits_sorted_by_passed_tests_desc_is_non_increasing(
+        self, authenticated_graphql_client
+    ):
+        result = authenticated_graphql_client(
+            TestGraphQL.QUERY_AUDITS,
+            variables={
+                "limit": 20,
+                "sortOptions": [{"field": "passed_tests", "direction": "desc"}],
+            },
+        )
+        assert "data" in result or "errors" in result
+        rows = ((result.get("data") or {}).get("audits") or {}).get("data") or []
+        values = [row["passedTests"] for row in rows if row.get("passedTests") is not None]
+        if len(values) < 2:
+            pytest.skip("Fewer than 2 non-null passedTests values — not enough data to prove ordering")
+        assert all(values[i] >= values[i + 1] for i in range(len(values) - 1)), (
+            f"passedTests values are not sorted descending: {values}"
+        )
+
+    def test_audits_sorted_by_model_name_does_not_error(self, authenticated_graphql_client):
+        """`model_name` is remapped server-side to `model_snapshot__display_name` before
+        the sort-field allowlist check — this must succeed, not be rejected as invalid."""
+        result = authenticated_graphql_client(
+            TestGraphQL.QUERY_AUDITS,
+            variables={
+                "limit": 10,
+                "sortOptions": [{"field": "model_name", "direction": "asc"}],
+            },
+        )
+        assert "data" in result or "errors" in result
+        for err in result.get("errors") or []:
+            msg = str(err.get("message", "")).lower()
+            assert "invalid field" not in msg, (
+                f"Sorting by 'model_name' was rejected by the allowlist despite the "
+                f"server-side remap to model_snapshot__display_name: {err}"
+            )
+
+    def test_audits_without_sort_options_returns_well_formed_response(
+        self, authenticated_graphql_client
+    ):
+        """No explicit sortOptions — resolver defaults to created_at desc server-side."""
+        result = authenticated_graphql_client(TestGraphQL.QUERY_AUDITS, variables={"limit": 10})
+        assert "data" in result or "errors" in result
+        if result.get("data") and result["data"].get("audits") is not None:
+            wrapper = result["data"]["audits"]
+            assert "data" in wrapper
+            assert "totalItemsCount" in wrapper
 
 
 # ── Audit tests pagination (new — Jun 2026) ───────────────────────────────────
