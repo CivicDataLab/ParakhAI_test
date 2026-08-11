@@ -7,6 +7,7 @@ without degradation — a realistic scenario during peak usage (workshop, launch
 
 Scenarios:
   TestConcurrentGraphQLReads       — concurrent aiModels + audits queries
+  TestAuditsSortPerformance        — concurrent audits queries with sortOptions set
   TestPaginationPerformance        — large-page-size read latency
   TestGraphQLMutationConcurrency   — concurrent myOrganizations lookups
 
@@ -40,6 +41,16 @@ BUDGET = {
     "large_page_s": 5.0,
     "success_rate_10_concurrent": 0.90,
     "success_rate_mixed": 0.85,
+    # Measured live 2026-08-11 across 3 runs (pytest-rerun): per-request latency
+    # at 5-way concurrency was 9-15s on the cleanest run and up to 35s under
+    # noisier conditions — all 100% success, zero errors, but meaningfully
+    # slower than the unsorted audits baseline (concurrent_5_all_succeed_s =
+    # 6.0s). The ORDER BY + queryset.count() + per-row model_name remap in
+    # get_audits() likely isn't using the (organization, -created_at) index
+    # when sorting by passed_tests instead. Budget set above the observed
+    # best-case max (15.06s) so this catches a real regression without
+    # flagging already-known slowness on every run.
+    "sorted_audits_5_concurrent_s": 20.0,
 }
 
 # ── GraphQL queries ────────────────────────────────────────────────────────────
@@ -49,6 +60,17 @@ _QUERY_AUDITS = "{ audits { data { id status } totalItemsCount } }"
 _QUERY_MY_ORGS = "{ myOrganizations { id name } }"
 _QUERY_AI_MODELS_LARGE = "{ aiModels(limit: 50) { id name } }"
 _QUERY_AUDITS_LARGE = "{ audits(limit: 50) { data { id } totalItemsCount } }"
+
+# Sorted-audits load query — field selection MUST stay light (id/status/passedTests
+# only). The frontend's full-field audits query (name modelName status modules
+# metrics evaluationMode auditType totalTests passedTests failedTests createdAt
+# startedAt completedAt) times out past 30s even at limit:5 on this dev
+# environment — a known, unfixed backend perf hang (docs/app_bugs.md bug #13).
+# Do not widen this query to that shape; it would just reproduce the hang here.
+_QUERY_AUDITS_SORTED = (
+    "{ audits(limit: 20, sortOptions: [{field: \"passed_tests\", direction: \"desc\"}]) "
+    "{ data { id status passedTests } totalItemsCount } }"
+)
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -192,6 +214,52 @@ class TestConcurrentGraphQLReads:
         assert result["elapsed_s"] < BUDGET["single_read_s"], (
             f"Single aiModels query took {result['elapsed_s']:.2f}s — "
             f"exceeds {BUDGET['single_read_s']}s budget"
+        )
+
+
+# ── Scenario 1b: Sorted Audits Read Concurrency ───────────────────────────────
+
+
+@pytest.mark.timeout(300)
+class TestAuditsSortPerformance:
+    """Concurrent authenticated audits reads with sortOptions set.
+
+    The `sortOptions` allowlist path (graphql_api/qs_utils.py::apply_sorting)
+    adds work per request beyond a bare unsorted read — the resolver's
+    per-row model_name remap plus queryset.count() inside apply_pagination
+    both run whether or not a sort is requested, but ORDER BY itself has a
+    cost the unsorted baseline in TestConcurrentGraphQLReads doesn't exercise.
+    No prior coverage of this path existed under concurrency.
+    """
+
+    def _burst(self, gql, query: str, concurrency: int, label: str) -> list[dict]:
+        results: list[dict] = []
+        with ThreadPoolExecutor(max_workers=concurrency) as ex:
+            futures = {
+                ex.submit(_execute_query, gql, query, f"{label}-{i}"): i
+                for i in range(concurrency)
+            }
+            for fut in as_completed(futures):
+                results.append(fut.result())
+        return results
+
+    def test_5_concurrent_audits_sorted_by_passed_tests(self, authenticated_graphql_client):
+        """5 concurrent audits(sortOptions: passed_tests desc) queries must all succeed within budget."""
+        results = self._burst(
+            authenticated_graphql_client, _QUERY_AUDITS_SORTED, 5, "audits-sorted"
+        )
+        _save_metrics("concurrent_audits_sorted_n5", results)
+
+        failures = [r for r in results if not r["success"]]
+        assert not failures, (
+            f"{len(failures)}/5 concurrent sorted-audits queries failed: "
+            f"{[r['error'] for r in failures]}"
+        )
+        slow = [r for r in results if r["elapsed_s"] > BUDGET["sorted_audits_5_concurrent_s"]]
+        slow_times = [f"{r['elapsed_s']:.2f}s" for r in slow]
+        assert not slow, (
+            f"{len(slow)}/5 sorted-audits queries exceeded "
+            f"{BUDGET['sorted_audits_5_concurrent_s']}s: {slow_times}"
         )
 
 
