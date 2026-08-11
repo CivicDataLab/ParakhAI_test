@@ -85,6 +85,65 @@ jobs:
           repository: CivicDataLab/ParakhAI_test
           ref: main
 
+      # Guard 1 of 3 against a vacuously green run. Auth fixtures and the
+      # db-health tests call pytest.skip when the backend is unreachable, so a
+      # completely dead deployment would otherwise produce all-skips and exit 0
+      # — a gate that certifies a broken deploy as healthy. Fail here instead,
+      # before pytest gets the chance to skip its way to success.
+      - name: Preflight — backend GraphQL endpoint is reachable
+        run: |
+          echo "Probing $GRAPHQL_URL"
+          for attempt in 1 2 3 4 5; do
+            body=$(curl -sS --max-time 30 \
+              -A "$PROBE_UA" \
+              -H 'Accept: application/json' \
+              --get --data-urlencode 'query={healthCheck}' \
+              "$GRAPHQL_URL" || true)
+            # The endpoint answers with spaces after the colons, so normalise
+            # before matching.
+            if printf '%s' "$body" | tr -d ' \n\t' | grep -q '"healthCheck":"OK"'; then
+              echo "Backend healthy on attempt $attempt."
+              exit 0
+            fi
+            echo "Attempt $attempt did not report healthy. Response: ${body:-<empty>}"
+            # Written as a full `if` rather than `[ ] && sleep` so the loop's
+            # final exit status stays 0 and `set -e` cannot kill the step
+            # before the ::error:: annotation below is emitted.
+            if [ "$attempt" -lt 5 ]; then sleep 5; fi
+          done
+          echo "::error::Backend GraphQL endpoint $GRAPHQL_URL did not return healthCheck OK after 5 attempts. Refusing to run the smoke gate against an unreachable backend."
+          exit 1
+
+      # Guard 2 of 3. Confirms the backend actually serving traffic is the
+      # commit the caller just deployed, not a stale instance that happened
+      # to pass the reachability check above. Skipped entirely when
+      # deployed_sha is empty — the frontend caller and the standalone
+      # push/dispatch runs don't pass it, so they're unaffected.
+      #
+      # NOTE: the `version` query field is being added to the backend schema
+      # in a parallel PR and does not exist on live dev yet, so this guard
+      # cannot be exercised end-to-end until that ships. It fails loudly
+      # rather than silently passing if the field is missing or errors.
+      - name: Preflight — deployed backend SHA matches expected
+        if: ${{ inputs.deployed_sha != '' }}
+        run: |
+          echo "Verifying backend at $GRAPHQL_URL reports version $DEPLOYED_SHA"
+          body=$(curl -sS --max-time 30 \
+            -A "$PROBE_UA" \
+            -H 'Accept: application/json' \
+            --get --data-urlencode 'query={version}' \
+            "$GRAPHQL_URL" || true)
+          reported=$(printf '%s' "$body" | jq -r '.data.version // empty' 2>/dev/null || true)
+          if [ -z "$reported" ]; then
+            echo "::error::Backend at $GRAPHQL_URL did not return a usable {version} field (it may not exist yet). Response: ${body:-<empty>}"
+            exit 1
+          fi
+          if [ "$reported" != "$DEPLOYED_SHA" ]; then
+            echo "::error::Backend version mismatch: expected $DEPLOYED_SHA, backend reports $reported"
+            exit 1
+          fi
+          echo "Backend version matches expected SHA: $reported"
+
       - name: Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v6
         with:
@@ -108,6 +167,40 @@ jobs:
             --tb=short \
             --html=reports/smoke_report.html \
             --self-contained-html
+
+      # Guard 3 of 3. pytest.ini's addopts already include --json-report /
+      # --json-report-file=reports/report.json (verified, not assumed), so no
+      # extra flag is needed here — just read what pytest already wrote.
+      #
+      # This is the guard that actually catches the vacuous-green scenario:
+      # when every test in the selected marker expression skips (e.g. an
+      # unreachable backend), pytest's own exit code is still 0 because
+      # skips aren't failures. Runs with if: always() so it evaluates the
+      # report even when the "Run smoke tests" step above already failed,
+      # giving a clearer failure reason than a bare non-zero exit code.
+      - name: Verify minimum passed count and no collection/setup errors
+        if: always()
+        run: |
+          report=reports/report.json
+          if [ ! -f "$report" ]; then
+            echo "::error::$report was not produced by pytest — cannot verify pass count."
+            exit 1
+          fi
+
+          passed=$(jq -r '.summary.passed // 0' "$report")
+          errors=$(jq -r '.summary.error // 0' "$report")
+          echo "passed=$passed error=$errors min_passed=$MIN_PASSED"
+
+          ok=0
+          if [ "$errors" -ne 0 ]; then
+            echo "::error::$errors test(s) had collection/setup errors."
+            ok=1
+          fi
+          if [ "$passed" -lt "$MIN_PASSED" ]; then
+            echo "::error::Only $passed test(s) passed; expected at least $MIN_PASSED. (An unreachable backend can otherwise skip its way to a false-green exit 0.)"
+            ok=1
+          fi
+          exit $ok
 
       - name: Upload smoke test report
         if: always()
