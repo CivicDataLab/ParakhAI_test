@@ -633,6 +633,107 @@ class TestInputSanitisation:
             "Server returned 500 for a query containing a null byte"
         )
 
+    # ── audits sort/filter allowlist (graphql_api/qs_utils.py) ─────────────────
+    #
+    # `audits(sortOptions:, filters:)` passes the client-supplied `field` string
+    # straight into a Django ORM `order_by()` / `filter()` call, gated only by a
+    # per-query allowlist (see apps/model_audits/services/cached_queries.py::
+    # get_audits). The anonymous path short-circuits before this code ever runs
+    # (`if not user.is_authenticated: return AuditResponse(data=[], ...)`), so
+    # these need a real session to actually exercise the allowlist.
+
+    @pytest.mark.auth
+    def test_audits_sort_by_non_allowlisted_field_is_rejected(
+        self, authenticated_graphql_client
+    ):
+        """A sort field outside the server allowlist must fail closed.
+
+        Allowed sort fields for `audits` are name/status/model_snapshot__display_name/
+        passed_tests/evaluation_mode/audit_type/completed_at/created_at. Anything else
+        must be rejected — not silently ignored (falling back to default ordering while
+        looking successful) and not passed through to the ORM.
+        """
+        query = (
+            "query($sortOptions: [SortSpec!]) { "
+            "audits(sortOptions: $sortOptions) { data { id } totalItemsCount } }"
+        )
+        result = authenticated_graphql_client(
+            query,
+            variables={
+                "sortOptions": [
+                    {"field": "organization__owner__password", "direction": "asc"}
+                ]
+            },
+        )
+        assert result.get("errors"), (
+            "Sorting audits by a non-allowlisted field ('organization__owner__password') "
+            f"did not produce a GraphQL error — possible allowlist bypass. Response: {result}"
+        )
+        assert not (result.get("data") or {}).get("audits"), (
+            "Invalid sort field returned audit data alongside errors — "
+            "must fail closed with no data, not partial success."
+        )
+
+    @pytest.mark.auth
+    def test_audits_filter_by_non_allowlisted_field_is_rejected(
+        self, authenticated_graphql_client
+    ):
+        """A filter field outside the server allowlist must fail closed.
+
+        Allowed filter fields for `audits` are name/model_snapshot__display_name/
+        audit_type/evaluation_mode/model_id/status/completed_at — notably `requested_by`
+        (the owning user FK) is NOT allowed, so a client can't filter by arbitrary
+        internal fields even though the underlying ORM call would otherwise accept them.
+        """
+        query = (
+            "query($filters: [FilterSpec!]) { "
+            "audits(filters: $filters) { data { id } totalItemsCount } }"
+        )
+        result = authenticated_graphql_client(
+            query,
+            variables={
+                "filters": [{"field": "requested_by", "condition": "exact", "value": "1"}]
+            },
+        )
+        assert result.get("errors"), (
+            "Filtering audits by a non-allowlisted field ('requested_by') did not "
+            f"produce a GraphQL error — possible allowlist bypass. Response: {result}"
+        )
+        assert not (result.get("data") or {}).get("audits"), (
+            "Invalid filter field returned audit data alongside errors — "
+            "must fail closed with no data, not partial success."
+        )
+
+    @pytest.mark.auth
+    def test_audits_sort_field_injection_payload_is_rejected_cleanly(
+        self, authenticated_graphql_client
+    ):
+        """An injection-flavored sort field must be rejected without a 500 or leak.
+
+        Django's order_by() doesn't build raw SQL from this string (it's parameterised
+        at the ORM layer), so classic SQL injection isn't the real risk here — but a
+        garbage field string reaching order_by() unvalidated should still be impossible
+        thanks to the allowlist, and the resulting error must not leak a stack trace.
+        """
+        query = (
+            "query($sortOptions: [SortSpec!]) { "
+            "audits(sortOptions: $sortOptions) { data { id } totalItemsCount } }"
+        )
+        result = authenticated_graphql_client(
+            query,
+            variables={
+                "sortOptions": [
+                    {"field": "created_at); DROP TABLE audits;--", "direction": "asc"}
+                ]
+            },
+        )
+        assert result.get("errors"), (
+            f"Injection-flavored sort field did not produce a GraphQL error. Response: {result}"
+        )
+        body_lower = str(result).lower()
+        for leak in ("traceback", "psycopg", "django.db", 'file "/'):
+            assert leak not in body_lower, f"Sort-field error response leaks '{leak}': {result}"
+
 
 # ── Playground + review mutation security ─────────────────────────────────────
 
