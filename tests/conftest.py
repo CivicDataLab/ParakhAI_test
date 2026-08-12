@@ -498,17 +498,35 @@ def authenticated_graphql_client(browser: Browser, authenticated_storage_state: 
     missing, dev env down) — matches the behaviour of every other
     auth-dependent fixture in this file.
 
+    Token staleness: this fixture is session-scoped, so on a suite that runs
+    longer than the ~5 min Keycloak token TTL, a token fetched at session
+    start goes stale mid-run. `DataSpaceAuthMiddleware` (ParakhAPI) swallows
+    the resulting auth failure and silently sets `request.user =
+    AnonymousUser()` — no 401/403, no "expired"/"token" text, just a normal
+    200 with whatever the anonymous code path returns. That's indistinguishable
+    from a legitimate empty/anonymous response, so the reactive
+    401-or-"expired token" retry below can never catch it. This is the same
+    TTL class of bug as `_refresh_storage_state_if_stale` was written for
+    (see its docstring — TEST-001, 137 tests lost to exactly this shape of
+    silent degradation), just never applied to this fixture. Proactively
+    refresh both the storage state and the token whenever either is older
+    than `_STORAGE_STATE_TTL_S`, checked before every call, not just once at
+    fixture setup.
+
     Usage::
         def test_something(authenticated_graphql_client):
             data = authenticated_graphql_client(QUERY)
             data = authenticated_graphql_client(MUTATION, variables={...}, method="POST")
     """
     import json as _json
+    import time as _time
 
+    _refresh_storage_state_if_stale(browser, authenticated_storage_state)
     try:
         token = _fetch_access_token_sync(browser, authenticated_storage_state)
     except Exception as exc:  # noqa: BLE001 — surface as a skip, not an error
         pytest.skip(f"Could not acquire access token for authenticated GraphQL client: {exc}")
+    token_fetched_at = _time.time()
 
     org_id = str(getattr(Config, "CIVICDATALAB_ORG_ID", 1))
 
@@ -532,7 +550,18 @@ def authenticated_graphql_client(browser: Browser, authenticated_storage_state: 
     )
 
     def _call(query: str, variables=None, method: str = "GET") -> dict:
-        nonlocal token
+        nonlocal token, token_fetched_at
+        # Proactive refresh: see the fixture docstring — a stale token degrades
+        # to a silent, error-free anonymous response that the reactive retry
+        # below cannot detect, so staleness must be caught before it fires.
+        if _time.time() - token_fetched_at >= _STORAGE_STATE_TTL_S:
+            _refresh_storage_state_if_stale(browser, authenticated_storage_state)
+            try:
+                token = _fetch_access_token_sync(browser, authenticated_storage_state)
+                session.headers.update({"Authorization": f"Bearer {token}"})
+                token_fetched_at = _time.time()
+            except Exception:  # noqa: BLE001 — fall through and let the request itself surface the failure
+                pass
         body = {"query": query}
         if variables:
             body["variables"] = variables
@@ -562,6 +591,7 @@ def authenticated_graphql_client(browser: Browser, authenticated_storage_state: 
             try:
                 token = _fetch_access_token_sync(browser, authenticated_storage_state)
                 session.headers.update({"Authorization": f"Bearer {token}"})
+                token_fetched_at = _time.time()
                 resp = _do_request()
             except Exception:
                 pass
