@@ -98,6 +98,7 @@ jobs:
             --tb=short \
             --html=reports/api_report.html \
             --self-contained-html \
+            --json-report-file=reports/api.json \
             -m api
 
       - name: Upload API test report
@@ -105,7 +106,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: api-test-report
-          path: reports/api_report.html
+          path: |
+            reports/api_report.html
+            reports/api.json
           retention-days: 30
 
   # ────────────────────────────────────────────── E2E tests (3-shard matrix)
@@ -200,6 +203,7 @@ jobs:
             --tb=short \
             --html=reports/a11y_report.html \
             --self-contained-html \
+            --json-report-file=reports/accessibility.json \
             -m accessibility
 
       - name: Upload accessibility reports
@@ -209,6 +213,7 @@ jobs:
           name: accessibility-report
           path: |
             reports/a11y_report.html
+            reports/accessibility.json
             reports/accessibility_report.json
             reports/accessibility_login_report.json
           retention-days: 30
@@ -235,14 +240,22 @@ jobs:
       - name: Install Playwright browsers
         run: playwright install --with-deps chromium
 
-      # Restore cached baselines so we compare against a known good state
+      # Restore cached baselines so we compare against a known good state.
+      #
+      # The `v2-` generation prefix deliberately orphans every cache written
+      # before 2026-08-12. Those caches hold the poisoned baselines documented in
+      # docs/visual_diffs.md (a 404, stuck "Loading …" curtains, and four copies
+      # of the logged-out homepage). Without the bump, editing tests/visual/**
+      # changes the primary key but `restore-keys` still falls back to the newest
+      # old cache — so CI would restore the poisoned generation and diff correct
+      # captures against it. Bump this again if baselines ever need a clean slate.
       - name: Restore visual baselines cache
         uses: actions/cache@v5
         with:
           path: snapshots/
-          key: visual-baselines-${{ runner.os }}-${{ hashFiles('tests/visual/**') }}
+          key: visual-baselines-v2-${{ runner.os }}-${{ hashFiles('tests/visual/**') }}
           restore-keys: |
-            visual-baselines-${{ runner.os }}-
+            visual-baselines-v2-${{ runner.os }}-
 
       - name: Run visual regression tests
         continue-on-error: true
@@ -252,6 +265,7 @@ jobs:
             --tb=short \
             --html=reports/visual_report.html \
             --self-contained-html \
+            --json-report-file=reports/visual.json \
             -m visual
 
       # Save updated baselines back to cache
@@ -260,7 +274,8 @@ jobs:
         uses: actions/cache@v5
         with:
           path: snapshots/
-          key: visual-baselines-${{ runner.os }}-${{ hashFiles('tests/visual/**') }}
+          # Must stay in lockstep with the restore step's generation prefix above.
+          key: visual-baselines-v2-${{ runner.os }}-${{ hashFiles('tests/visual/**') }}
 
       - name: Upload visual regression report and diffs
         if: always()
@@ -269,6 +284,7 @@ jobs:
           name: visual-regression-report
           path: |
             reports/visual_report.html
+            reports/visual.json
             screenshots/DIFF_*
             snapshots/
           retention-days: 30
@@ -292,6 +308,16 @@ jobs:
       - name: Install report dependencies
         run: pip install pytest-json-report
 
+      # All suite reports, so the summary table can show real test counts
+      # instead of job status. Each suite's pytest step is `continue-on-error`,
+      # so its job result is ~always "success" no matter how many tests failed.
+      - name: Download all suite reports
+        uses: actions/download-artifact@v4
+        with:
+          path: suite-artifacts/
+          merge-multiple: true
+        continue-on-error: true
+
       - name: Download E2E shard reports
         if: needs.e2e-tests.result != 'skipped'
         uses: actions/download-artifact@v4
@@ -314,17 +340,37 @@ jobs:
         if: needs.e2e-tests.result != 'skipped'
         run: cat reports/e2e_summary.md >> $GITHUB_STEP_SUMMARY
 
-      - name: Print suite status table
+      # Real per-suite test counts, read from the JSON reports rather than from
+      # `needs.<job>.result`. The old table printed job status, which is
+      # structurally incapable of showing a test failure here: every suite runs
+      # its pytest step with `continue-on-error: true`, so the job succeeds even
+      # when tests fail, and the most-read signal in the run always said
+      # "success". See scripts/suite_summary.py.
+      - name: Print suite results table
         run: |
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Suite | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| API Tests | ${{ needs.api-tests.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| E2E Tests | ${{ needs.e2e-tests.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Accessibility | ${{ needs.accessibility-tests.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Visual Regression | ${{ needs.visual-tests.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Platform:** ${{ env.BASE_URL }}" >> $GITHUB_STEP_SUMMARY
+          {
+            echo ""
+            echo "## Test results by suite"
+            echo ""
+            python scripts/suite_summary.py \
+              "API=suite-artifacts/api.json" \
+              "E2E=shard-artifacts/*/reports/e2e_shard_*.json" \
+              "Accessibility=suite-artifacts/accessibility.json" \
+              "Visual Regression=suite-artifacts/visual.json"
+            echo ""
+            echo "**Platform:** ${{ env.BASE_URL }}"
+            echo ""
+            echo "<details><summary>Job status (plumbing, not test results)</summary>"
+            echo ""
+            echo "| Job | Result |"
+            echo "|-----|--------|"
+            echo "| API Tests | ${{ needs.api-tests.result }} |"
+            echo "| E2E Tests | ${{ needs.e2e-tests.result }} |"
+            echo "| Accessibility | ${{ needs.accessibility-tests.result }} |"
+            echo "| Visual Regression | ${{ needs.visual-tests.result }} |"
+            echo ""
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload combined E2E report
         if: needs.e2e-tests.result != 'skipped'
