@@ -1,0 +1,77 @@
+# CI / GitHub Actions Notes
+
+Durable findings about this repo's own CI workflows. Product defects belong in
+[`app_bugs.md`](app_bugs.md); this file is for the pipeline itself — behaviours,
+gotchas, and corrections to things we previously believed.
+
+---
+
+## Hyphenated job ids in `needs.<id>.result` are FINE (corrected 2026-08-12)
+
+**Status: corrects a previously-held belief. No code change required.**
+
+A note carried in our knowledge base claimed that `needs.<job-id>.result` "breaks
+silently for hyphenated job ids (parses as subtraction)", and that jobs referenced
+in expressions should therefore be renamed to avoid hyphens (e.g. `build-and-push`
+→ `build`). Acting on that would have meant rewriting working guards in
+`ci.yml` such as:
+
+```yaml
+if: needs.e2e-tests.result != 'skipped'
+```
+
+**That belief is wrong.** Hyphens are explicitly legal:
+
+> "the property name must start with a letter or `_` and contain only alphanumeric
+> characters, `-`, or `_`."
+> — [GitHub Actions: contexts](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts)
+
+Verified independently with `actionlint` on a throwaway workflow: it resolves
+`needs.e2e-tests.result` cleanly — typing the context as
+`{e2e-tests: {outputs: {}; result: string}}` — while still rejecting a genuinely
+undefined job id. That it rejects the undefined case proves it is doing real
+resolution rather than waving everything through.
+
+Reproduce in ~30 seconds:
+
+```bash
+# scratch workflow with a hyphenated job id referenced via needs.<id>.result
+actionlint /path/to/scratch/.github/workflows/hyphen_test.yml
+```
+
+The original diagnosis was a misattribution. The symptom was real but the cause
+was almost certainly one of the sibling gotchas from the same pipeline work:
+
+- a job with `uses:` (reusable workflow call) **cannot** also declare `environment:`
+  — GitHub rejects the whole file at parse time;
+- a job with `if: always()` ignores workflow cancellation entirely and has no
+  default timeout — always pair it with an explicit `timeout-minutes`.
+
+**Still true and worth keeping:** `failure()` / `success()` builtins are a fine
+choice for gating a job after a `workflow_call` job — just not for the hyphen
+reason.
+
+### Real caveat that does hold
+
+Dereferencing a genuinely nonexistent property yields an **empty string**, silently.
+So a typo'd `needs` reference fails **open** — a guarded step runs when you expected
+it to be skipped — rather than failing loudly. Worth a second look whenever a guard
+"doesn't seem to be doing anything".
+
+### Takeaway
+
+A recorded lesson is evidence, not proof — especially a "X breaks silently" claim,
+which is exactly the shape that gets misattributed (real symptom, wrong assigned
+cause). Verify against primary docs or a linter before letting one change working
+code or contort a naming scheme.
+
+---
+
+## Currently paused jobs
+
+| Job | Status | Notes |
+|---|---|---|
+| `e2e-tests` | **paused** since 2026-08-11 (`if: false`) | By request, not due to failures. `test-summary`'s E2E-report steps are guarded on `needs.e2e-tests.result != 'skipped'` so the pipeline degrades cleanly on missing shard artifacts. To resume, delete the `if: false` line to restore `if: always()`; the guards are harmless and can stay. |
+
+Note the chain `e2e-tests needs: visual-tests` — resuming `e2e-tests` alone works
+regardless of `visual-tests`, since the job's own `if:` controls it.
