@@ -194,3 +194,52 @@ def capture_integrity_problem(
         return "capture is a blank/near-uniform image — nothing rendered"
 
     return None
+
+
+# ── Screenshot masks ─────────────────────────────────────────────────────────
+# Shared with every visual test module so a new suite cannot silently omit the
+# identity masks and start committing the test account's name to baselines.
+
+# Dynamic regions that change every page load — masking stops false diffs on
+# nightly visual runs.
+DEFAULT_MASKS = [
+    "[class*='timestamp']",
+    "[class*='last-updated']",
+    "[class*='activity']",
+    "time",
+    "[class*='polling']",
+]
+
+# Personal data rendered by the logged-in shell. Masked on every authenticated
+# capture for two reasons:
+#   1. Privacy — these baselines embed the real test account's full name
+#      ("Welcome, <first> <last>") and avatar initials. `snapshots/` is
+#      gitignored so they never reach git history, but CI both caches the
+#      directory and uploads it as a 30-day build artifact
+#      (.github/workflows/ci.yml), so the images are retrievable by anyone with
+#      repo access.
+#   2. Portability — an unmasked name pins every baseline to one account, so
+#      re-running the suite as TEST_USER_2 would diff on the sidebar alone.
+# Deliberately NOT matching initials literally: locators/workspace_locators.py
+# pins `text=MSM` while this account renders "SM", confirming initials vary per
+# account. Anchored `^Welcome,` is used rather than
+# AIMakerLocators.WELCOME_MESSAGE's bare `text=Welcome`, which would also match
+# body copy containing the word. `_capture_page_masked` drops zero-count
+# selectors, so listing extras is free.
+# Verified against the live DOM 2026-08-12:
+#   <div class="text-center …">            ← masked (the whole identity block)
+#     <div class="… rounded-full …"><span>SM</span></div>   ← initials, NO avatar class
+#     <p class="welcome-text">Welcome,&nbsp;<span>Saqib Manan</span></p>
+#     <a class="switch-roles-link">Switch Roles</a>
+#   </div>
+# The sidebar initials circle is a bare Tailwind div, so `[class*='avatar' i]`
+# (which matches only the 2 header avatars) does not cover it. Masking the
+# parent block catches the circle and the name together. That also masks the
+# "Switch Roles" link — an accepted trade: a small, static control loses pixel
+# coverage so no capture carries identity.
+AUTH_PII_MASKS = [
+    "[class*='avatar' i]",  # header avatar circle(s) rendering initials
+    ".welcome-text >> xpath=..",  # sidebar identity block (circle + name)
+    "text=/^Welcome,/ >> xpath=..",  # fallback if .welcome-text is renamed
+    "button[aria-label='Open profile']",  # per locators/dashboard_locators.py
+]

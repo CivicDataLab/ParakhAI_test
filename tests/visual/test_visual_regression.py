@@ -15,7 +15,12 @@ from PIL import Image, ImageChops
 from playwright.sync_api import Page
 
 from utils.config import Config
-from utils.visual_guards import capture_integrity_problem, wait_for_render_settled
+from utils.visual_guards import (
+    AUTH_PII_MASKS,
+    DEFAULT_MASKS,
+    capture_integrity_problem,
+    wait_for_render_settled,
+)
 
 pytestmark = [pytest.mark.visual]
 
@@ -163,49 +168,11 @@ def _capture_page_masked(page: Page, url: str, masks: list) -> Image.Image:
     return Image.open(io.BytesIO(raw))
 
 
-# Dynamic regions that change every page load — masking stops false diffs on
-# nightly visual runs.
-_DEFAULT_MASKS = [
-    "[class*='timestamp']",
-    "[class*='last-updated']",
-    "[class*='activity']",
-    "time",
-    "[class*='polling']",
-]
-
-# Personal data rendered by the logged-in shell. Masked on every authenticated
-# capture for two reasons:
-#   1. Privacy — these baselines embed the real test account's full name
-#      ("Welcome, <first> <last>") and avatar initials. `snapshots/` is
-#      gitignored so they never reach git history, but CI both caches the
-#      directory and uploads it as a 30-day build artifact
-#      (.github/workflows/ci.yml), so the images are retrievable by anyone with
-#      repo access.
-#   2. Portability — an unmasked name pins every baseline to one account, so
-#      re-running the suite as TEST_USER_2 would diff on the sidebar alone.
-# Deliberately NOT matching initials literally: locators/workspace_locators.py
-# pins `text=MSM` while this account renders "SM", confirming initials vary per
-# account. Anchored `^Welcome,` is used rather than
-# AIMakerLocators.WELCOME_MESSAGE's bare `text=Welcome`, which would also match
-# body copy containing the word. `_capture_page_masked` drops zero-count
-# selectors, so listing extras is free.
-# Verified against the live DOM 2026-08-12:
-#   <div class="text-center …">            ← masked (the whole identity block)
-#     <div class="… rounded-full …"><span>SM</span></div>   ← initials, NO avatar class
-#     <p class="welcome-text">Welcome,&nbsp;<span>Saqib Manan</span></p>
-#     <a class="switch-roles-link">Switch Roles</a>
-#   </div>
-# The sidebar initials circle is a bare Tailwind div, so `[class*='avatar' i]`
-# (which matches only the 2 header avatars) does not cover it. Masking the
-# parent block catches the circle and the name together. That also masks the
-# "Switch Roles" link — an accepted trade: a small, static control loses pixel
-# coverage so no capture carries identity.
-_AUTH_PII_MASKS = [
-    "[class*='avatar' i]",  # header avatar circle(s) rendering initials
-    ".welcome-text >> xpath=..",  # sidebar identity block (circle + name)
-    "text=/^Welcome,/ >> xpath=..",  # fallback if .welcome-text is renamed
-    "button[aria-label='Open profile']",  # per locators/dashboard_locators.py
-]
+# Mask lists live in utils.visual_guards so sibling visual suites share one
+# definition — a new module that forgot _AUTH_PII_MASKS would quietly start
+# baking the account name back into baselines.
+_DEFAULT_MASKS = DEFAULT_MASKS
+_AUTH_PII_MASKS = AUTH_PII_MASKS
 
 # Auth routes whose content is genuinely non-deterministic between two captures
 # against the live/shared dev environment: the New Evaluation wizard's model
