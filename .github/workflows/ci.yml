@@ -218,7 +218,12 @@ jobs:
     name: Visual Regression Tests
     runs-on: ubuntu-latest
     needs: accessibility-tests
-    if: always()
+    # PAUSED 2026-08-12 — remove this line (restoring `if: always()`) to
+    # resume. Nothing downstream consumes this job's artifacts: the cached
+    # baselines and reports are uploaded from within the job, and
+    # test-summary only reads needs.visual-tests.result for its status
+    # table (prints `skipped` while this is off).
+    if: false
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
