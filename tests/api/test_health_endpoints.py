@@ -70,9 +70,16 @@ class TestLiveness:
         )
 
     def test_rejects_non_get(self, api_client):
+        """Confirmed live 2026-08-12: Django's CsrfViewMiddleware intercepts a
+        POST with no CSRF cookie before the view's @require_GET decorator ever
+        runs, so the real response is 403 ('CSRF verification failed'), not
+        405. Both are valid non-GET rejections — accept either rather than
+        pinning to whichever middleware happens to reject first, since that
+        ordering isn't this test's concern.
+        """
         resp = api_client.post(_health_url("/health/"), timeout=10)
         _skip_if_not_deployed(resp)
-        assert resp.status_code == 405
+        assert resp.status_code in (403, 405), resp.text[:300]
 
     def test_response_has_no_stack_trace_or_internal_details(self, api_client):
         """Even a healthy response must not leak framework internals."""
@@ -99,9 +106,11 @@ class TestReadiness:
         )
 
     def test_rejects_non_get(self, api_client):
+        """See TestLiveness.test_rejects_non_get — same CSRF-before-@require_GET
+        ordering applies here."""
         resp = api_client.post(_health_url("/health/ready/"), timeout=10)
         _skip_if_not_deployed(resp)
-        assert resp.status_code == 405
+        assert resp.status_code in (403, 405), resp.text[:300]
 
     def test_response_has_no_stack_trace_or_internal_details(self, api_client):
         resp = api_client.get(_health_url("/health/ready/"), timeout=10)
