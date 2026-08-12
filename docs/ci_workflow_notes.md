@@ -75,3 +75,36 @@ code or contort a naming scheme.
 
 Note the chain `e2e-tests needs: visual-tests` — resuming `e2e-tests` alone works
 regardless of `visual-tests`, since the job's own `if:` controls it.
+
+---
+
+## Tried making api-tests + accessibility-tests concurrent — reverted same day (2026-08-12)
+
+**Status: reverted. `ci.yml` is back to the full serial chain.**
+
+Theory going in: bug #3's root cause (dev backend overwhelmed under concurrent
+load, producing "too many clients"/ReadTimeouts) might no longer apply, since
+two things changed the same day — the backend moved from `runserver` to a
+Docker deployment, and bugs #13/#14 (routes that used to hang indefinitely)
+were independently re-verified fixed (both now resolve in under 30s).
+
+Changed `accessibility-tests` from `needs: api-tests` to `needs: lint`, so it
+would start alongside `api-tests` instead of after it. A local 2-suite
+concurrency smoke test beforehand showed no pool-exhaustion symptoms — but
+was confounded by an unrelated CI run hitting the same backend at the same
+time (this branch has an open PR into `main`, so every push auto-triggers a
+run), so it wasn't treated as conclusive on its own.
+
+The real in-CI test started failing within ~13 minutes. Reverted immediately
+on report; the run was cancelled rather than left to finish, so there is
+**no captured job log of the actual failure mode** — that's the gap to close
+before trying again, not a reason to assume the theory was wrong. Also
+observed: because `visual-tests` only depends on `accessibility-tests` (not
+`api-tests`), making accessibility fast + independent had a wider blast
+radius than intended — `visual-tests` started overlapping with `api-tests`
+too, not just accessibility. Any re-attempt should account for that
+cascading effect, not just the two jobs whose `needs:` actually changed.
+
+**Before re-attempting:** get a completed (not cancelled) run's job logs
+first, so the failure signature can actually be diagnosed — same-shape
+ReadTimeouts as bug #3, or something new post-Docker-migration.
