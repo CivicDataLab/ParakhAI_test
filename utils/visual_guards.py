@@ -243,3 +243,43 @@ AUTH_PII_MASKS = [
     "text=/^Welcome,/ >> xpath=..",  # fallback if .welcome-text is renamed
     "button[aria-label='Open profile']",  # per locators/dashboard_locators.py
 ]
+
+# Per-route masks for content that is genuinely live (not identity, not a11y
+# noise), keyed by the `name` half of AUTH_ROUTES / RESPONSIVE_ROUTES tuples.
+#
+# ai_maker_dashboard was failing its hard pixel-diff assertion on ordinary re-runs
+# purely because its stat counters increment during normal platform use (observed
+# 2026-08-12: "Evaluations Completed" 3 -> 4 between two runs) — not a rendering
+# bug. The blanket fix would be adding it to _NON_DETERMINISTIC_VISUAL, but that
+# silences the diff for the WHOLE page, including the static layout/model-card
+# grid a real regression would land in. Masking just the volatile numbers keeps
+# everything else — the "Overview" heading, the four *labels*, model cards,
+# structure — under a real hard assertion.
+#
+# Verified against the live DOM 2026-08-12 (logged in as TEST_EMAIL_2, since the
+# masks must not be tied to one account's data):
+#   <div class="overview-metrics-grid ...">
+#     <div class="metric-card">
+#       <p class="metric-card-label">Evaluations Completed</p>  <- static, NOT masked
+#       <p class="metric-card-value">4</p>                       <- volatile, masked
+#     </div>
+#     ... (Test Cases Evaluated / Models Added / Issues Flagged, same shape)
+#   </div>
+#   <div class="audits-section">
+#     <h2>Recent Evaluations</h2><a href="...">See all</a>       <- static, NOT masked
+#     <table class="DataTable-module_Table__NRxaN">...</table>  <- live rows, masked
+#   </div>
+# The DataTable-module_* class is an auto-generated CSS-module hash that will
+# change on any frontend rebuild — mask by the semantic `table` tag scoped under
+# the stable `.audits-section` class instead, not the hashed class.
+_ROUTE_EXTRA_MASKS: dict[str, list[str]] = {
+    "ai_maker_dashboard": [
+        "[class*='metric-card-value' i]",
+        ".audits-section table",
+    ],
+}
+
+
+def route_masks(name: str) -> list[str]:
+    """DEFAULT_MASKS + AUTH_PII_MASKS + any masks specific to route *name*."""
+    return DEFAULT_MASKS + AUTH_PII_MASKS + _ROUTE_EXTRA_MASKS.get(name, [])

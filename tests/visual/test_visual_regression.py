@@ -16,9 +16,8 @@ from playwright.sync_api import Page
 
 from utils.config import Config
 from utils.visual_guards import (
-    AUTH_PII_MASKS,
-    DEFAULT_MASKS,
     capture_integrity_problem,
+    route_masks,
     wait_for_render_settled,
 )
 
@@ -169,10 +168,9 @@ def _capture_page_masked(page: Page, url: str, masks: list) -> Image.Image:
 
 
 # Mask lists live in utils.visual_guards so sibling visual suites share one
-# definition — a new module that forgot _AUTH_PII_MASKS would quietly start
-# baking the account name back into baselines.
-_DEFAULT_MASKS = DEFAULT_MASKS
-_AUTH_PII_MASKS = AUTH_PII_MASKS
+# definition — a new module that forgot AUTH_PII_MASKS would quietly start
+# baking the account name back into baselines. route_masks(name) layers on
+# any route-specific masks (e.g. ai_maker_dashboard's live stat counters).
 
 # Auth routes whose content is genuinely non-deterministic between two captures
 # against the live/shared dev environment: the New Evaluation wizard's model
@@ -335,7 +333,8 @@ class TestAuthenticatedPageVisuals:
     "baseline saved" message. Subsequent runs diff against the cached
     baseline at Config.VISUAL_THRESHOLD (default 0.1%).
 
-    Dynamic regions are masked via _DEFAULT_MASKS to prevent flaky diffs.
+    Dynamic regions are masked via route_masks(name) (utils.visual_guards) to
+    prevent flaky diffs.
     Tests are parametrized by (path, name); each is independent so a failure
     on one page doesn't mask the others.
     """
@@ -402,7 +401,7 @@ class TestAuthenticatedPageVisuals:
         try:
             try:
                 img = _capture_page_masked(
-                    page, Config.url(path), _DEFAULT_MASKS + _AUTH_PII_MASKS
+                    page, Config.url(path), route_masks(name)
                 )
             except Exception as exc:  # noqa: BLE001
                 pytest.skip(
