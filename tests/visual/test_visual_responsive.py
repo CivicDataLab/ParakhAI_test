@@ -72,9 +72,8 @@ from tests.visual.test_visual_regression import (
 )
 from utils.config import Config
 from utils.visual_guards import (
-    AUTH_PII_MASKS,
-    DEFAULT_MASKS,
     capture_integrity_problem,
+    route_masks,
     wait_for_render_settled,
 )
 
@@ -107,14 +106,15 @@ RESPONSIVE_VIEWPORTS = [
 # diff becomes an xfail rather than a hard failure, mirroring VISUAL-002 in the
 # desktop suite.
 #
-# Note this diverges from the desktop module, which treats `ai_maker_dashboard`
-# as a hard assertion. That page now renders a live "Recent Evaluations" table
-# and live stat counters; `DEFAULT_MASKS` covers timestamps but not evaluation
-# names or counts, and the suite's own `regression_write` tests create
-# evaluations. Treating it as deterministic would produce exactly the flaky red
-# that erodes trust in a visual suite. Flagged rather than silently differing.
+# `ai_maker_dashboard` was here too until 2026-08-12, blanket-xfailed for the
+# same live-stat-counter reason given below. That silenced diffs across the
+# WHOLE page — layout, model cards, structure included — not just the counters.
+# Fixed properly instead: `route_masks()` (utils/visual_guards) masks just
+# `.metric-card-value` and the live evaluations table, verified against the live
+# DOM logged in as TEST_EMAIL_2. It's now a real hard assertion again, matching
+# the desktop suite. `evaluations_list` / `models_list` remain here unmasked —
+# out of scope for that fix; they'd need the same treatment before removal.
 _NON_DETERMINISTIC_RESPONSIVE = {
-    "ai_maker_dashboard",
     "evaluations_list",
     "models_list",
 }
@@ -125,7 +125,7 @@ _NON_DETERMINISTIC_RESPONSIVE = {
 _OVERFLOW_TOLERANCE_PX = 2
 
 
-def _capture_responsive(page, path: str):
+def _capture_responsive(page, path: str, name: str):
     """Capture `path`, skipping when the render can't be trusted.
 
     Returns the PIL image. Skips (never fails) on an untrustworthy capture, for
@@ -133,9 +133,7 @@ def _capture_responsive(page, path: str):
     pixels change?" question was never asked.
     """
     try:
-        img = _capture_page_masked(
-            page, Config.url(path), DEFAULT_MASKS + AUTH_PII_MASKS
-        )
+        img = _capture_page_masked(page, Config.url(path), route_masks(name))
     except Exception as exc:  # noqa: BLE001 — mirrors the desktop suite's handling
         pytest.skip(
             f"Could not capture {path}: {exc}. "
@@ -171,7 +169,7 @@ class TestResponsiveAuthenticatedVisuals:
             browser, authenticated_storage_state, width, height
         )
         try:
-            img = _capture_responsive(page, path)
+            img = _capture_responsive(page, path, name)
             snapshot = f"auth_{name}_{viewport}_{width}x{height}"
 
             if name in _NON_DETERMINISTIC_RESPONSIVE:
