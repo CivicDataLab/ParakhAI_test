@@ -95,16 +95,42 @@ was confounded by an unrelated CI run hitting the same backend at the same
 time (this branch has an open PR into `main`, so every push auto-triggers a
 run), so it wasn't treated as conclusive on its own.
 
-The real in-CI test started failing within ~13 minutes. Reverted immediately
-on report; the run was cancelled rather than left to finish, so there is
-**no captured job log of the actual failure mode** — that's the gap to close
-before trying again, not a reason to assume the theory was wrong. Also
-observed: because `visual-tests` only depends on `accessibility-tests` (not
-`api-tests`), making accessibility fast + independent had a wider blast
+The real in-CI test started failing within ~13 minutes. Reverted on report;
+`api-tests` was cancelled at 20m29s (vs a 6m31s clean baseline — 3x+), and
+`accessibility-tests` + `visual-tests` both actually completed *successfully*
+despite running concurrently with it — the slowdown/failures were
+concentrated in `api-tests`, not universal.
+
+**Corrected 2026-08-12, after pulling the cancelled job's partial log**
+(`gh api repos/.../actions/jobs/<id>/logs` — GitHub retains whatever a job
+uploaded before it was killed): there IS a captured failure, and it's
+diagnostic. `tests/api/test_audit_detail_api.py` — several tests sharing
+fixture-heavy queries — failed together in sequence:
+
+```
+11:23:01Z RERUN
+11:24:04Z RERUN   (~63s later)
+11:25:05Z FAILED  (~61s later)
+```
+
+~60s between each attempt before it failed/retried is a timeout signature,
+not an assertion bug — matches bug #3's fingerprint exactly (dev backend
+overwhelmed under concurrent load), reproducing under Docker just as it did
+under `runserver`. So: the Docker migration + #13/#14 fixes were NOT
+sufficient to make this pairing safe. `accessibility-tests`/`visual-tests`
+being fine is consistent with `api-tests`' fixture-heavy queries being the
+specific concurrency-sensitive load, not the whole suite.
+
+Also observed: because `visual-tests` only depends on `accessibility-tests`
+(not `api-tests`), making accessibility fast + independent had a wider blast
 radius than intended — `visual-tests` started overlapping with `api-tests`
 too, not just accessibility. Any re-attempt should account for that
 cascading effect, not just the two jobs whose `needs:` actually changed.
 
-**Before re-attempting:** get a completed (not cancelled) run's job logs
-first, so the failure signature can actually be diagnosed — same-shape
-ReadTimeouts as bug #3, or something new post-Docker-migration.
+**Before re-attempting:** the failure signature is now known (timeout-driven
+RERUN/RERUN/FAILED clusters on fixture-heavy `tests/api/test_audit_detail_api.py`
+queries, ~60s per stalled attempt). A re-attempt should watch specifically for
+recurrence of that exact pattern rather than treating a generic "it failed"
+as sufficient — and should isolate whether it's `api-tests`' fixture load
+specifically, since `accessibility-tests`/`visual-tests` showed no such
+symptom running concurrently with it in this same run.
