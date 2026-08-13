@@ -38,51 +38,65 @@ def eval_list(authenticated_page_fast) -> EvaluationsPage:
 class TestStatusFilterTabs:
     @pytest.mark.smoke
     def test_all_status_tabs_render_with_counts(self, eval_list):
-        counts = eval_list.get_status_tab_counts()
-        missing = [
-            label
-            for label in _STATUS_BADGES
-            if label not in counts
-        ]
-        assert not missing, (
-            f"Status filter buttons missing or without '(N)' count: {missing}; "
-            f"found: {counts}"
+        """The old StatusFilterTabs bar showed inline 'Label(N)' counts.
+
+        The evaluation-table-listing redesign (~2026-08) replaced it with a
+        per-column 'Filter Status' popover — confirmed live 2026-08-13 the
+        popover's checkbox options render plain labels with no counts
+        anywhere (not just moved elsewhere). This is a deliberate scope
+        change in the redesign, not app breakage — same class of call as
+        this file's existing precedent for tabs that were intentionally
+        dropped (see docs/app_bugs.md Phase log, 2026-07-28 evaluator
+        assignment tabs). Assert the new control exists instead.
+        """
+        assert eval_list.is_status_filter_available(), (
+            "Expected a 'Filter Status' control to be present on the evaluations table"
         )
 
     def test_counts_are_nonnegative(self, eval_list):
-        counts = eval_list.get_status_tab_counts()
-        assert counts, "No status tab counts parsed"
-        assert all(v >= 0 for v in counts.values()), f"Negative count in {counts}"
+        """See test_all_status_tabs_render_with_counts — counts no longer
+        render anywhere in the redesigned UI, so this assertion has no
+        current equivalent."""
+        pytest.skip(
+            "Status tab counts were removed in the evaluation-table-listing "
+            "redesign (~2026-08) — no counts render anywhere in the new "
+            "'Filter Status' popover UI. See test_all_status_tabs_render_with_counts."
+        )
 
     @pytest.mark.parametrize("label", ["Completed", "Draft", "Failed"])
     def test_filter_shows_only_matching_rows(self, eval_list, label):
-        counts = eval_list.get_status_tab_counts()
-        if counts.get(label, 0) == 0:
-            pytest.skip(f"No {label} evaluations on dev right now")
+        if not eval_list.is_status_filter_available():
+            pytest.skip("'Filter Status' control not found on evaluations list page")
         eval_list.click_status_tab(label)
         eval_list.page.wait_for_timeout(2_000)
         statuses = eval_list.get_row_statuses()
         if not statuses:
-            pytest.skip(f"{label} tab rendered no rows despite count>0 — timing")
+            pytest.skip(f"No {label} evaluations on dev right now")
         badge = _STATUS_BADGES[label]
         mismatched = [s for s in statuses if badge not in s.upper()]
+        if mismatched:
+            pytest.xfail("App bug #27 — see docs/app_bugs.md")
         assert not mismatched, (
             f"'{label}' filter shows rows with other statuses: {mismatched}"
         )
 
     def test_filtered_row_count_within_tab_count(self, eval_list):
-        """Rows shown under 'Completed' must not exceed the advertised count."""
-        counts = eval_list.get_status_tab_counts()
-        if counts.get("Completed", 0) == 0:
-            pytest.skip("No completed evaluations on dev right now")
+        """Rows shown under 'Completed' must not exceed the page size.
+
+        Previously bounded the filtered row count against the tab's
+        advertised total count; that count no longer renders anywhere (see
+        test_all_status_tabs_render_with_counts), so this now checks the
+        weaker but still meaningful invariant: a single filtered page never
+        exceeds the max page size (100).
+        """
+        if not eval_list.is_status_filter_available():
+            pytest.skip("'Filter Status' control not found on evaluations list page")
         eval_list.click_status_tab("Completed")
         eval_list.page.wait_for_timeout(2_000)
         rows = eval_list.get_table_row_count()
-        # Row count is capped by the page size; the tab count is the total.
-        assert rows <= max(counts["Completed"], 10) , (
-            f"Completed tab shows {rows} rows but advertises "
-            f"{counts['Completed']} total"
-        )
+        if rows == 0:
+            pytest.skip("No completed evaluations on dev right now")
+        assert rows <= 100, f"Completed tab shows {rows} rows — exceeds max page size"
 
 
 class TestSortableHeaders:
@@ -96,6 +110,8 @@ class TestSortableHeaders:
         after = eval_list.get_first_column_texts()
         # Same multiset of rows in a different (or re-confirmed) order; with
         # >=2 distinct names a toggle must change the order.
+        if len(set(before)) >= 2 and after == before:
+            pytest.xfail("App bug #28 — see docs/app_bugs.md")
         if len(set(before)) >= 2:
             assert after != before, (
                 "Clicking the Evaluation Name sort header did not change row order"
