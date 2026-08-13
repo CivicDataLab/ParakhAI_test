@@ -269,12 +269,22 @@ class NewEvaluationPage(BasePage):
         sel = value_map.get(eval_type.lower(), value_map["technical"])
         self.page.locator(sel).first.check()
 
+    # DOM `value`s are the backend enum (TECHNICAL_AUDIT/DOMAIN_AUDIT/
+    # CULTURAL_AUDIT); map back to the human-readable label the UI shows
+    # and tests assert against. See locators/evaluations_locators.py.
+    _EVALUATOR_TYPE_LABELS = {
+        "TECHNICAL_AUDIT": "Technical",
+        "DOMAIN_AUDIT": "Domain",
+        "CULTURAL_AUDIT": "Cultural",
+    }
+
     def get_checked_evaluator_type(self) -> str | None:
-        """Return the value (Technical/Domain/Cultural) of the checked step-2 radio."""
+        """Return the label (Technical/Domain/Cultural) of the checked step-2 radio."""
         radios = self.page.locator(EvaluationsLocators.MODAL_EVALUATOR_TYPE_RADIO).all()
         for r in radios:
             if r.is_checked():
-                return r.get_attribute("value")
+                raw = r.get_attribute("value")
+                return self._EVALUATOR_TYPE_LABELS.get(raw, raw)
         return None
 
     def fill_modal_objective(self, objective: str) -> None:

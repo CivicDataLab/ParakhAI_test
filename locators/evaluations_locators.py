@@ -96,12 +96,17 @@ class EvaluationsLocators:
     )
     MODAL_LOADING_MODELS = "[role='dialog'] :text('Loading models')"
 
-    # Step-2 evaluator-type radios (values: Technical / Domain / Cultural;
-    # Technical is checked by default).
+    # Step-2 evaluator-type radios. DOM `value`s are the backend enum
+    # (TECHNICAL_AUDIT / DOMAIN_AUDIT / CULTURAL_AUDIT), not the display
+    # label — confirmed via live DOM dump 2026-08-13 (previously plain
+    # 'Technical' / 'Domain' / 'Cultural', now drifted to the _AUDIT suffix
+    # form). TECHNICAL_AUDIT is checked by default. See
+    # NewEvaluationPage.get_checked_evaluator_type() for the reverse mapping
+    # back to the human-readable label tests assert against.
     MODAL_EVALUATOR_TYPE_RADIO = "input[name='evaluatorType']"
-    MODAL_EVALUATOR_TECHNICAL = "input[name='evaluatorType'][value='Technical']"
-    MODAL_EVALUATOR_DOMAIN = "input[name='evaluatorType'][value='Domain']"
-    MODAL_EVALUATOR_CULTURAL = "input[name='evaluatorType'][value='Cultural']"
+    MODAL_EVALUATOR_TECHNICAL = "input[name='evaluatorType'][value='TECHNICAL_AUDIT']"
+    MODAL_EVALUATOR_DOMAIN = "input[name='evaluatorType'][value='DOMAIN_AUDIT']"
+    MODAL_EVALUATOR_CULTURAL = "input[name='evaluatorType'][value='CULTURAL_AUDIT']"
     # Step-2 objective textarea — required; Start Evaluation stays disabled
     # while it is empty.
     MODAL_OBJECTIVE_TEXTAREA = "[role='dialog'] textarea"
