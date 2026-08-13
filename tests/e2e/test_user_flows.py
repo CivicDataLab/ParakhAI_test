@@ -263,6 +263,11 @@ class TestFlow04_EvaluationDetailAndReport:
     @pytest.mark.xfail(
         reason="App bug #15 — deep-link navigation to evaluation detail "
         "intermittently renders the public homepage instead. See docs/app_bugs.md.",
+        # ~50% hit rate per the ledger, not "always reproduces" — strict=False
+        # so a lucky run's XPASS doesn't fail the suite. Same convention as
+        # bug #14's xfails (docs/app_bugs.md); confirmed live 2026-08-13 this
+        # one was still missing it and XPASS(strict) broke the run.
+        strict=False,
     )
     def test_evaluation_detail_shows_full_results(self, page: Page, completed_eval_id: int):
         """A COMPLETED evaluation's detail shows overview, summary, risks, and modules."""
