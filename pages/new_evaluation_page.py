@@ -226,16 +226,25 @@ class NewEvaluationPage(BasePage):
         loc.wait_for(state="visible", timeout=self.timeout)
         loc.fill(name)
 
+    # Callers use 'bulk'/'manual' as the public method name; the DOM `value`
+    # attribute for the Playground radio drifted to 'playground' (confirmed
+    # via origin/dev source 2026-08-13 — 'bulk' is unchanged). Translate here
+    # so the public 'bulk'/'manual' API doesn't need touching at ~20 call
+    # sites across the suite.
+    _EVAL_METHOD_DOM_VALUES = {"bulk": "bulk", "manual": "playground"}
+
     def select_evaluation_method(self, method: str = "bulk") -> None:
         """Select the evaluation-method radio in step 1: 'bulk' or 'manual' (Playground)."""
+        dom_value = self._EVAL_METHOD_DOM_VALUES.get(method, method)
         self.page.locator(
-            f"input[name='evaluationMethod'][value='{method}']"
+            f"input[name='evaluationMethod'][value='{dom_value}']"
         ).click()
 
     def is_method_selected(self, method: str) -> bool:
         """Return True if the given evaluation-method radio is checked."""
+        dom_value = self._EVAL_METHOD_DOM_VALUES.get(method, method)
         return self.page.locator(
-            f"input[name='evaluationMethod'][value='{method}']"
+            f"input[name='evaluationMethod'][value='{dom_value}']"
         ).is_checked()
 
     def click_modal_next(self) -> NewEvaluationPage:
