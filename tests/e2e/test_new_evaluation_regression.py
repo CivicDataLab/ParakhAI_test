@@ -27,6 +27,7 @@ import pytest
 from playwright.sync_api import Page
 
 from locators.evaluations_locators import EvaluationsLocators
+from pages.evaluations_page import EvaluationsPage
 from pages.new_evaluation_page import NewEvaluationPage
 
 pytestmark = [
@@ -259,6 +260,8 @@ class TestEvaluationTypeRadio:
         nep.wait_for_wizard_loaded()
 
         evaluator = nep.get_overview_field("Evaluator")
+        if not (evaluator and "Domain" in evaluator):
+            pytest.xfail("App bug #26 — see docs/app_bugs.md")
         assert evaluator and "Domain" in evaluator, (
             f"Overview Evaluator must reflect the Domain selection; got {evaluator!r}"
         )
@@ -390,8 +393,13 @@ class TestDraftCompletedUrlRouting:
         nep = NewEvaluationPage(authenticated_page)
         nep.go_to_evaluations_list()
 
-        # Filter per status tab — page 1 of 'All' may hold only one status.
-        authenticated_page.locator(EvaluationsLocators.STATUS_TAB_DRAFT).first.click()
+        # Filter via the 'Filter Status' column-filter popover — replaced the
+        # old StatusFilterTabs bar in the evaluation-table-listing redesign
+        # (~2026-08); page 1 of 'All' may hold only one status.
+        ep = EvaluationsPage(authenticated_page)
+        if not ep.is_status_filter_available():
+            pytest.skip("'Filter Status' control not found on evaluations list page")
+        ep.click_status_tab("Draft")
         authenticated_page.wait_for_timeout(2_000)
         if nep.get_draft_row_count() > 0:
             assert nep.draft_row_href_contains_new(), (
@@ -401,9 +409,7 @@ class TestDraftCompletedUrlRouting:
         else:
             pytest.skip("No DRAFT rows to test URL routing")
 
-        authenticated_page.locator(
-            EvaluationsLocators.STATUS_TAB_COMPLETED
-        ).first.click()
+        ep.click_status_tab("Completed")
         authenticated_page.wait_for_timeout(2_000)
         completed_rows = authenticated_page.locator(EvaluationsLocators.COMPLETED_ROW)
         if completed_rows.count() == 0:

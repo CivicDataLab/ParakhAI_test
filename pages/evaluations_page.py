@@ -69,11 +69,25 @@ class EvaluationsPage(BasePage):
         (~2026-08) — confirmed live 2026-08-13. Opens the 'Filter Status'
         popover, checks the matching option, and clicks Apply. 'All' clears
         any active filter instead (there's no 'All' checkbox anymore).
+
+        The popover is a multi-select checkbox group, not mutually-exclusive
+        tabs — calling this twice with different labels would otherwise
+        ADD the second status rather than switching to it. Uncheck every
+        currently-checked box first so callers get tab-like single-select
+        behaviour, matching what every caller of this method expects.
         """
         self.page.locator(EvaluationsLocators.FILTER_STATUS_BUTTON).click()
         self.page.locator(EvaluationsLocators.FILTER_DIALOG).first.wait_for(
             state="visible", timeout=5_000
         )
+        # Capture handles up front — the locator is live and re-filters on
+        # [aria-checked='true'], so clicking one while iterating by index
+        # would skip the next as the matching set shrinks underneath it.
+        checked_handles = self.page.locator(
+            f"{EvaluationsLocators.FILTER_DIALOG} [role='checkbox'][aria-checked='true']"
+        ).all()
+        for handle in checked_handles:
+            handle.click()
         if status == "All":
             clear_btn = self.page.locator(EvaluationsLocators.FILTER_CLEAR_BUTTON).first
             if clear_btn.is_visible() and clear_btn.get_attribute("aria-disabled") != "true":
