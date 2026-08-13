@@ -230,14 +230,27 @@ class TestBulkDraftPersistence:
         )
         audit_id = nep.get_audit_id_from_url()
         nep.click_back_to_list()
-        nep.page.locator(EvaluationsLocators.STATUS_TAB_DRAFT).first.click()
-        nep.page.wait_for_timeout(2_000)
-        # Parallel workers also create drafts, so don't assume ours is the
-        # first row — find its wizard link by auditId anywhere in the tab.
+        # The status-filter tab bar (STATUS_TAB_*) was removed in the
+        # evaluation-table-listing redesign (~2026-08) in favour of a
+        # per-column filter on the DataTable — confirmed live 2026-08-13
+        # (STATUS_TAB_DRAFT/ALL/[role='tab'] all count 0 on both a fresh
+        # nav and post-Back-to-List). The default (unfiltered) list is
+        # sorted most-recent-first, so the just-created draft is already
+        # visible without filtering. Wait for OUR row specifically (not just
+        # any row) — the table can render its first (stale/cached) page
+        # before the freshly-created draft has synced in, confirmed live
+        # 2026-08-13 (needed ~8s after Back to List for the new row to
+        # appear even though generic rows render almost immediately).
         our_link = nep.page.locator(f"a[href*='auditId={audit_id}']")
+        try:
+            our_link.first.wait_for(state="attached", timeout=15_000)
+        except Exception:
+            pass
+        # Parallel workers also create drafts, so don't assume ours is the
+        # first row — find its wizard link by auditId anywhere in the list.
         assert our_link.count() > 0, (
             f"The just-created draft (auditId={audit_id}) must appear in the "
-            "Draft tab with a wizard link"
+            "evaluations list with a wizard link"
         )
         href = our_link.first.get_attribute("href") or ""
         assert "/evaluations/new" in href, (
