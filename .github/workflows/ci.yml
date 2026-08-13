@@ -7,6 +7,24 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# One run at a time per PR (or per branch/ref for push/workflow_dispatch).
+# Added 2026-08-12: rapid pushes to an open PR were each auto-triggering a
+# full run, and because this workflow shares one dev backend across every
+# run (not just within a run), overlapping runs contended with each other -
+# api-tests took 42m26s against a 6m31s baseline while two runs overlapped
+# (see docs/ci_workflow_notes.md). cancel-in-progress means a new push
+# supersedes the old run's results immediately rather than letting a stale
+# commit's run keep consuming the shared backend.
+#
+# Caveat worth watching: jobs using `if: always()` (accessibility-tests,
+# visual-tests, test-summary) are documented to sometimes ignore workflow
+# cancellation and start anyway even after the run is marked cancelled -
+# they're already paired with explicit timeout-minutes as the backstop for
+# that, but verify a real cancelled run to confirm behavior, don't assume.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
