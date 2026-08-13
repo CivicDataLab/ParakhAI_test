@@ -85,8 +85,10 @@ class EvaluationsLocators:
     MODAL_MODEL_DROPDOWN = "select[name='modelSelect']"
     MODAL_VERSION_DROPDOWN = "select[name='versionSelect']"
     MODAL_EVAL_NAME_INPUT = "input[name='evaluationName']"
+    # Playground radio's DOM value drifted to 'playground' (was 'manual');
+    # confirmed via origin/dev source 2026-08-13. Bulk unchanged.
     MODAL_EVAL_METHOD_BULK = "input[name='evaluationMethod'][value='bulk']"
-    MODAL_EVAL_METHOD_PLAYGROUND = "input[name='evaluationMethod'][value='manual']"
+    MODAL_EVAL_METHOD_PLAYGROUND = "input[name='evaluationMethod'][value='playground']"
     MODAL_NEXT_BUTTON = "[role='dialog'] button:has-text('Next')"
     MODAL_BACK_BUTTON = "[role='dialog'] button:has-text('Back')"
     MODAL_START_BUTTON = "[role='dialog'] button:has-text('Start Evaluation')"
