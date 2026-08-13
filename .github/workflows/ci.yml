@@ -16,11 +16,15 @@ on:
 # supersedes the old run's results immediately rather than letting a stale
 # commit's run keep consuming the shared backend.
 #
-# Caveat worth watching: jobs using `if: always()` (accessibility-tests,
-# visual-tests, test-summary) are documented to sometimes ignore workflow
-# cancellation and start anyway even after the run is marked cancelled -
-# they're already paired with explicit timeout-minutes as the backstop for
-# that, but verify a real cancelled run to confirm behavior, don't assume.
+# Verified live 2026-08-12 that `if: always()` on a job ignores workflow
+# cancellation and lets it start anyway even after the run is marked
+# cancelled: api-tests correctly cancelled, but accessibility-tests (then
+# `if: always()`) started right after and kept running against the shared
+# backend regardless. Removed always() from the actual test jobs
+# (accessibility-tests, visual-tests) so they respect cancellation via
+# default success()-gating. test-summary still needs always() (it must
+# tolerate e2e-tests' deliberate skip while paused) - paired with
+# !cancelled() there instead of removing it outright.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -146,10 +150,13 @@ jobs:
     name: E2E Tests (shard ${{ matrix.shard }}/${{ strategy.job-total }})
     runs-on: ubuntu-latest
     needs: visual-tests
-    # PAUSED 2026-08-11 — remove this line (restoring `if: always()`) to
-    # resume. test-summary's E2E-report steps are guarded on
-    # `needs.e2e-tests.result != 'skipped'` and degrade cleanly while this
-    # is off.
+    # PAUSED 2026-08-11 — remove this line to resume. test-summary's
+    # E2E-report steps are guarded on `needs.e2e-tests.result != 'skipped'`
+    # and degrade cleanly while this is off. Do NOT restore `if: always()`
+    # (that was the original value) — removed the same pattern from
+    # accessibility-tests/visual-tests 2026-08-12 after verifying live that
+    # it ignores workflow cancellation; default success()-gating is correct
+    # here for the same reason.
     if: false
     timeout-minutes: 60
     strategy:
@@ -204,7 +211,14 @@ jobs:
     name: Accessibility Tests (axe)
     runs-on: ubuntu-latest
     needs: api-tests
-    if: always()
+    # No if: always() here on purpose (removed 2026-08-12) - it was letting
+    # this job start even after the run was cancelled (verified live: a
+    # superseded run's api-tests correctly cancelled, but this job ignored
+    # that and kept running against the shared backend for up to its
+    # timeout). Every test step already uses continue-on-error, so
+    # api-tests' job conclusion is "success" even when its tests fail -
+    # default gating only actually skips this job on a genuine infra
+    # failure or cancellation, both cases where skipping is correct.
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
@@ -249,7 +263,8 @@ jobs:
     name: Visual Regression Tests
     runs-on: ubuntu-latest
     needs: accessibility-tests
-    if: always()
+    # No if: always() here either - see the comment on accessibility-tests'
+    # if: line above; same reasoning applies.
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
@@ -320,7 +335,14 @@ jobs:
     name: Test Summary
     runs-on: ubuntu-latest
     needs: [api-tests, e2e-tests, accessibility-tests, visual-tests]
-    if: always()
+    # Kept always() here (unlike the test jobs above) because this is the
+    # reporting job, not a test job - it must still run while e2e-tests is
+    # deliberately paused (if: false -> always "skipped", and default
+    # success() gating treats a skipped dependency as not-satisfied, which
+    # would stop this job from running at all). Paired with !cancelled() so
+    # it still respects a real concurrency-group cancellation rather than
+    # repeating the bug just fixed on the test jobs.
+    if: always() && !cancelled()
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
