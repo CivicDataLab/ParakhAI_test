@@ -18,13 +18,14 @@ class EvaluationsLocators:
     EVAL_COMPLETED_COL = "th:text('Completed'), :text('Completed')"
 
     # ── Status filter tabs (StatusFilterTabs component — Jun 2026) ───────────
-    # As of late Jun 2026 the component renders 9 tabs:
-    #   All | Draft | Queued | Running | In Progress | Pending Review | Completed | Failed | Cancelled
-    # Use :has-text for substring match so count badges ("Draft(40)") still match.
+    # REMOVED in the evaluation-table-listing redesign (~2026-08): the tab bar
+    # is gone. Status filtering now lives in a per-column filter popover on
+    # the DataTable (see FILTER_STATUS_BUTTON below) — confirmed live
+    # 2026-08-13 (button/[role='tab'] counts are 0 for all of these on both a
+    # fresh nav and a post-navigation SPA transition). Kept as dead constants
+    # only so any external reference doesn't hard-crash; do not use in new code.
     STATUS_TAB_ALL = "button:has-text('All'), [role='tab']:has-text('All')"
     STATUS_TAB_DRAFT = "button:has-text('Draft'), [role='tab']:has-text('Draft')"
-    # "Pending" is now split into "Queued" and "Pending Review" — keep old selector
-    # as a broad fallback and add the specific new ones.
     STATUS_TAB_PENDING = "button:has-text('Pending'), [role='tab']:has-text('Pending')"
     STATUS_TAB_QUEUED = "button:has-text('Queued'), [role='tab']:has-text('Queued')"
     STATUS_TAB_IN_PROGRESS = "button:has-text('In Progress'), [role='tab']:has-text('In Progress')"
@@ -33,6 +34,17 @@ class EvaluationsLocators:
     STATUS_TAB_COMPLETED = "button:has-text('Completed'), [role='tab']:has-text('Completed')"
     STATUS_TAB_FAILED = "button:has-text('Failed'), [role='tab']:has-text('Failed')"
     STATUS_TAB_CANCELLED = "button:has-text('Cancelled'), [role='tab']:has-text('Cancelled')"
+
+    # ── Status column filter popover (replaces StatusFilterTabs, ~2026-08) ───
+    # DataTable columns each get a filter icon button (aria-label="Filter
+    # <Column>"); clicking it opens a [role='dialog'] with a checkbox per
+    # option (real <label for=...> pairs — click the label, not the Radix
+    # checkbox <button>) plus Clear/Apply actions. Apply starts aria-disabled
+    # until a checkbox changes. Confirmed live 2026-08-13.
+    FILTER_STATUS_BUTTON = "button[aria-label='Filter Status']"
+    FILTER_DIALOG = "[role='dialog']"
+    FILTER_APPLY_BUTTON = "[role='dialog'] button:has-text('Apply')"
+    FILTER_CLEAR_BUTTON = "[role='dialog'] button:has-text('Clear')"
 
     # ── List table controls (verified live 03 Jul 2026) ──────────────────────
     # Column headers are sort buttons (accessible text includes
