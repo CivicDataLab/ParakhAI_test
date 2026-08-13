@@ -364,7 +364,7 @@ jobs:
               "API=suite-artifacts/api.json" \
               "E2E=shard-artifacts/*/reports/e2e_shard_*.json" \
               "Accessibility=suite-artifacts/accessibility.json" \
-              "Visual Regression=suite-artifacts/visual.json"
+              "Visual Regression=suite-artifacts/reports/visual.json"
             echo ""
             echo "**Platform:** ${{ env.BASE_URL }}"
             echo ""
