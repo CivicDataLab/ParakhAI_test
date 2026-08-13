@@ -340,9 +340,11 @@ class TestPlatformIssuesExtended:
             "Must be read-only for all terminal statuses (COMPLETED, FAILED, CANCELLED)."
         )
 
-    @pytest.mark.xfail(reason="UX-013: No success toast after Add Evaluator — known bug")
     def test_ux013_add_evaluator_shows_success_feedback(self, authenticated_page_fast: Page):
-        """UX-013: Adding an evaluator must show a success toast/confirmation."""
+        """UX-013 (fixed 2026-08-13, re-verified live): a phantom success toast used
+        to appear even after cancelling the Add Evaluator dialog (i.e. success
+        feedback fired without the mutation completing). Live repro 2026-08-13
+        confirmed no toast appears after Cancel — xfail removed."""
         authenticated_page_fast.goto(Config.url("/dashboard/ai-maker/1/auditors"))
         authenticated_page_fast.wait_for_timeout(2000)
         add_btn = authenticated_page_fast.locator(
