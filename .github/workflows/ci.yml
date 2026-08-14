@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      run_all:
+        description: "Run every suite, bypassing path-based filtering"
+        type: boolean
+        required: false
+        default: false
 
 # One run at a time per PR (or per branch/ref for push/workflow_dispatch).
 # Added 2026-08-12: rapid pushes to an open PR were each auto-triggering a
@@ -65,6 +71,169 @@ env:
   SANDBOX_ORG_SLUG: ${{ vars.SANDBOX_ORG_SLUG }}
 
 jobs:
+  # ────────────────────────────────────────────── Change detection
+  # Added 2026-08-14 so a PR/push only runs the suites whose test code (or
+  # its actual dependencies) changed — a docs-only change now runs lint and
+  # nothing else, instead of the full ~25min chain every time.
+  #
+  # Every gated job below reads this job's outputs through its own `if:`.
+  # Two failure modes both have to make downstream jobs run, not skip:
+  #   1. This job is deliberately skipped (workflow_dispatch run_all=true) —
+  #      handled by the `if:` below, which skips this job entirely so
+  #      `needs.changes.result` becomes 'skipped'.
+  #   2. This action errors outright (e.g. dorny/paths-filter itself breaks)
+  #      — `needs.changes.result` becomes 'failure'.
+  # Every gated job's condition is `needs.changes.result != 'success' ||
+  # needs.changes.outputs.<category> == 'true'` — in both failure modes above
+  # the left side is true, so every suite runs (fail OPEN, not closed). A
+  # broken filter should never silently make every future PR pass CI having
+  # run zero tests.
+  changes:
+    name: Detect changed paths
+    runs-on: ubuntu-latest
+    if: github.event.inputs.run_all != 'true'
+    outputs:
+      api: ${{ steps.filter.outputs.api }}
+      accessibility: ${{ steps.filter.outputs.accessibility }}
+      visual: ${{ steps.filter.outputs.visual }}
+      performance: ${{ steps.filter.outputs.performance }}
+      load: ${{ steps.filter.outputs.load }}
+      e2e: ${{ steps.filter.outputs.e2e }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Filter changed paths by test category
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          # workflow_dispatch has no natural "changed since what" — diff
+          # against main so a manual run without run_all still filters
+          # sensibly instead of erroring.
+          base: ${{ github.event_name == 'workflow_dispatch' && 'main' || '' }}
+          # Each category repeats a shared "universal" block of files whose
+          # fixtures/imports every suite's test collection depends on
+          # (verified via grep, not guessed) rather than using YAML anchors
+          # to de-duplicate it — this is the first path-filtering this repo
+          # has had; a second layer of YAML-anchor indirection on top of an
+          # already-new pattern isn't worth the maintenance cost it adds.
+          filters: |
+            api:
+              - 'tests/api/**'
+              - 'tests/data/**'
+              - 'conftest.py'
+              - 'tests/conftest.py'
+              - 'utils/config.py'
+              - 'utils/helpers.py'
+              - 'utils/report_generator.py'
+              - 'pages/base_page.py'
+              - 'pages/home_page.py'
+              - 'pages/login_page.py'
+              - 'locators/home_locators.py'
+              - 'locators/login_locators.py'
+              - 'pytest.ini'
+              - 'pyproject.toml'
+              - 'requirements.txt'
+            accessibility:
+              - 'tests/accessibility/**'
+              - 'utils/reporters.py'
+              - 'conftest.py'
+              - 'tests/conftest.py'
+              - 'utils/config.py'
+              - 'utils/helpers.py'
+              - 'utils/report_generator.py'
+              - 'pages/base_page.py'
+              - 'pages/home_page.py'
+              - 'pages/login_page.py'
+              - 'locators/home_locators.py'
+              - 'locators/login_locators.py'
+              - 'pytest.ini'
+              - 'pyproject.toml'
+              - 'requirements.txt'
+            visual:
+              - 'tests/visual/**'
+              - 'pages/evaluator_role_page.py'
+              - 'pages/new_evaluation_page.py'
+              - 'locators/evaluations_locators.py'
+              - 'locators/evaluator_role_locators.py'
+              - 'utils/visual_guards.py'
+              - 'conftest.py'
+              - 'tests/conftest.py'
+              - 'utils/config.py'
+              - 'utils/helpers.py'
+              - 'utils/report_generator.py'
+              - 'pages/base_page.py'
+              - 'pages/home_page.py'
+              - 'pages/login_page.py'
+              - 'locators/home_locators.py'
+              - 'locators/login_locators.py'
+              - 'pytest.ini'
+              - 'pyproject.toml'
+              - 'requirements.txt'
+            performance:
+              - 'tests/performance/**'
+              - 'pages/dashboard_page.py'
+              - 'pages/new_evaluation_page.py'
+              - 'utils/reporters.py'
+              - 'conftest.py'
+              - 'tests/conftest.py'
+              - 'utils/config.py'
+              - 'utils/helpers.py'
+              - 'utils/report_generator.py'
+              - 'pages/base_page.py'
+              - 'pages/home_page.py'
+              - 'pages/login_page.py'
+              - 'locators/home_locators.py'
+              - 'locators/login_locators.py'
+              - 'pytest.ini'
+              - 'pyproject.toml'
+              - 'requirements.txt'
+            load:
+              - 'tests/load/**'
+              - 'tests/data/**'
+              - 'pages/evaluations_page.py'
+              - 'pages/new_evaluation_page.py'
+              - 'locators/evaluations_locators.py'
+              - 'utils/reporters.py'
+              - 'conftest.py'
+              - 'tests/conftest.py'
+              - 'utils/config.py'
+              - 'utils/helpers.py'
+              - 'utils/report_generator.py'
+              - 'pages/base_page.py'
+              - 'pages/home_page.py'
+              - 'pages/login_page.py'
+              - 'locators/home_locators.py'
+              - 'locators/login_locators.py'
+              - 'pytest.ini'
+              - 'pyproject.toml'
+              - 'requirements.txt'
+            e2e:
+              - 'tests/e2e/**'
+              - 'tests/data/**'
+              - 'pages/**'
+              - 'locators/add_model_flow_locators.py'
+              - 'locators/dashboard_locators.py'
+              - 'locators/evaluation_detail_locators.py'
+              - 'locators/evaluations_locators.py'
+              - 'locators/evaluator_role_locators.py'
+              - 'locators/evaluators_locators.py'
+              - 'locators/models_locators.py'
+              - 'locators/prompt_libraries_locators.py'
+              - 'utils/test_data_factory.py'
+              - 'conftest.py'
+              - 'tests/conftest.py'
+              - 'utils/config.py'
+              - 'utils/helpers.py'
+              - 'utils/report_generator.py'
+              - 'pages/base_page.py'
+              - 'pages/home_page.py'
+              - 'pages/login_page.py'
+              - 'locators/home_locators.py'
+              - 'locators/login_locators.py'
+              - 'pytest.ini'
+              - 'pyproject.toml'
+              - 'requirements.txt'
+
   # ────────────────────────────────────────────── Lint
   lint:
     name: Lint (ruff)
