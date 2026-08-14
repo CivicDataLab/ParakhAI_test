@@ -59,30 +59,12 @@ def _load(pattern: str) -> tuple[dict[str, int], float, str | None]:
     return counts, duration, None
 
 
-def _unmask(s: str) -> str:
-    """Join *s* with zero-width spaces so it survives GitHub's log masking.
-
-    GitHub Actions replaces any exact substring of workflow output that
-    matches a configured secret's value with "***" - wherever it appears, not
-    just where the secret was meant to be used. Some secret here (repo-level,
-    value unknown - secrets are write-only, not even readable via `gh`)
-    happens to be a short string that collides with substrings of real test
-    counts, so numbers in this table showed up partially masked (e.g. "176"
-    rendered as "***76") regardless of what actually ran. A zero-width space
-    (U+200B) between every character breaks the contiguous-substring match
-    masking relies on, while rendering identically to a human: invisible in
-    both GitHub's Markdown-rendered summary and a plain-text copy/paste.
-    """
-    zero_width_space = chr(0x200B)  # explicit codepoint - never a literal invisible char in source
-    return zero_width_space.join(s)
-
-
 def _status(counts: dict[str, int], error: str | None) -> str:
     if error:
         return f"⚠️ {error}"
     failed = counts.get("failed", 0) + counts.get("error", 0)
     if failed:
-        return f"❌ {_unmask(str(failed))} failed"
+        return f"❌ {failed} failed"
     executed = counts.get("passed", 0) + counts.get("xpassed", 0) + failed
     if executed == 0:
         # An all-skipped suite is not a pass. This is how an environment outage
@@ -118,13 +100,11 @@ def main(argv: list[str]) -> int:
             any_failure = True
 
         cells = [
-            _unmask(str(counts.get(key, 0))) if counts else "—"
+            str(counts.get(key, 0)) if counts else "—"
             for key in ("passed", "failed", "skipped", "xfailed", "error")
         ]
         rows.append(
-            f"| {label} | {status} | "
-            + " | ".join(cells)
-            + f" | {_unmask(_fmt_duration(duration))} |"
+            f"| {label} | {status} | " + " | ".join(cells) + f" | {_fmt_duration(duration)} |"
         )
 
     print("| Suite | Status | ✅ | ❌ | ⏭️ | 🔶 xfail | 💥 | Duration |")
