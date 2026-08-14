@@ -280,7 +280,17 @@ jobs:
   api-tests:
     name: API Tests
     runs-on: ubuntu-latest
-    needs: lint
+    needs: [lint, changes]
+    # Path-filtered 2026-08-14 — see the `changes` job's header comment for
+    # the fail-open contract. `always() && !cancelled()` (not bare always())
+    # is required so this job is still *evaluated* when path-filtered suites
+    # ahead of it in the chain get skipped, while still respecting a real
+    # concurrency-group cancellation — the same proven-safe pairing already
+    # used on test-summary; bare always() was proven unsafe here 2026-08-12.
+    if: |
+      always() && !cancelled() &&
+      needs.lint.result == 'success' &&
+      (needs.changes.result != 'success' || needs.changes.outputs.api == 'true')
     steps:
       - uses: actions/checkout@v6
 
