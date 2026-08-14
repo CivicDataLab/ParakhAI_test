@@ -643,7 +643,7 @@ jobs:
   test-summary:
     name: Test Summary
     runs-on: ubuntu-latest
-    needs: [api-tests, e2e-tests, accessibility-tests, visual-tests]
+    needs: [api-tests, e2e-tests, accessibility-tests, visual-tests, performance-tests, load-tests]
     # Kept always() here (unlike the test jobs above) because this is the
     # reporting job, not a test job - it must still run while e2e-tests is
     # deliberately paused (if: false -> always "skipped", and default
@@ -713,7 +713,9 @@ jobs:
               "API=suite-artifacts/api.json" \
               "E2E=shard-artifacts/*/reports/e2e_shard_*.json" \
               "Accessibility=suite-artifacts/accessibility.json" \
-              "Visual Regression=suite-artifacts/reports/visual.json"
+              "Visual Regression=suite-artifacts/reports/visual.json" \
+              "Performance=suite-artifacts/performance.json" \
+              "Load=suite-artifacts/load.json"
             echo ""
             echo "**Platform:** ${{ env.BASE_URL }}"
             echo ""
@@ -725,6 +727,8 @@ jobs:
             echo "| E2E Tests | ${{ needs.e2e-tests.result }} |"
             echo "| Accessibility | ${{ needs.accessibility-tests.result }} |"
             echo "| Visual Regression | ${{ needs.visual-tests.result }} |"
+            echo "| Performance | ${{ needs.performance-tests.result }} |"
+            echo "| Load | ${{ needs.load-tests.result }} |"
             echo ""
             echo "</details>"
           } >> "$GITHUB_STEP_SUMMARY"
