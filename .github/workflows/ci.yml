@@ -396,15 +396,20 @@ jobs:
   accessibility-tests:
     name: Accessibility Tests (axe)
     runs-on: ubuntu-latest
-    needs: api-tests
-    # No if: always() here on purpose (removed 2026-08-12) - it was letting
-    # this job start even after the run was cancelled (verified live: a
-    # superseded run's api-tests correctly cancelled, but this job ignored
-    # that and kept running against the shared backend for up to its
-    # timeout). Every test step already uses continue-on-error, so
-    # api-tests' job conclusion is "success" even when its tests fail -
-    # default gating only actually skips this job on a genuine infra
-    # failure or cancellation, both cases where skipping is correct.
+    needs: [lint, api-tests, changes]
+    # Path-filtered 2026-08-14 — brings back an explicit `if:` (removed
+    # 2026-08-12 when bare always() was found to ignore cancellation; see
+    # api-tests' comment above for why always()+!cancelled() is safe where
+    # bare always() wasn't). needs.lint.result is checked directly (not just
+    # inferred via api-tests) because a skipped api-tests is ambiguous by
+    # itself — it means EITHER "path filter didn't match" (fine) OR "lint
+    # failed upstream and this cascaded" (must NOT run). Only a direct,
+    # unfiltered check against lint disambiguates that.
+    if: |
+      always() && !cancelled() &&
+      needs.lint.result == 'success' &&
+      (needs.api-tests.result == 'success' || needs.api-tests.result == 'skipped') &&
+      (needs.changes.result != 'success' || needs.changes.outputs.accessibility == 'true')
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
@@ -448,9 +453,13 @@ jobs:
   visual-tests:
     name: Visual Regression Tests
     runs-on: ubuntu-latest
-    needs: accessibility-tests
-    # No if: always() here either - see the comment on accessibility-tests'
-    # if: line above; same reasoning applies.
+    needs: [lint, accessibility-tests, changes]
+    # Path-filtered 2026-08-14 — same pattern as accessibility-tests above.
+    if: |
+      always() && !cancelled() &&
+      needs.lint.result == 'success' &&
+      (needs.accessibility-tests.result == 'success' || needs.accessibility-tests.result == 'skipped') &&
+      (needs.changes.result != 'success' || needs.changes.outputs.visual == 'true')
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
