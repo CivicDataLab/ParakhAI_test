@@ -226,16 +226,25 @@ class NewEvaluationPage(BasePage):
         loc.wait_for(state="visible", timeout=self.timeout)
         loc.fill(name)
 
+    # Callers use 'bulk'/'manual' as the public method name; the DOM `value`
+    # attribute for the Playground radio drifted to 'playground' (confirmed
+    # via origin/dev source 2026-08-13 — 'bulk' is unchanged). Translate here
+    # so the public 'bulk'/'manual' API doesn't need touching at ~20 call
+    # sites across the suite.
+    _EVAL_METHOD_DOM_VALUES = {"bulk": "bulk", "manual": "playground"}
+
     def select_evaluation_method(self, method: str = "bulk") -> None:
         """Select the evaluation-method radio in step 1: 'bulk' or 'manual' (Playground)."""
+        dom_value = self._EVAL_METHOD_DOM_VALUES.get(method, method)
         self.page.locator(
-            f"input[name='evaluationMethod'][value='{method}']"
+            f"input[name='evaluationMethod'][value='{dom_value}']"
         ).click()
 
     def is_method_selected(self, method: str) -> bool:
         """Return True if the given evaluation-method radio is checked."""
+        dom_value = self._EVAL_METHOD_DOM_VALUES.get(method, method)
         return self.page.locator(
-            f"input[name='evaluationMethod'][value='{method}']"
+            f"input[name='evaluationMethod'][value='{dom_value}']"
         ).is_checked()
 
     def click_modal_next(self) -> NewEvaluationPage:
@@ -269,12 +278,22 @@ class NewEvaluationPage(BasePage):
         sel = value_map.get(eval_type.lower(), value_map["technical"])
         self.page.locator(sel).first.check()
 
+    # DOM `value`s are the backend enum (TECHNICAL_AUDIT/DOMAIN_AUDIT/
+    # CULTURAL_AUDIT); map back to the human-readable label the UI shows
+    # and tests assert against. See locators/evaluations_locators.py.
+    _EVALUATOR_TYPE_LABELS = {
+        "TECHNICAL_AUDIT": "Technical",
+        "DOMAIN_AUDIT": "Domain",
+        "CULTURAL_AUDIT": "Cultural",
+    }
+
     def get_checked_evaluator_type(self) -> str | None:
-        """Return the value (Technical/Domain/Cultural) of the checked step-2 radio."""
+        """Return the label (Technical/Domain/Cultural) of the checked step-2 radio."""
         radios = self.page.locator(EvaluationsLocators.MODAL_EVALUATOR_TYPE_RADIO).all()
         for r in radios:
             if r.is_checked():
-                return r.get_attribute("value")
+                raw = r.get_attribute("value")
+                return self._EVALUATOR_TYPE_LABELS.get(raw, raw)
         return None
 
     def fill_modal_objective(self, objective: str) -> None:

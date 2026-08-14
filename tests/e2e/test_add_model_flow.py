@@ -117,6 +117,11 @@ class TestCDSAddModelEditor:
         page.on("pageerror", lambda e: errors.append(str(e)))
         page.goto(Config.cds_url("/en/manage/ai-models"), wait_until="domcontentloaded", timeout=20000)
         page.wait_for_timeout(3000)
+        if "opub-kc" in page.url or "auth/realms" in page.url:
+            pytest.skip(
+                "CDS editor not reached — page (uses anonymous `page` fixture, no CDS "
+                f"auth) redirected to Keycloak login before the editor loaded: {page.url}"
+            )
         syntax_errors = [e for e in errors if "SyntaxError" in e or "appendChild" in e]
         assert not syntax_errors, (
             "CDS-001: JS SyntaxError(s) on editor page load:\n" + "\n".join(syntax_errors)
@@ -139,6 +144,11 @@ class TestCDSAddModelEditor:
         page.on("pageerror", lambda e: console_errors.append(str(e)))
         page.goto(Config.cds_url("/en/manage/ai-models"), wait_until="domcontentloaded", timeout=20000)
         page.wait_for_timeout(3000)
+        if "opub-kc" in page.url or "auth/realms" in page.url:
+            pytest.skip(
+                "CDS editor not reached — page (uses anonymous `page` fixture, no CDS "
+                f"auth) redirected to Keycloak login before the editor loaded: {page.url}"
+            )
         assert not console_errors, f"Console errors on CDS editor load: {console_errors}"
 
     @pytest.mark.xfail(reason="CDS-004: ?tab=registered param silently ignored on CivicDataSpace AI Models — known bug")

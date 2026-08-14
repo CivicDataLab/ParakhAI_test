@@ -18,13 +18,14 @@ class EvaluationsLocators:
     EVAL_COMPLETED_COL = "th:text('Completed'), :text('Completed')"
 
     # ── Status filter tabs (StatusFilterTabs component — Jun 2026) ───────────
-    # As of late Jun 2026 the component renders 9 tabs:
-    #   All | Draft | Queued | Running | In Progress | Pending Review | Completed | Failed | Cancelled
-    # Use :has-text for substring match so count badges ("Draft(40)") still match.
+    # REMOVED in the evaluation-table-listing redesign (~2026-08): the tab bar
+    # is gone. Status filtering now lives in a per-column filter popover on
+    # the DataTable (see FILTER_STATUS_BUTTON below) — confirmed live
+    # 2026-08-13 (button/[role='tab'] counts are 0 for all of these on both a
+    # fresh nav and a post-navigation SPA transition). Kept as dead constants
+    # only so any external reference doesn't hard-crash; do not use in new code.
     STATUS_TAB_ALL = "button:has-text('All'), [role='tab']:has-text('All')"
     STATUS_TAB_DRAFT = "button:has-text('Draft'), [role='tab']:has-text('Draft')"
-    # "Pending" is now split into "Queued" and "Pending Review" — keep old selector
-    # as a broad fallback and add the specific new ones.
     STATUS_TAB_PENDING = "button:has-text('Pending'), [role='tab']:has-text('Pending')"
     STATUS_TAB_QUEUED = "button:has-text('Queued'), [role='tab']:has-text('Queued')"
     STATUS_TAB_IN_PROGRESS = "button:has-text('In Progress'), [role='tab']:has-text('In Progress')"
@@ -33,6 +34,17 @@ class EvaluationsLocators:
     STATUS_TAB_COMPLETED = "button:has-text('Completed'), [role='tab']:has-text('Completed')"
     STATUS_TAB_FAILED = "button:has-text('Failed'), [role='tab']:has-text('Failed')"
     STATUS_TAB_CANCELLED = "button:has-text('Cancelled'), [role='tab']:has-text('Cancelled')"
+
+    # ── Status column filter popover (replaces StatusFilterTabs, ~2026-08) ───
+    # DataTable columns each get a filter icon button (aria-label="Filter
+    # <Column>"); clicking it opens a [role='dialog'] with a checkbox per
+    # option (real <label for=...> pairs — click the label, not the Radix
+    # checkbox <button>) plus Clear/Apply actions. Apply starts aria-disabled
+    # until a checkbox changes. Confirmed live 2026-08-13.
+    FILTER_STATUS_BUTTON = "button[aria-label='Filter Status']"
+    FILTER_DIALOG = "[role='dialog']"
+    FILTER_APPLY_BUTTON = "[role='dialog'] button:has-text('Apply')"
+    FILTER_CLEAR_BUTTON = "[role='dialog'] button:has-text('Clear')"
 
     # ── List table controls (verified live 03 Jul 2026) ──────────────────────
     # Column headers are sort buttons (accessible text includes
@@ -85,8 +97,10 @@ class EvaluationsLocators:
     MODAL_MODEL_DROPDOWN = "select[name='modelSelect']"
     MODAL_VERSION_DROPDOWN = "select[name='versionSelect']"
     MODAL_EVAL_NAME_INPUT = "input[name='evaluationName']"
+    # Playground radio's DOM value drifted to 'playground' (was 'manual');
+    # confirmed via origin/dev source 2026-08-13. Bulk unchanged.
     MODAL_EVAL_METHOD_BULK = "input[name='evaluationMethod'][value='bulk']"
-    MODAL_EVAL_METHOD_PLAYGROUND = "input[name='evaluationMethod'][value='manual']"
+    MODAL_EVAL_METHOD_PLAYGROUND = "input[name='evaluationMethod'][value='playground']"
     MODAL_NEXT_BUTTON = "[role='dialog'] button:has-text('Next')"
     MODAL_BACK_BUTTON = "[role='dialog'] button:has-text('Back')"
     MODAL_START_BUTTON = "[role='dialog'] button:has-text('Start Evaluation')"
@@ -96,12 +110,17 @@ class EvaluationsLocators:
     )
     MODAL_LOADING_MODELS = "[role='dialog'] :text('Loading models')"
 
-    # Step-2 evaluator-type radios (values: Technical / Domain / Cultural;
-    # Technical is checked by default).
+    # Step-2 evaluator-type radios. DOM `value`s are the backend enum
+    # (TECHNICAL_AUDIT / DOMAIN_AUDIT / CULTURAL_AUDIT), not the display
+    # label — confirmed via live DOM dump 2026-08-13 (previously plain
+    # 'Technical' / 'Domain' / 'Cultural', now drifted to the _AUDIT suffix
+    # form). TECHNICAL_AUDIT is checked by default. See
+    # NewEvaluationPage.get_checked_evaluator_type() for the reverse mapping
+    # back to the human-readable label tests assert against.
     MODAL_EVALUATOR_TYPE_RADIO = "input[name='evaluatorType']"
-    MODAL_EVALUATOR_TECHNICAL = "input[name='evaluatorType'][value='Technical']"
-    MODAL_EVALUATOR_DOMAIN = "input[name='evaluatorType'][value='Domain']"
-    MODAL_EVALUATOR_CULTURAL = "input[name='evaluatorType'][value='Cultural']"
+    MODAL_EVALUATOR_TECHNICAL = "input[name='evaluatorType'][value='TECHNICAL_AUDIT']"
+    MODAL_EVALUATOR_DOMAIN = "input[name='evaluatorType'][value='DOMAIN_AUDIT']"
+    MODAL_EVALUATOR_CULTURAL = "input[name='evaluatorType'][value='CULTURAL_AUDIT']"
     # Step-2 objective textarea — required; Start Evaluation stays disabled
     # while it is empty.
     MODAL_OBJECTIVE_TEXTAREA = "[role='dialog'] textarea"

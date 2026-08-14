@@ -7,6 +7,28 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# One run at a time per PR (or per branch/ref for push/workflow_dispatch).
+# Added 2026-08-12: rapid pushes to an open PR were each auto-triggering a
+# full run, and because this workflow shares one dev backend across every
+# run (not just within a run), overlapping runs contended with each other -
+# api-tests took 42m26s against a 6m31s baseline while two runs overlapped
+# (see docs/ci_workflow_notes.md). cancel-in-progress means a new push
+# supersedes the old run's results immediately rather than letting a stale
+# commit's run keep consuming the shared backend.
+#
+# Verified live 2026-08-12 that `if: always()` on a job ignores workflow
+# cancellation and lets it start anyway even after the run is marked
+# cancelled: api-tests correctly cancelled, but accessibility-tests (then
+# `if: always()`) started right after and kept running against the shared
+# backend regardless. Removed always() from the actual test jobs
+# (accessibility-tests, visual-tests) so they respect cancellation via
+# default success()-gating. test-summary still needs always() (it must
+# tolerate e2e-tests' deliberate skip while paused) - paired with
+# !cancelled() there instead of removing it outright.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -33,7 +55,14 @@ env:
   TEST_EMAIL_2: ${{ secrets.TEST_EMAIL_2 }}
   TEST_PASSWORD_2: ${{ secrets.TEST_PASSWORD_2 }}
   TEST_USER_INDEX: "1"
-  SANDBOX_ORG_SLUG: ${{ secrets.SANDBOX_ORG_SLUG }}
+  # Repo Variable, not a Secret (2026-08-14): its value ("1", CivicDataLab's
+  # org id) isn't sensitive, and GitHub was masking every digit "1" in the job
+  # summary numbers because it exactly matched this secret's value — moving
+  # it here stops that without touching the actual secret, which is left in
+  # place for run-smoke.yml/scheduled.yml (unrelated blast radius: run-smoke
+  # is the reusable workflow ParakhAI-frontend's CD pipeline calls, not worth
+  # touching for a cosmetic fix scoped to this file's own job summary).
+  SANDBOX_ORG_SLUG: ${{ vars.SANDBOX_ORG_SLUG }}
 
 jobs:
   # ────────────────────────────────────────────── Lint
@@ -71,6 +100,14 @@ jobs:
   # so e2e-tests (the heaviest, most concurrency-sensitive suite) gets the
   # backend to itself. This trades total pipeline wall-clock time for
   # reliability.
+  #
+  # TRIED 2026-08-12: made api-tests + accessibility-tests concurrent (both
+  # `needs: lint`) on the theory that #13/#14 being independently re-verified
+  # fixed that same day, plus the backend's runserver -> Docker migration,
+  # meant the underlying capacity problem was gone. It wasn't (or isn't
+  # fully) — the concurrent run started failing in CI within ~13 minutes and
+  # was reverted same-day. Re-attempt only with a real repro of what failed
+  # (job logs from a completed run, not a cancelled one) in hand first.
   api-tests:
     name: API Tests
     runs-on: ubuntu-latest
@@ -98,6 +135,7 @@ jobs:
             --tb=short \
             --html=reports/api_report.html \
             --self-contained-html \
+            --json-report-file=reports/api.json \
             -m api
 
       - name: Upload API test report
@@ -105,7 +143,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: api-test-report
-          path: reports/api_report.html
+          path: |
+            reports/api_report.html
+            reports/api.json
           retention-days: 30
 
   # ────────────────────────────────────────────── E2E tests (3-shard matrix)
@@ -117,12 +157,15 @@ jobs:
     name: E2E Tests (shard ${{ matrix.shard }}/${{ strategy.job-total }})
     runs-on: ubuntu-latest
     needs: visual-tests
-    # PAUSED 2026-08-11 — remove this line (restoring `if: always()`) to
-    # resume. test-summary's E2E-report steps are guarded on
-    # `needs.e2e-tests.result != 'skipped'` and degrade cleanly while this
-    # is off.
+    # PAUSED 2026-08-11 — remove this line to resume. test-summary's
+    # E2E-report steps are guarded on `needs.e2e-tests.result != 'skipped'`
+    # and degrade cleanly while this is off. Do NOT restore `if: always()`
+    # (that was the original value) — removed the same pattern from
+    # accessibility-tests/visual-tests 2026-08-12 after verifying live that
+    # it ignores workflow cancellation; default success()-gating is correct
+    # here for the same reason.
     if: false
-    timeout-minutes: 30
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -175,8 +218,15 @@ jobs:
     name: Accessibility Tests (axe)
     runs-on: ubuntu-latest
     needs: api-tests
-    if: always()
-    timeout-minutes: 30
+    # No if: always() here on purpose (removed 2026-08-12) - it was letting
+    # this job start even after the run was cancelled (verified live: a
+    # superseded run's api-tests correctly cancelled, but this job ignored
+    # that and kept running against the shared backend for up to its
+    # timeout). Every test step already uses continue-on-error, so
+    # api-tests' job conclusion is "success" even when its tests fail -
+    # default gating only actually skips this job on a genuine infra
+    # failure or cancellation, both cases where skipping is correct.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
 
@@ -200,6 +250,7 @@ jobs:
             --tb=short \
             --html=reports/a11y_report.html \
             --self-contained-html \
+            --json-report-file=reports/accessibility.json \
             -m accessibility
 
       - name: Upload accessibility reports
@@ -209,6 +260,7 @@ jobs:
           name: accessibility-report
           path: |
             reports/a11y_report.html
+            reports/accessibility.json
             reports/accessibility_report.json
             reports/accessibility_login_report.json
           retention-days: 30
@@ -218,8 +270,9 @@ jobs:
     name: Visual Regression Tests
     runs-on: ubuntu-latest
     needs: accessibility-tests
-    if: always()
-    timeout-minutes: 30
+    # No if: always() here either - see the comment on accessibility-tests'
+    # if: line above; same reasoning applies.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
 
@@ -235,14 +288,22 @@ jobs:
       - name: Install Playwright browsers
         run: playwright install --with-deps chromium
 
-      # Restore cached baselines so we compare against a known good state
+      # Restore cached baselines so we compare against a known good state.
+      #
+      # The `v2-` generation prefix deliberately orphans every cache written
+      # before 2026-08-12. Those caches hold the poisoned baselines documented in
+      # docs/visual_diffs.md (a 404, stuck "Loading …" curtains, and four copies
+      # of the logged-out homepage). Without the bump, editing tests/visual/**
+      # changes the primary key but `restore-keys` still falls back to the newest
+      # old cache — so CI would restore the poisoned generation and diff correct
+      # captures against it. Bump this again if baselines ever need a clean slate.
       - name: Restore visual baselines cache
         uses: actions/cache@v5
         with:
           path: snapshots/
-          key: visual-baselines-${{ runner.os }}-${{ hashFiles('tests/visual/**') }}
+          key: visual-baselines-v2-${{ runner.os }}-${{ hashFiles('tests/visual/**') }}
           restore-keys: |
-            visual-baselines-${{ runner.os }}-
+            visual-baselines-v2-${{ runner.os }}-
 
       - name: Run visual regression tests
         continue-on-error: true
@@ -252,6 +313,7 @@ jobs:
             --tb=short \
             --html=reports/visual_report.html \
             --self-contained-html \
+            --json-report-file=reports/visual.json \
             -m visual
 
       # Save updated baselines back to cache
@@ -260,7 +322,8 @@ jobs:
         uses: actions/cache@v5
         with:
           path: snapshots/
-          key: visual-baselines-${{ runner.os }}-${{ hashFiles('tests/visual/**') }}
+          # Must stay in lockstep with the restore step's generation prefix above.
+          key: visual-baselines-v2-${{ runner.os }}-${{ hashFiles('tests/visual/**') }}
 
       - name: Upload visual regression report and diffs
         if: always()
@@ -269,6 +332,7 @@ jobs:
           name: visual-regression-report
           path: |
             reports/visual_report.html
+            reports/visual.json
             screenshots/DIFF_*
             snapshots/
           retention-days: 30
@@ -278,7 +342,14 @@ jobs:
     name: Test Summary
     runs-on: ubuntu-latest
     needs: [api-tests, e2e-tests, accessibility-tests, visual-tests]
-    if: always()
+    # Kept always() here (unlike the test jobs above) because this is the
+    # reporting job, not a test job - it must still run while e2e-tests is
+    # deliberately paused (if: false -> always "skipped", and default
+    # success() gating treats a skipped dependency as not-satisfied, which
+    # would stop this job from running at all). Paired with !cancelled() so
+    # it still respects a real concurrency-group cancellation rather than
+    # repeating the bug just fixed on the test jobs.
+    if: always() && !cancelled()
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
@@ -291,6 +362,16 @@ jobs:
 
       - name: Install report dependencies
         run: pip install pytest-json-report
+
+      # All suite reports, so the summary table can show real test counts
+      # instead of job status. Each suite's pytest step is `continue-on-error`,
+      # so its job result is ~always "success" no matter how many tests failed.
+      - name: Download all suite reports
+        uses: actions/download-artifact@v4
+        with:
+          path: suite-artifacts/
+          merge-multiple: true
+        continue-on-error: true
 
       - name: Download E2E shard reports
         if: needs.e2e-tests.result != 'skipped'
@@ -314,17 +395,37 @@ jobs:
         if: needs.e2e-tests.result != 'skipped'
         run: cat reports/e2e_summary.md >> $GITHUB_STEP_SUMMARY
 
-      - name: Print suite status table
+      # Real per-suite test counts, read from the JSON reports rather than from
+      # `needs.<job>.result`. The old table printed job status, which is
+      # structurally incapable of showing a test failure here: every suite runs
+      # its pytest step with `continue-on-error: true`, so the job succeeds even
+      # when tests fail, and the most-read signal in the run always said
+      # "success". See scripts/suite_summary.py.
+      - name: Print suite results table
         run: |
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Suite | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| API Tests | ${{ needs.api-tests.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| E2E Tests | ${{ needs.e2e-tests.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Accessibility | ${{ needs.accessibility-tests.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Visual Regression | ${{ needs.visual-tests.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Platform:** ${{ env.BASE_URL }}" >> $GITHUB_STEP_SUMMARY
+          {
+            echo ""
+            echo "## Test results by suite"
+            echo ""
+            python scripts/suite_summary.py \
+              "API=suite-artifacts/api.json" \
+              "E2E=shard-artifacts/*/reports/e2e_shard_*.json" \
+              "Accessibility=suite-artifacts/accessibility.json" \
+              "Visual Regression=suite-artifacts/reports/visual.json"
+            echo ""
+            echo "**Platform:** ${{ env.BASE_URL }}"
+            echo ""
+            echo "<details><summary>Job status (plumbing, not test results)</summary>"
+            echo ""
+            echo "| Job | Result |"
+            echo "|-----|--------|"
+            echo "| API Tests | ${{ needs.api-tests.result }} |"
+            echo "| E2E Tests | ${{ needs.e2e-tests.result }} |"
+            echo "| Accessibility | ${{ needs.accessibility-tests.result }} |"
+            echo "| Visual Regression | ${{ needs.visual-tests.result }} |"
+            echo ""
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload combined E2E report
         if: needs.e2e-tests.result != 'skipped'

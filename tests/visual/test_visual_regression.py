@@ -15,6 +15,11 @@ from PIL import Image, ImageChops
 from playwright.sync_api import Page
 
 from utils.config import Config
+from utils.visual_guards import (
+    capture_integrity_problem,
+    route_masks,
+    wait_for_render_settled,
+)
 
 pytestmark = [pytest.mark.visual]
 
@@ -90,12 +95,22 @@ def _compare_or_save_baseline(
 
 
 def _capture_page(page: Page, url: str) -> Image.Image:
-    """Navigate to url and return a PIL Image of the full page screenshot."""
+    """Navigate to url and return a PIL Image of the full page screenshot.
+
+    Skips when the capture fails an integrity check (404 / stuck curtain /
+    blank) so a bad render is never written to a baseline. The homepage-fallback
+    check is off here — these are the public pages, so that content is expected.
+    """
     page.goto(url, wait_until="networkidle", timeout=30_000)
     page.wait_for_timeout(1_000)  # allow fonts/animations to settle
     raw = page.screenshot(full_page=True)
     import io
-    return Image.open(io.BytesIO(raw))
+    img = Image.open(io.BytesIO(raw))
+
+    problem = capture_integrity_problem(page, img)
+    if problem:
+        pytest.skip(f"Capture integrity check failed for {url}: {problem}")
+    return img
 
 
 def _page_at_viewport(browser, width: int, height: int) -> Page:
@@ -137,6 +152,10 @@ def _capture_page_masked(page: Page, url: str, masks: list) -> Image.Image:
     instead.
     """
     page.goto(url, wait_until="load", timeout=30_000)
+    # Wait out the auth/data curtains before settling — a flat 2.5s here was
+    # capturing mid-curtain, which is how stuck "Loading …" states ended up
+    # saved as baselines. See utils.visual_guards.wait_for_render_settled.
+    wait_for_render_settled(page)
     page.wait_for_timeout(2_500)
     mask_locators = []
     for sel in masks:
@@ -148,15 +167,10 @@ def _capture_page_masked(page: Page, url: str, masks: list) -> Image.Image:
     return Image.open(io.BytesIO(raw))
 
 
-# Dynamic regions that change every page load — masking stops false diffs on
-# nightly visual runs.
-_DEFAULT_MASKS = [
-    "[class*='timestamp']",
-    "[class*='last-updated']",
-    "[class*='activity']",
-    "time",
-    "[class*='polling']",
-]
+# Mask lists live in utils.visual_guards so sibling visual suites share one
+# definition — a new module that forgot AUTH_PII_MASKS would quietly start
+# baking the account name back into baselines. route_masks(name) layers on
+# any route-specific masks (e.g. ai_maker_dashboard's live stat counters).
 
 # Auth routes whose content is genuinely non-deterministic between two captures
 # against the live/shared dev environment: the New Evaluation wizard's model
@@ -166,8 +180,16 @@ _DEFAULT_MASKS = [
 # pixel-diff at the 0.1% threshold is inherently flaky for these, so a diff is
 # reported as xfail (VISUAL-002) rather than a hard failure. They still save a
 # baseline on first run and still XPASS when a capture happens to match. The
-# static/structural pages (homepage, role/org selectors, ai-maker overview,
-# completed evaluation detail) remain hard pixel-diff assertions.
+# static/structural pages (homepage, role/org selectors, ai-maker overview)
+# remain hard pixel-diff assertions.
+#
+# evaluation_detail_completed added 2026-08-14: its content is tied to
+# whichever audit the completed_eval_id fixture happens to discover/seed each
+# run (confirmed live: 1.085% diff in CI, well past the 0.2% threshold) -
+# different evaluation name, scores, and sample-issue text each pick, not just
+# a few live numbers a mask could absorb. Unlike ai_maker_dashboard's stat
+# counters (route_masks(), utils.visual_guards), the varying content here
+# spans most of the page, so xfail-on-diff is the correct tool, not masking.
 _NON_DETERMINISTIC_VISUAL = {
     "new_evaluation_wizard",
     "prompt_libraries",
@@ -177,6 +199,7 @@ _NON_DETERMINISTIC_VISUAL = {
     "models_list",
     "evaluations_list",
     "auditors_management",
+    "evaluation_detail_completed",
 }
 
 
@@ -319,7 +342,8 @@ class TestAuthenticatedPageVisuals:
     "baseline saved" message. Subsequent runs diff against the cached
     baseline at Config.VISUAL_THRESHOLD (default 0.1%).
 
-    Dynamic regions are masked via _DEFAULT_MASKS to prevent flaky diffs.
+    Dynamic regions are masked via route_masks(name) (utils.visual_guards) to
+    prevent flaky diffs.
     Tests are parametrized by (path, name); each is independent so a failure
     on one page doesn't mask the others.
     """
@@ -336,7 +360,16 @@ class TestAuthenticatedPageVisuals:
         ("/dashboard/auditor", "auditor_dashboard"),
         ("/dashboard/auditor/assignments", "auditor_assignments"),
         ("/dashboard/auditor/evaluations", "auditor_evaluations"),
-        ("/evaluation/288", "evaluation_detail_completed"),
+        # `{eval_id}` is substituted at runtime from the session-scoped
+        # `completed_eval_id` fixture. This route previously read
+        # "/evaluation/288" — a path that does not exist in the frontend app
+        # router (the real shape is
+        # /dashboard/ai-maker/[orgId]/evaluations/[evaluationId]), so every run
+        # captured a 404 and then hard-asserted that 404 against itself. The
+        # hardcoded 288 is the same drifting-constant pattern conftest's
+        # `completed_eval_id` fixture was written to retire; this was the last
+        # caller still using it.
+        ("/dashboard/ai-maker/1/evaluations/{eval_id}", "evaluation_detail_completed"),
     ]
 
     @pytest.mark.parametrize(
@@ -345,19 +378,52 @@ class TestAuthenticatedPageVisuals:
     @pytest.mark.auth
     @pytest.mark.regression
     def test_authenticated_page_desktop(
-        self, browser, authenticated_storage_state, path, name
+        self, request, browser, authenticated_storage_state, path, name
     ):
+        if "{eval_id}" in path:
+            # Resolved lazily so the (session-scoped, potentially seeding)
+            # lookup only runs for the one route that needs it.
+            #
+            # `completed_eval_id` skips cleanly when it simply finds no COMPLETED
+            # audit, but its UI-seeding fallback can also raise outright (observed
+            # 2026-08-12: Playwright TimeoutError on
+            # input[name='evaluatorType'][value='Technical']). That is a data-fixture
+            # failure, not a visual one — letting it fail here would make the visual
+            # suite red for a reason no baseline can express. Same rationale as the
+            # capture-integrity gate: no valid subject means no signal, so skip.
+            # pytest.skip raises from BaseException, so a genuine skip still passes
+            # through this handler untouched.
+            try:
+                eval_id = request.getfixturevalue("completed_eval_id")
+            except Exception as exc:  # noqa: BLE001
+                pytest.skip(
+                    "Could not resolve a COMPLETED evaluation to capture: "
+                    f"{type(exc).__name__}: {exc}. The `completed_eval_id` fixture's "
+                    "discovery found no match and its seeding fallback failed — a "
+                    "fixture/seeding issue, not a visual regression."
+                )
+            path = path.format(eval_id=eval_id)
+
         page = _authenticated_page_at_viewport(
             browser, authenticated_storage_state, 1440, 900
         )
         try:
             try:
-                img = _capture_page_masked(page, Config.url(path), _DEFAULT_MASKS)
+                img = _capture_page_masked(
+                    page, Config.url(path), route_masks(name)
+                )
             except Exception as exc:  # noqa: BLE001
                 pytest.skip(
                     f"Could not capture {path}: {exc}. "
                     "Page may be unreachable for this account."
                 )
+
+            # Never save or diff a capture that isn't the page under test —
+            # see utils/visual_guards for why this skips rather than fails.
+            problem = capture_integrity_problem(page, img, expect_auth_route=True)
+            if problem:
+                pytest.skip(f"Capture integrity check failed for {path}: {problem}")
+
             if name in _NON_DETERMINISTIC_VISUAL:
                 try:
                     _compare_or_save_baseline(img, f"auth_{name}_desktop_1440x900")

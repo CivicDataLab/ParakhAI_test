@@ -15,6 +15,8 @@ Run with:
     pytest tests/e2e/test_regression_new_features.py -m regression -v
 """
 
+import re
+
 import pytest
 from playwright.sync_api import Page
 
@@ -26,12 +28,36 @@ _DETAIL_TIMEOUT = 120  # seconds — evaluation detail pages have multiple API c
 
 
 def _nav_to_eval_detail(page: Page, eval_id: int, wait_ms: int = 3_500) -> None:
+    """Navigate to an evaluation detail page and wait out its loading curtains.
+
+    The page shows up to two sequential curtains — 'Verifying your
+    session...' then 'Loading evaluation...' — that can each take 15-30s+
+    on dev (see tasks/lessons.md, 'dev curtains are SLOW'). The previous
+    fixed `wait_ms` (default 3.5s) was far too short and only survived
+    because most callers here soft-retry-then-xfail on an empty result.
+    Content can also flash empty between the curtain clearing and the
+    real data rendering (same caveat NewEvaluationPage.wait_for_wizard_loaded
+    documents), so require a positive 'Evaluation Overview' marker too, not
+    just curtain-absence — bounded by `wait_ms` as a floor and 45s ceiling.
+    """
     page.goto(
         Config.url(f"/dashboard/ai-maker/1/evaluations/{eval_id}"),
         wait_until="domcontentloaded",
         timeout=60_000,
     )
-    page.wait_for_timeout(wait_ms)
+    curtains = ("Verifying your session", "Loading evaluation")
+    deadline_ms = max(wait_ms, 45_000)
+    elapsed = 0
+    poll_ms = 2_000
+    while elapsed < deadline_ms:
+        try:
+            body = page.locator("body").inner_text()
+        except Exception:
+            body = ""
+        if not any(c in body for c in curtains) and "Evaluation Overview" in body:
+            break
+        page.wait_for_timeout(poll_ms)
+        elapsed += poll_ms
 
 
 # ── Audit Results List ────────────────────────────────────────────────────────
@@ -97,12 +123,20 @@ class TestAuditResultsList:
         _nav_to_eval_detail(authenticated_page_fast, completed_eval_id)
         authenticated_page_fast.wait_for_timeout(2_000)
 
-        status_indicators = authenticated_page_fast.locator(
-            "text=/^PASS$|^FAIL$|^pass$|^fail$/i, "
-            "[class*='pass' i], [class*='fail' i], "
-            "[data-status='PASS'], [data-status='FAIL'], "
-            # Risk tags from AuditResultsList
-            "[class*='risk' i], [class*='tag' i]:has-text('LOW'), [class*='tag' i]:has-text('HIGH')"
+        # Playwright's text=/regex/flags engine cannot be comma-joined with
+        # plain CSS in one selector string — the flags parser consumes
+        # everything after the closing '/' instead of stopping at the
+        # comma. Build the regex half with get_by_text() and .or_() it with
+        # the CSS half instead (see tasks/lessons.md, 2026-05-18 / 2026-07-28).
+        status_indicators = authenticated_page_fast.get_by_text(
+            re.compile(r"^(pass|fail)$", re.IGNORECASE)
+        ).or_(
+            authenticated_page_fast.locator(
+                "[class*='pass' i], [class*='fail' i], "
+                "[data-status='PASS'], [data-status='FAIL'], "
+                # Risk tags from AuditResultsList
+                "[class*='risk' i], [class*='tag' i]:has-text('LOW'), [class*='tag' i]:has-text('HIGH')"
+            )
         )
         if status_indicators.count() == 0:
             pytest.xfail(
@@ -126,10 +160,11 @@ class TestSkippedTestsErrorsCard:
         authenticated_page_fast.wait_for_timeout(2_000)
 
         # The component renders "Error leading to skipped test" or "SKIPPED TESTS" text
-        skipped_indicators = authenticated_page_fast.locator(
-            "text=/Skipped Tests|SKIPPED TESTS|Error leading to skipped/i, "
-            "[class*='skipped' i]"
-        )
+        # See status_indicators above — text=/regex/flags can't be
+        # comma-joined with plain CSS; use .or_() instead.
+        skipped_indicators = authenticated_page_fast.get_by_text(
+            re.compile(r"Skipped Tests|SKIPPED TESTS|Error leading to skipped", re.IGNORECASE)
+        ).or_(authenticated_page_fast.locator("[class*='skipped' i]"))
 
         # Also check the existing SUMMARY_SKIPPED_TESTS locator from EvaluationsLocators
         from locators.evaluations_locators import EvaluationsLocators
@@ -322,14 +357,17 @@ class TestProgressBarComponent:
 
         from locators.evaluations_locators import EvaluationsLocators
 
-        progress_indicators = authenticated_page_fast.locator(
-            # ProgressBar component renders as progress element or div with aria role
-            "progress, [role='progressbar'], "
-            # Text-based: percentage
-            "text=/\\d+%/i, "
+        # See TestAuditResultsList.test_results_contain_pass_fail_indicators
+        # above — text=/regex/flags can't be comma-joined with plain CSS.
+        progress_indicators = (
+            authenticated_page_fast.locator(
+                # ProgressBar component renders as progress element or div with aria role
+                "progress, [role='progressbar']"
+            )
+            .or_(authenticated_page_fast.get_by_text(re.compile(r"\d+%")))
             # Existing summary cards that confirm the eval completed
-            f"{EvaluationsLocators.SUMMARY_PASS_RATE}, "
-            f"{EvaluationsLocators.SUMMARY_PASSED_TESTS}"
+            .or_(authenticated_page_fast.locator(EvaluationsLocators.SUMMARY_PASS_RATE))
+            .or_(authenticated_page_fast.locator(EvaluationsLocators.SUMMARY_PASSED_TESTS))
         )
         assert progress_indicators.count() > 0 and progress_indicators.first.is_visible(timeout=5_000), (
             "No progress indicator found on completed evaluation detail — "

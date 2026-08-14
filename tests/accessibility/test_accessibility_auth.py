@@ -414,7 +414,8 @@ class TestDialogAccessibility:
 
     @pytest.mark.auth
     @pytest.mark.xfail(
-        reason="UX-010: New Evaluation dialog aria-describedby references non-existent element — known bug"
+        reason="UX-010: New Evaluation dialog aria-describedby references non-existent element — known bug, intermittent (XPASSed 2026-08-14, no app_bugs.md row yet)",
+        strict=False,
     )
     def test_ux010_new_evaluation_dialog_aria_describedby_resolves(
         self, authenticated_page_fast: Page

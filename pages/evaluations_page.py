@@ -62,24 +62,60 @@ class EvaluationsPage(BasePage):
         return self.is_visible(self.PAGE_HEADING)
 
     def click_status_tab(self, status: str) -> None:
-        """Click a StatusFilterTab by label: 'All', 'Draft', 'Pending', 'Running', 'Completed', 'Failed'."""
-        tab_map = {
-            "All": EvaluationsLocators.STATUS_TAB_ALL,
-            "Draft": EvaluationsLocators.STATUS_TAB_DRAFT,
-            "Pending": EvaluationsLocators.STATUS_TAB_PENDING,
-            "Queued": EvaluationsLocators.STATUS_TAB_QUEUED,
-            "In Progress": EvaluationsLocators.STATUS_TAB_IN_PROGRESS,
-            "Pending Review": EvaluationsLocators.STATUS_TAB_PENDING_REVIEW,
-            "Running": EvaluationsLocators.STATUS_TAB_RUNNING,
-            "Completed": EvaluationsLocators.STATUS_TAB_COMPLETED,
-            "Failed": EvaluationsLocators.STATUS_TAB_FAILED,
-            "Cancelled": EvaluationsLocators.STATUS_TAB_CANCELLED,
-        }
-        # .first: 'Completed' also matches the 'Completed on' sort header, and
-        # count badges make exact-text matching brittle — the filter tab is
-        # always the first match in DOM order.
-        self.page.locator(tab_map[status]).first.click()
-        self.page.wait_for_timeout(500)
+        """Filter the evaluations table to a single status.
+
+        The old StatusFilterTabs bar was replaced by a per-column filter
+        popover on the DataTable in the evaluation-table-listing redesign
+        (~2026-08) — confirmed live 2026-08-13. Opens the 'Filter Status'
+        popover, checks the matching option, and clicks Apply. 'All' clears
+        any active filter instead (there's no 'All' checkbox anymore).
+
+        The popover is a multi-select checkbox group, not mutually-exclusive
+        tabs — calling this twice with different labels would otherwise
+        ADD the second status rather than switching to it. Uncheck every
+        currently-checked box first so callers get tab-like single-select
+        behaviour, matching what every caller of this method expects.
+        """
+        self.page.locator(EvaluationsLocators.FILTER_STATUS_BUTTON).click()
+        self.page.locator(EvaluationsLocators.FILTER_DIALOG).first.wait_for(
+            state="visible", timeout=5_000
+        )
+        # Capture handles up front — the locator is live and re-filters on
+        # [aria-checked='true'], so clicking one while iterating by index
+        # would skip the next as the matching set shrinks underneath it.
+        checked_handles = self.page.locator(
+            f"{EvaluationsLocators.FILTER_DIALOG} [role='checkbox'][aria-checked='true']"
+        ).all()
+        for handle in checked_handles:
+            handle.click()
+        if status == "All":
+            clear_btn = self.page.locator(EvaluationsLocators.FILTER_CLEAR_BUTTON).first
+            if clear_btn.is_visible() and clear_btn.get_attribute("aria-disabled") != "true":
+                clear_btn.click()
+            else:
+                self.page.keyboard.press("Escape")
+            self.page.wait_for_timeout(500)
+            return
+        self.page.locator(
+            f"{EvaluationsLocators.FILTER_DIALOG} label:has-text('{status}')"
+        ).first.click()
+        self.page.locator(EvaluationsLocators.FILTER_APPLY_BUTTON).click()
+        self.page.wait_for_timeout(800)
+
+    def get_status_filter_options(self) -> list[str]:
+        """Open the 'Filter Status' popover and return the available status labels."""
+        self.page.locator(EvaluationsLocators.FILTER_STATUS_BUTTON).click()
+        self.page.locator(EvaluationsLocators.FILTER_DIALOG).first.wait_for(
+            state="visible", timeout=5_000
+        )
+        labels = self.page.locator(f"{EvaluationsLocators.FILTER_DIALOG} label").all_inner_texts()
+        self.page.keyboard.press("Escape")
+        self.page.wait_for_timeout(200)
+        return labels
+
+    def is_status_filter_available(self) -> bool:
+        """Return True if the 'Filter Status' column-filter control is present."""
+        return self.is_visible(EvaluationsLocators.FILTER_STATUS_BUTTON)
 
     def is_pagination_visible(self) -> bool:
         return self.is_visible(EvaluationsLocators.PAGINATION_CONTAINER)
