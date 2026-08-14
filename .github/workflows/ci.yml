@@ -55,7 +55,14 @@ env:
   TEST_EMAIL_2: ${{ secrets.TEST_EMAIL_2 }}
   TEST_PASSWORD_2: ${{ secrets.TEST_PASSWORD_2 }}
   TEST_USER_INDEX: "1"
-  SANDBOX_ORG_SLUG: ${{ secrets.SANDBOX_ORG_SLUG }}
+  # Repo Variable, not a Secret (2026-08-14): its value ("1", CivicDataLab's
+  # org id) isn't sensitive, and GitHub was masking every digit "1" in the job
+  # summary numbers because it exactly matched this secret's value — moving
+  # it here stops that without touching the actual secret, which is left in
+  # place for run-smoke.yml/scheduled.yml (unrelated blast radius: run-smoke
+  # is the reusable workflow ParakhAI-frontend's CD pipeline calls, not worth
+  # touching for a cosmetic fix scoped to this file's own job summary).
+  SANDBOX_ORG_SLUG: ${{ vars.SANDBOX_ORG_SLUG }}
 
 jobs:
   # ────────────────────────────────────────────── Lint
