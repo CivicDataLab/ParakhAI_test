@@ -258,9 +258,10 @@ jobs:
   # acquisition (scripts/_api_client.get_access_token) and a few
   # cookie-security tests drive a real headless Chromium via Playwright.
   #
-  # api-tests / accessibility-tests / visual-tests / e2e-tests run in a
-  # serial chain (via `needs:`) rather than all firing at once after lint.
-  # They all hit the same shared dev backend (dev.parakh.civicdataspace.in),
+  # api-tests / accessibility-tests / visual-tests / performance-tests /
+  # load-tests / e2e-tests run in a serial chain (via `needs:`) rather than
+  # all firing at once after lint. They all hit the same shared dev backend
+  # (dev.parakh.civicdataspace.in),
   # which has known slow-query issues (docs/app_bugs.md #13/#14) — running
   # them concurrently was overwhelming it and producing widespread transient
   # ReadTimeouts / stuck "Loading..." states that looked like test failures
@@ -523,6 +524,109 @@ jobs:
             reports/visual.json
             screenshots/DIFF_*
             snapshots/
+          retention-days: 30
+
+  # ────────────────────────────────────────────── Performance tests
+  # New 2026-08-14 — previously only ran nightly (scheduled.yml, run_perf
+  # toggle), never on PRs. Path-filtered like the suites above it in the
+  # chain; mirrors api-tests' job structure.
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    needs: [lint, visual-tests, changes]
+    if: |
+      always() && !cancelled() &&
+      needs.lint.result == 'success' &&
+      (needs.visual-tests.result == 'success' || needs.visual-tests.result == 'skipped') &&
+      (needs.changes.result != 'success' || needs.changes.outputs.performance == 'true')
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install Playwright browsers
+        run: playwright install --with-deps chromium
+
+      - name: Run performance tests
+        continue-on-error: true
+        run: |
+          pytest tests/performance/ \
+            -v \
+            --tb=short \
+            --html=reports/performance_report.html \
+            --self-contained-html \
+            --json-report-file=reports/performance.json \
+            -m performance
+
+      - name: Upload performance test report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: performance-test-report
+          path: |
+            reports/performance_report.html
+            reports/performance.json
+          retention-days: 30
+
+  # ────────────────────────────────────────────── Load tests
+  # New 2026-08-14 — didn't run in any workflow before this (not even
+  # nightly). tests/load/** does concurrent-mutation/degradation testing
+  # against the shared dev backend (pytest.ini's own marker description), so
+  # it's placed last-active in the chain deliberately — nothing else in the
+  # same run executes after it, minimizing exposure if it does degrade the
+  # backend for the run's own later steps (there are none).
+  load-tests:
+    name: Load Tests
+    runs-on: ubuntu-latest
+    needs: [lint, performance-tests, changes]
+    if: |
+      always() && !cancelled() &&
+      needs.lint.result == 'success' &&
+      (needs.performance-tests.result == 'success' || needs.performance-tests.result == 'skipped') &&
+      (needs.changes.result != 'success' || needs.changes.outputs.load == 'true')
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install Playwright browsers
+        run: playwright install --with-deps chromium
+
+      - name: Run load tests
+        continue-on-error: true
+        run: |
+          pytest tests/load/ \
+            -v \
+            --tb=short \
+            --html=reports/load_report.html \
+            --self-contained-html \
+            --json-report-file=reports/load.json \
+            -m load
+
+      - name: Upload load test report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: load-test-report
+          path: |
+            reports/load_report.html
+            reports/load.json
           retention-days: 30
 
   # ────────────────────────────────────────────── Summary
