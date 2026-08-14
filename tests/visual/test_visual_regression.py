@@ -180,8 +180,16 @@ def _capture_page_masked(page: Page, url: str, masks: list) -> Image.Image:
 # pixel-diff at the 0.1% threshold is inherently flaky for these, so a diff is
 # reported as xfail (VISUAL-002) rather than a hard failure. They still save a
 # baseline on first run and still XPASS when a capture happens to match. The
-# static/structural pages (homepage, role/org selectors, ai-maker overview,
-# completed evaluation detail) remain hard pixel-diff assertions.
+# static/structural pages (homepage, role/org selectors, ai-maker overview)
+# remain hard pixel-diff assertions.
+#
+# evaluation_detail_completed added 2026-08-14: its content is tied to
+# whichever audit the completed_eval_id fixture happens to discover/seed each
+# run (confirmed live: 1.085% diff in CI, well past the 0.2% threshold) -
+# different evaluation name, scores, and sample-issue text each pick, not just
+# a few live numbers a mask could absorb. Unlike ai_maker_dashboard's stat
+# counters (route_masks(), utils.visual_guards), the varying content here
+# spans most of the page, so xfail-on-diff is the correct tool, not masking.
 _NON_DETERMINISTIC_VISUAL = {
     "new_evaluation_wizard",
     "prompt_libraries",
@@ -191,6 +199,7 @@ _NON_DETERMINISTIC_VISUAL = {
     "models_list",
     "evaluations_list",
     "auditors_management",
+    "evaluation_detail_completed",
 }
 
 
