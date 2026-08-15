@@ -71,10 +71,12 @@ code or contort a naming scheme.
 
 | Job | Status | Notes |
 |---|---|---|
-| `e2e-tests` | **paused** since 2026-08-11 (`if: false`) | By request, not due to failures. `test-summary`'s E2E-report steps are guarded on `needs.e2e-tests.result != 'skipped'` so the pipeline degrades cleanly on missing shard artifacts. To resume, delete the `if: false` line to restore `if: always()`; the guards are harmless and can stay. |
+| `e2e-tests` | **paused** since 2026-08-11 (`if: false`) | By request, not due to failures. `test-summary`'s E2E-report steps are guarded on `needs.e2e-tests.result != 'skipped'` so the pipeline degrades cleanly on missing shard artifacts. To resume: delete the active `if: false` line and uncomment the real gated condition already sitting commented-out directly below it in `ci.yml` — do **not** restore `if: always()`, see the "Path-filtered CI" section below for why. |
 
-Note the chain `e2e-tests needs: visual-tests` — resuming `e2e-tests` alone works
-regardless of `visual-tests`, since the job's own `if:` controls it.
+`e2e-tests` now depends on `needs: [lint, load-tests, changes]` (as of the
+2026-08-14 path-filtering change below) rather than just `visual-tests` —
+resuming it still works independent of any of those, since the job's own
+`if:` is what actually controls it.
 
 ---
 
@@ -134,3 +136,83 @@ recurrence of that exact pattern rather than treating a generic "it failed"
 as sufficient — and should isolate whether it's `api-tests`' fixture load
 specifically, since `accessibility-tests`/`visual-tests` showed no such
 symptom running concurrently with it in this same run.
+
+---
+
+## Path-filtered CI (2026-08-14)
+
+**Status: implemented, first path-filtering this repo has ever had.**
+
+`ci.yml` previously ran the full chain — `api-tests` → `accessibility-tests`
+→ `visual-tests` → `e2e-tests` — on every push/PR regardless of what changed.
+A new `changes` job (`dorny/paths-filter@v3`) now detects which of six
+categories (`api`, `accessibility`, `visual`, `performance`, `load`, `e2e`)
+actually changed, and every suite job is gated on its own category. Two new
+suites were added at the same time: `performance-tests` and `load-tests`
+(previously performance only ran nightly via `scheduled.yml`; load didn't
+run in any workflow at all).
+
+Two categories from the original request were deliberately **not** turned
+into their own jobs:
+
+- **security** is a pytest *marker*, not a directory —
+  `tests/api/test_security.py` carries `pytestmark = [pytest.mark.api,
+  pytest.mark.security]`, so `api-tests`' existing `-m api` run already
+  executes every security test. A dedicated job would just re-run a subset
+  of `api-tests`.
+- **data** (`tests/data/test_data.py`) has zero `def test_` functions — it's
+  a shared `TestGraphQL`/`TestUsers`/etc. constants class. A `data-tests` job
+  would collect 0 tests every run. `tests/data/**` changes instead route
+  into the `api`, `e2e`, and `load` filters (the suites whose test files
+  actually import `TestGraphQL`).
+
+### Fail-open, not fail-closed
+
+If the `changes` job errors, or is deliberately skipped via the
+`workflow_dispatch` `run_all` input, every downstream job must still run —
+a broken filter should never silently make every future PR pass CI having
+run zero tests. Every gated job's condition includes:
+
+```yaml
+(needs.changes.result != 'success' || needs.changes.outputs.<category> == 'true')
+```
+
+`changes.result` is `'skipped'` under `run_all` (its own `if:` skips it) and
+would be `'failure'` if the action itself errors — both `!= 'success'`, so
+every category's clause is satisfied and every suite runs.
+
+### The skip/failure-ambiguity gotcha (the reason `lint` is checked directly everywhere)
+
+`needs.<job>.result == 'skipped'` is true for two completely different
+reasons that are otherwise indistinguishable: (1) that job's own path filter
+just didn't match — expected, fine — or (2) an *upstream* job genuinely
+failed, e.g. `lint` breaks, which makes every job after it (whose `if:` now
+includes `always()`) evaluate to `'skipped'` too, cascading the same value
+down the whole chain. Checking only "did my immediate predecessor
+succeed-or-skip" can't tell these apart.
+
+The fix used throughout `ci.yml`: every gated job adds `lint` to its own
+`needs:` and checks `needs.lint.result == 'success'` **directly**, not just
+inferred transitively through its predecessor. `lint` is never path-filtered,
+so its result is always unambiguous. This is why every gated job's `needs:`
+list has three entries (`lint`, its immediate predecessor, `changes`) even
+though `lint` isn't otherwise in that job's critical path — it's there
+purely to make the direct reference legal.
+
+**Verify this specifically, don't just trust the design**: intentionally
+break `ruff` (e.g. commit an unused import) together with an unrelated
+`tests/api/**` change, push, and confirm every downstream job shows
+`skipped` — not that they ran anyway. If any of them run, the fail-open
+logic has a real bug, not just a theoretical one.
+
+### Why `always() && !cancelled()` reappears on accessibility-tests/visual-tests
+
+These two jobs had **no** `if:` at all (relying on default `success()`
+gating) since the 2026-08-12 fix documented above, specifically to avoid the
+bare-`always()`-ignores-cancellation bug. Path filtering requires an
+explicit `if:` again (a job needs custom logic to still be *evaluated* when
+its predecessor was filtered-out-skipped rather than genuinely successful).
+This is safe because it uses the same `always() && !cancelled()` pairing
+already proven safe on `test-summary` — never bare `always()`. If you see
+bare `always()` reappear on any suite job in this file, that is the
+2026-08-12 bug coming back, not this change.

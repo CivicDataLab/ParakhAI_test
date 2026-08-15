@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      run_all:
+        description: "Run every suite, bypassing path-based filtering"
+        type: boolean
+        required: false
+        default: false
 
 # One run at a time per PR (or per branch/ref for push/workflow_dispatch).
 # Added 2026-08-12: rapid pushes to an open PR were each auto-triggering a
@@ -65,6 +71,169 @@ env:
   SANDBOX_ORG_SLUG: ${{ vars.SANDBOX_ORG_SLUG }}
 
 jobs:
+  # ────────────────────────────────────────────── Change detection
+  # Added 2026-08-14 so a PR/push only runs the suites whose test code (or
+  # its actual dependencies) changed — a docs-only change now runs lint and
+  # nothing else, instead of the full ~25min chain every time.
+  #
+  # Every gated job below reads this job's outputs through its own `if:`.
+  # Two failure modes both have to make downstream jobs run, not skip:
+  #   1. This job is deliberately skipped (workflow_dispatch run_all=true) —
+  #      handled by the `if:` below, which skips this job entirely so
+  #      `needs.changes.result` becomes 'skipped'.
+  #   2. This action errors outright (e.g. dorny/paths-filter itself breaks)
+  #      — `needs.changes.result` becomes 'failure'.
+  # Every gated job's condition is `needs.changes.result != 'success' ||
+  # needs.changes.outputs.<category> == 'true'` — in both failure modes above
+  # the left side is true, so every suite runs (fail OPEN, not closed). A
+  # broken filter should never silently make every future PR pass CI having
+  # run zero tests.
+  changes:
+    name: Detect changed paths
+    runs-on: ubuntu-latest
+    if: github.event.inputs.run_all != 'true'
+    outputs:
+      api: ${{ steps.filter.outputs.api }}
+      accessibility: ${{ steps.filter.outputs.accessibility }}
+      visual: ${{ steps.filter.outputs.visual }}
+      performance: ${{ steps.filter.outputs.performance }}
+      load: ${{ steps.filter.outputs.load }}
+      e2e: ${{ steps.filter.outputs.e2e }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Filter changed paths by test category
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          # workflow_dispatch has no natural "changed since what" — diff
+          # against main so a manual run without run_all still filters
+          # sensibly instead of erroring.
+          base: ${{ github.event_name == 'workflow_dispatch' && 'main' || '' }}
+          # Each category repeats a shared "universal" block of files whose
+          # fixtures/imports every suite's test collection depends on
+          # (verified via grep, not guessed) rather than using YAML anchors
+          # to de-duplicate it — this is the first path-filtering this repo
+          # has had; a second layer of YAML-anchor indirection on top of an
+          # already-new pattern isn't worth the maintenance cost it adds.
+          filters: |
+            api:
+              - 'tests/api/**'
+              - 'tests/data/**'
+              - 'conftest.py'
+              - 'tests/conftest.py'
+              - 'utils/config.py'
+              - 'utils/helpers.py'
+              - 'utils/report_generator.py'
+              - 'pages/base_page.py'
+              - 'pages/home_page.py'
+              - 'pages/login_page.py'
+              - 'locators/home_locators.py'
+              - 'locators/login_locators.py'
+              - 'pytest.ini'
+              - 'pyproject.toml'
+              - 'requirements.txt'
+            accessibility:
+              - 'tests/accessibility/**'
+              - 'utils/reporters.py'
+              - 'conftest.py'
+              - 'tests/conftest.py'
+              - 'utils/config.py'
+              - 'utils/helpers.py'
+              - 'utils/report_generator.py'
+              - 'pages/base_page.py'
+              - 'pages/home_page.py'
+              - 'pages/login_page.py'
+              - 'locators/home_locators.py'
+              - 'locators/login_locators.py'
+              - 'pytest.ini'
+              - 'pyproject.toml'
+              - 'requirements.txt'
+            visual:
+              - 'tests/visual/**'
+              - 'pages/evaluator_role_page.py'
+              - 'pages/new_evaluation_page.py'
+              - 'locators/evaluations_locators.py'
+              - 'locators/evaluator_role_locators.py'
+              - 'utils/visual_guards.py'
+              - 'conftest.py'
+              - 'tests/conftest.py'
+              - 'utils/config.py'
+              - 'utils/helpers.py'
+              - 'utils/report_generator.py'
+              - 'pages/base_page.py'
+              - 'pages/home_page.py'
+              - 'pages/login_page.py'
+              - 'locators/home_locators.py'
+              - 'locators/login_locators.py'
+              - 'pytest.ini'
+              - 'pyproject.toml'
+              - 'requirements.txt'
+            performance:
+              - 'tests/performance/**'
+              - 'pages/dashboard_page.py'
+              - 'pages/new_evaluation_page.py'
+              - 'utils/reporters.py'
+              - 'conftest.py'
+              - 'tests/conftest.py'
+              - 'utils/config.py'
+              - 'utils/helpers.py'
+              - 'utils/report_generator.py'
+              - 'pages/base_page.py'
+              - 'pages/home_page.py'
+              - 'pages/login_page.py'
+              - 'locators/home_locators.py'
+              - 'locators/login_locators.py'
+              - 'pytest.ini'
+              - 'pyproject.toml'
+              - 'requirements.txt'
+            load:
+              - 'tests/load/**'
+              - 'tests/data/**'
+              - 'pages/evaluations_page.py'
+              - 'pages/new_evaluation_page.py'
+              - 'locators/evaluations_locators.py'
+              - 'utils/reporters.py'
+              - 'conftest.py'
+              - 'tests/conftest.py'
+              - 'utils/config.py'
+              - 'utils/helpers.py'
+              - 'utils/report_generator.py'
+              - 'pages/base_page.py'
+              - 'pages/home_page.py'
+              - 'pages/login_page.py'
+              - 'locators/home_locators.py'
+              - 'locators/login_locators.py'
+              - 'pytest.ini'
+              - 'pyproject.toml'
+              - 'requirements.txt'
+            e2e:
+              - 'tests/e2e/**'
+              - 'tests/data/**'
+              - 'pages/**'
+              - 'locators/add_model_flow_locators.py'
+              - 'locators/dashboard_locators.py'
+              - 'locators/evaluation_detail_locators.py'
+              - 'locators/evaluations_locators.py'
+              - 'locators/evaluator_role_locators.py'
+              - 'locators/evaluators_locators.py'
+              - 'locators/models_locators.py'
+              - 'locators/prompt_libraries_locators.py'
+              - 'utils/test_data_factory.py'
+              - 'conftest.py'
+              - 'tests/conftest.py'
+              - 'utils/config.py'
+              - 'utils/helpers.py'
+              - 'utils/report_generator.py'
+              - 'pages/base_page.py'
+              - 'pages/home_page.py'
+              - 'pages/login_page.py'
+              - 'locators/home_locators.py'
+              - 'locators/login_locators.py'
+              - 'pytest.ini'
+              - 'pyproject.toml'
+              - 'requirements.txt'
+
   # ────────────────────────────────────────────── Lint
   lint:
     name: Lint (ruff)
@@ -89,9 +258,10 @@ jobs:
   # acquisition (scripts/_api_client.get_access_token) and a few
   # cookie-security tests drive a real headless Chromium via Playwright.
   #
-  # api-tests / accessibility-tests / visual-tests / e2e-tests run in a
-  # serial chain (via `needs:`) rather than all firing at once after lint.
-  # They all hit the same shared dev backend (dev.parakh.civicdataspace.in),
+  # api-tests / accessibility-tests / visual-tests / performance-tests /
+  # load-tests / e2e-tests run in a serial chain (via `needs:`) rather than
+  # all firing at once after lint. They all hit the same shared dev backend
+  # (dev.parakh.civicdataspace.in),
   # which has known slow-query issues (docs/app_bugs.md #13/#14) — running
   # them concurrently was overwhelming it and producing widespread transient
   # ReadTimeouts / stuck "Loading..." states that looked like test failures
@@ -111,7 +281,17 @@ jobs:
   api-tests:
     name: API Tests
     runs-on: ubuntu-latest
-    needs: lint
+    needs: [lint, changes]
+    # Path-filtered 2026-08-14 — see the `changes` job's header comment for
+    # the fail-open contract. `always() && !cancelled()` (not bare always())
+    # is required so this job is still *evaluated* when path-filtered suites
+    # ahead of it in the chain get skipped, while still respecting a real
+    # concurrency-group cancellation — the same proven-safe pairing already
+    # used on test-summary; bare always() was proven unsafe here 2026-08-12.
+    if: |
+      always() && !cancelled() &&
+      needs.lint.result == 'success' &&
+      (needs.changes.result != 'success' || needs.changes.outputs.api == 'true')
     steps:
       - uses: actions/checkout@v6
 
@@ -156,15 +336,25 @@ jobs:
   e2e-tests:
     name: E2E Tests (shard ${{ matrix.shard }}/${{ strategy.job-total }})
     runs-on: ubuntu-latest
-    needs: visual-tests
+    needs: [lint, load-tests, changes]
     # PAUSED 2026-08-11 — remove this line to resume. test-summary's
     # E2E-report steps are guarded on `needs.e2e-tests.result != 'skipped'`
     # and degrade cleanly while this is off. Do NOT restore `if: always()`
     # (that was the original value) — removed the same pattern from
     # accessibility-tests/visual-tests 2026-08-12 after verifying live that
-    # it ignores workflow cancellation; default success()-gating is correct
-    # here for the same reason.
+    # it ignores workflow cancellation.
+    #
+    # Path filtering was added 2026-08-14 (see the `changes` job) to every
+    # other suite in this chain. When resuming e2e, delete the `if: false`
+    # line above and uncomment the real gated condition below instead of
+    # restoring plain always() — same always()+!cancelled() pairing used
+    # everywhere else in this file.
     if: false
+    # if: |
+    #   always() && !cancelled() &&
+    #   needs.lint.result == 'success' &&
+    #   (needs.load-tests.result == 'success' || needs.load-tests.result == 'skipped') &&
+    #   (needs.changes.result != 'success' || needs.changes.outputs.e2e == 'true')
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -217,15 +407,20 @@ jobs:
   accessibility-tests:
     name: Accessibility Tests (axe)
     runs-on: ubuntu-latest
-    needs: api-tests
-    # No if: always() here on purpose (removed 2026-08-12) - it was letting
-    # this job start even after the run was cancelled (verified live: a
-    # superseded run's api-tests correctly cancelled, but this job ignored
-    # that and kept running against the shared backend for up to its
-    # timeout). Every test step already uses continue-on-error, so
-    # api-tests' job conclusion is "success" even when its tests fail -
-    # default gating only actually skips this job on a genuine infra
-    # failure or cancellation, both cases where skipping is correct.
+    needs: [lint, api-tests, changes]
+    # Path-filtered 2026-08-14 — brings back an explicit `if:` (removed
+    # 2026-08-12 when bare always() was found to ignore cancellation; see
+    # api-tests' comment above for why always()+!cancelled() is safe where
+    # bare always() wasn't). needs.lint.result is checked directly (not just
+    # inferred via api-tests) because a skipped api-tests is ambiguous by
+    # itself — it means EITHER "path filter didn't match" (fine) OR "lint
+    # failed upstream and this cascaded" (must NOT run). Only a direct,
+    # unfiltered check against lint disambiguates that.
+    if: |
+      always() && !cancelled() &&
+      needs.lint.result == 'success' &&
+      (needs.api-tests.result == 'success' || needs.api-tests.result == 'skipped') &&
+      (needs.changes.result != 'success' || needs.changes.outputs.accessibility == 'true')
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
@@ -269,9 +464,13 @@ jobs:
   visual-tests:
     name: Visual Regression Tests
     runs-on: ubuntu-latest
-    needs: accessibility-tests
-    # No if: always() here either - see the comment on accessibility-tests'
-    # if: line above; same reasoning applies.
+    needs: [lint, accessibility-tests, changes]
+    # Path-filtered 2026-08-14 — same pattern as accessibility-tests above.
+    if: |
+      always() && !cancelled() &&
+      needs.lint.result == 'success' &&
+      (needs.accessibility-tests.result == 'success' || needs.accessibility-tests.result == 'skipped') &&
+      (needs.changes.result != 'success' || needs.changes.outputs.visual == 'true')
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
@@ -337,11 +536,114 @@ jobs:
             snapshots/
           retention-days: 30
 
+  # ────────────────────────────────────────────── Performance tests
+  # New 2026-08-14 — previously only ran nightly (scheduled.yml, run_perf
+  # toggle), never on PRs. Path-filtered like the suites above it in the
+  # chain; mirrors api-tests' job structure.
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    needs: [lint, visual-tests, changes]
+    if: |
+      always() && !cancelled() &&
+      needs.lint.result == 'success' &&
+      (needs.visual-tests.result == 'success' || needs.visual-tests.result == 'skipped') &&
+      (needs.changes.result != 'success' || needs.changes.outputs.performance == 'true')
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install Playwright browsers
+        run: playwright install --with-deps chromium
+
+      - name: Run performance tests
+        continue-on-error: true
+        run: |
+          pytest tests/performance/ \
+            -v \
+            --tb=short \
+            --html=reports/performance_report.html \
+            --self-contained-html \
+            --json-report-file=reports/performance.json \
+            -m performance
+
+      - name: Upload performance test report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: performance-test-report
+          path: |
+            reports/performance_report.html
+            reports/performance.json
+          retention-days: 30
+
+  # ────────────────────────────────────────────── Load tests
+  # New 2026-08-14 — didn't run in any workflow before this (not even
+  # nightly). tests/load/** does concurrent-mutation/degradation testing
+  # against the shared dev backend (pytest.ini's own marker description), so
+  # it's placed last-active in the chain deliberately — nothing else in the
+  # same run executes after it, minimizing exposure if it does degrade the
+  # backend for the run's own later steps (there are none).
+  load-tests:
+    name: Load Tests
+    runs-on: ubuntu-latest
+    needs: [lint, performance-tests, changes]
+    if: |
+      always() && !cancelled() &&
+      needs.lint.result == 'success' &&
+      (needs.performance-tests.result == 'success' || needs.performance-tests.result == 'skipped') &&
+      (needs.changes.result != 'success' || needs.changes.outputs.load == 'true')
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install Playwright browsers
+        run: playwright install --with-deps chromium
+
+      - name: Run load tests
+        continue-on-error: true
+        run: |
+          pytest tests/load/ \
+            -v \
+            --tb=short \
+            --html=reports/load_report.html \
+            --self-contained-html \
+            --json-report-file=reports/load.json \
+            -m load
+
+      - name: Upload load test report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: load-test-report
+          path: |
+            reports/load_report.html
+            reports/load.json
+          retention-days: 30
+
   # ────────────────────────────────────────────── Summary
   test-summary:
     name: Test Summary
     runs-on: ubuntu-latest
-    needs: [api-tests, e2e-tests, accessibility-tests, visual-tests]
+    needs: [api-tests, e2e-tests, accessibility-tests, visual-tests, performance-tests, load-tests]
     # Kept always() here (unlike the test jobs above) because this is the
     # reporting job, not a test job - it must still run while e2e-tests is
     # deliberately paused (if: false -> always "skipped", and default
@@ -411,7 +713,9 @@ jobs:
               "API=suite-artifacts/api.json" \
               "E2E=shard-artifacts/*/reports/e2e_shard_*.json" \
               "Accessibility=suite-artifacts/accessibility.json" \
-              "Visual Regression=suite-artifacts/reports/visual.json"
+              "Visual Regression=suite-artifacts/reports/visual.json" \
+              "Performance=suite-artifacts/performance.json" \
+              "Load=suite-artifacts/load.json"
             echo ""
             echo "**Platform:** ${{ env.BASE_URL }}"
             echo ""
@@ -423,6 +727,8 @@ jobs:
             echo "| E2E Tests | ${{ needs.e2e-tests.result }} |"
             echo "| Accessibility | ${{ needs.accessibility-tests.result }} |"
             echo "| Visual Regression | ${{ needs.visual-tests.result }} |"
+            echo "| Performance | ${{ needs.performance-tests.result }} |"
+            echo "| Load | ${{ needs.load-tests.result }} |"
             echo ""
             echo "</details>"
           } >> "$GITHUB_STEP_SUMMARY"
