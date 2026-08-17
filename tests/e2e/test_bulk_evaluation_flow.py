@@ -236,7 +236,7 @@ class TestEvaluatorReviewFlow:
         authenticated_page_fast.keyboard.press("End")
         authenticated_page_fast.wait_for_timeout(500)
 
-        assert review_page.is_review_section_visible() or review_page.is_submit_review_button_visible() or True, (
+        assert review_page.is_review_section_visible() or review_page.is_submit_review_button_visible(), (
             "Evaluator review section should be present on PENDING_REVIEW evaluation"
         )
 
@@ -250,9 +250,81 @@ class TestEvaluatorReviewFlow:
         authenticated_page_fast.keyboard.press("End")
         authenticated_page_fast.wait_for_timeout(500)
 
-        visible = review_page.is_submit_review_button_visible()
-        assert visible or True, (
+        assert review_page.is_submit_review_button_visible(), (
             "Submit Review button should appear on PENDING_REVIEW evaluation"
+        )
+
+
+# ── Evaluator override fields ─────────────────────────────────────────────────
+
+
+class TestEvaluatorOverrideFields:
+    """Override controls on a PENDING_REVIEW result row are actually interactive.
+
+    `EvaluatorReviewPage.override_result()`/`submit_review()` (the full write
+    path) were never exercised by any test before this — only presence checks
+    existed. Submitting a review irreversibly transitions a real sandbox audit
+    to COMPLETED (no un-submit mutation exists on the backend), so these tests
+    stop short of clicking Submit; they verify the override inputs themselves
+    accept and retain input, which was previously untested at any depth.
+    """
+
+    @pytest.fixture(scope="class")
+    def pending_review_eval_id(self, authenticated_graphql_client):
+        result = authenticated_graphql_client(
+            TestGraphQL.QUERY_AUDITS,
+            variables={
+                "filters": [
+                    {"field": "status", "condition": "exact", "value": "PENDING_REVIEW"}
+                ]
+            },
+        )
+        audits = ((result.get("data") or {}).get("audits") or {}).get("data") or []
+        if not audits:
+            pytest.skip("No PENDING_REVIEW evaluations found on this environment")
+        return int(audits[0]["id"])
+
+    def _open_review_with_rows(self, page: Page, eval_id: int) -> EvaluatorReviewPage:
+        detail = EvaluationDetailPage(page)
+        detail.go_to_evaluation_detail(eval_id)
+        review_page = EvaluatorReviewPage(page)
+        page.keyboard.press("End")
+        page.wait_for_timeout(500)
+        if review_page.get_result_row_count() == 0:
+            pytest.skip("PENDING_REVIEW evaluation has no result rows to override")
+        return review_page
+
+    def test_override_reason_textarea_accepts_typed_input(
+        self, authenticated_page_fast, pending_review_eval_id
+    ):
+        review_page = self._open_review_with_rows(
+            authenticated_page_fast, pending_review_eval_id
+        )
+        row = authenticated_page_fast.locator(review_page.RESULT_ROW).first
+        textarea = row.locator(review_page.OVERRIDE_REASON_TEXTAREA).first
+        if textarea.count() == 0:
+            pytest.skip("No override reason textarea rendered on this result row")
+
+        reason_text = "Automated coverage check — override reason"
+        textarea.fill(reason_text)
+        assert textarea.input_value() == reason_text, (
+            "Override reason textarea must retain typed input"
+        )
+
+    def test_override_risk_dropdown_has_selectable_options(
+        self, authenticated_page_fast, pending_review_eval_id
+    ):
+        review_page = self._open_review_with_rows(
+            authenticated_page_fast, pending_review_eval_id
+        )
+        row = authenticated_page_fast.locator(review_page.RESULT_ROW).first
+        dropdown = row.locator(review_page.OVERRIDE_RISK_DROPDOWN).first
+        if dropdown.count() == 0:
+            pytest.skip("No override risk dropdown rendered on this result row")
+
+        options = dropdown.locator("option").all_inner_texts()
+        assert len(options) >= 2, (
+            f"Override risk dropdown should expose multiple risk levels, got: {options}"
         )
 
 
