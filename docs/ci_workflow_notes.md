@@ -69,14 +69,18 @@ code or contort a naming scheme.
 
 ## Currently paused jobs
 
-| Job | Status | Notes |
-|---|---|---|
-| `e2e-tests` | **paused** since 2026-08-11 (`if: false`) | By request, not due to failures. `test-summary`'s E2E-report steps are guarded on `needs.e2e-tests.result != 'skipped'` so the pipeline degrades cleanly on missing shard artifacts. To resume: delete the active `if: false` line and uncomment the real gated condition already sitting commented-out directly below it in `ci.yml` — do **not** restore `if: always()`, see the "Path-filtered CI" section below for why. |
+None. `e2e-tests` was paused 2026-08-11 through 2026-08-17 (`if: false`, by
+request, not due to failures) and resumed once the full 543-test e2e round-2
+re-verification came back clean (PR #7) — it now uses the same path-filtered
+`if:` pattern as every other suite in this chain (see "Path-filtered CI"
+below), gated on `needs.changes.outputs.e2e`. `test-summary`'s E2E-report
+steps are still guarded on `needs.e2e-tests.result != 'skipped'`, which was
+originally added for the pause but stays harmless now that e2e runs
+normally — a path-filtered skip (no `tests/e2e/**` changes in a given PR)
+degrades the same way a paused job did.
 
-`e2e-tests` now depends on `needs: [lint, load-tests, changes]` (as of the
-2026-08-14 path-filtering change below) rather than just `visual-tests` —
-resuming it still works independent of any of those, since the job's own
-`if:` is what actually controls it.
+`e2e-tests` depends on `needs: [lint, load-tests, changes]` (as of the
+2026-08-14 path-filtering change below) rather than just `visual-tests`.
 
 ---
 
