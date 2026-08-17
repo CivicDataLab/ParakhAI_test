@@ -219,6 +219,7 @@ class TestBulkDraftPersistence:
             "Draft mode must survive Back to List → reopen"
         )
 
+    @pytest.mark.xfail(reason="App bug #30 — see docs/app_bugs.md", strict=False)
     def test_new_draft_appears_in_draft_tab_with_wizard_link(
         self, page: Page, sandbox_org, cleanup_evaluation
     ):
@@ -234,13 +235,16 @@ class TestBulkDraftPersistence:
         # evaluation-table-listing redesign (~2026-08) in favour of a
         # per-column filter on the DataTable — confirmed live 2026-08-13
         # (STATUS_TAB_DRAFT/ALL/[role='tab'] all count 0 on both a fresh
-        # nav and post-Back-to-List). The default (unfiltered) list is
-        # sorted most-recent-first, so the just-created draft is already
-        # visible without filtering. Wait for OUR row specifically (not just
-        # any row) — the table can render its first (stale/cached) page
-        # before the freshly-created draft has synced in, confirmed live
-        # 2026-08-13 (needed ~8s after Back to List for the new row to
-        # appear even though generic rows render almost immediately).
+        # nav and post-Back-to-List).
+        #
+        # This test previously assumed the default (unfiltered) list is
+        # sorted most-recent-first. Re-verified live 2026-08-17 (network
+        # capture of the actual GetAudits response) and that assumption is
+        # false: the default `audits` query returns the same fixed,
+        # non-recency-ordered page of ~10 rows regardless of how many new
+        # drafts are created or how long/how the page is reloaded — see
+        # bug #30. Left as a hard assertion (xfail, not rewritten to search)
+        # so a real fix on either side flips it back to green automatically.
         our_link = nep.page.locator(f"a[href*='auditId={audit_id}']")
         try:
             our_link.first.wait_for(state="attached", timeout=15_000)
