@@ -51,6 +51,20 @@ on:
       SANDBOX_ORG_SLUG:
         required: false
 
+# Added 2026-08-17 after a real, reproduced failure: two PRs merged 37s apart
+# each triggered their own push-to-main run of this workflow (no guard existed
+# here, unlike ci.yml's own concurrency block added 2026-08-12 for the exact
+# same reason). The second run overlapped the first against the shared dev
+# backend and hit a hard 120s pytest-timeout kill on a test that hangs under
+# concurrent load (no report.json produced -> smoke gate correctly failed,
+# but for an infra reason unrelated to the actual code being smoke-tested).
+# cancel-in-progress is also the right behavior for this workflow's
+# workflow_call use (ParakhAI-frontend's CD pipeline): a newer deploy's smoke
+# check should supersede a stale one, not queue behind it.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   smoke:
     name: Smoke Tests
