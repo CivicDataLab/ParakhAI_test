@@ -69,6 +69,9 @@ env:
   # is the reusable workflow ParakhAI-frontend's CD pipeline calls, not worth
   # touching for a cosmetic fix scoped to this file's own job summary).
   SANDBOX_ORG_SLUG: ${{ vars.SANDBOX_ORG_SLUG }}
+  # pending_pr marker (conftest.py): ParakhAI-Backend is private, so its PR state
+  # needs a GH_PR_TOKEN secret (fine-grained PAT, Pull requests: read on that repo)
+  GH_PR_TOKEN: ${{ secrets.GH_PR_TOKEN || github.token }}
 
 jobs:
   # ────────────────────────────────────────────── Change detection
