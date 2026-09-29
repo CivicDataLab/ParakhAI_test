@@ -19,7 +19,8 @@ Usage
 
 Each argument is `Label=path`. Missing or unparseable files are reported as
 such rather than skipped silently — a suite whose report never arrived is a
-result worth seeing, not a blank row. Shard globs are supported so the E2E
+result worth seeing, not a blank row. Exits 1 when any suite has failing
+tests, so CI can gate on it. Shard globs are supported so the E2E
 matrix can be passed as one label:
 
     python scripts/suite_summary.py "E2E=reports/e2e_shard_*.json"
@@ -112,9 +113,8 @@ def main(argv: list[str]) -> int:
     print("\n".join(rows))
     print()
     if any_failure:
-        print("> One or more suites have failing tests. Job status alone does not")
-        print("> reflect this — every suite runs with `continue-on-error: true`.")
-    return 0
+        print("> One or more suites have failing tests.")
+    return 1 if any_failure else 0
 
 
 if __name__ == "__main__":

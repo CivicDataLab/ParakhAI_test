@@ -712,7 +712,8 @@ jobs:
               "Accessibility=suite-artifacts/accessibility.json" \
               "Visual Regression=suite-artifacts/reports/visual.json" \
               "Performance=suite-artifacts/performance.json" \
-              "Load=suite-artifacts/load.json"
+              "Load=suite-artifacts/load.json" \
+              || echo "TESTS_FAILED=1" >> "$GITHUB_ENV"
             echo ""
             echo "**Platform:** ${{ env.BASE_URL }}"
             echo ""
@@ -739,3 +740,11 @@ jobs:
             reports/e2e_combined.json
             reports/e2e_summary.md
           retention-days: 30
+
+      # Every suite's pytest step is `continue-on-error` so all reports get
+      # produced; this is where a failing test finally turns the run red.
+      - name: Fail on test failures
+        if: env.TESTS_FAILED == '1'
+        run: |
+          echo "::error::One or more suites have failing tests — see the results table in the job summary."
+          exit 1
