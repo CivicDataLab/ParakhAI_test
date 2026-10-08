@@ -135,6 +135,31 @@ class ModelsPage(BasePage):
     def is_invite_auditors_visible(self) -> bool:
         return self.is_visible(self.INVITE_AUDITORS_LINK)
 
+    def click_invite_auditors(self) -> bool:
+        """Click the first 'Invite Evaluators' link/button (per model version)
+        and wait for the AuditorInvitation dialog to open.
+
+        Returns True if the dialog opened, False if there was nothing to
+        click (e.g. no versions on this model) — callers should skip rather
+        than fail on False, since that's a data gap, not a product bug.
+        """
+        link = self.page.locator(self.INVITE_AUDITORS_LINK).first
+        try:
+            link.wait_for(state="visible", timeout=8_000)
+        except Exception:
+            return False
+        link.click()
+        try:
+            self.page.locator(ModelsLocators.INVITE_AUDITOR_DIALOG).first.wait_for(
+                state="visible", timeout=self.timeout
+            )
+        except Exception:
+            return False
+        return True
+
+    def is_invite_auditor_dialog_visible(self) -> bool:
+        return self.is_visible(ModelsLocators.INVITE_AUDITOR_DIALOG)
+
     def is_past_evaluations_visible(self) -> bool:
         return self.is_visible(self.PAST_EVALUATIONS_HEADING)
 
