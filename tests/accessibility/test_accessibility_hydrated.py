@@ -133,3 +133,29 @@ class TestHydratedHomepageLanguage:
             "Indic-script text rendered under the page language (en) with no lang attribute "
             f"of its own: {untagged}"
         )
+
+
+@pytest.fixture
+def narrow_page(browser) -> Page:
+    """320 CSS px wide viewport — the WCAG 1.4.10 Reflow reference width."""
+    from utils.config import Config
+
+    context = browser.new_context(
+        viewport={"width": 320, "height": 640}, ignore_https_errors=True, locale="en-US"
+    )
+    context.set_default_timeout(Config.TIMEOUT)
+    yield context.new_page()
+    context.close()
+
+
+class TestHydratedHomepageReflow:
+    def test_no_horizontal_scroll_at_320px(self, narrow_page: Page):
+        """At 320px the whole hydrated homepage fits the viewport width (WCAG 1.4.10)."""
+        home = HomePage(narrow_page).go_to_home().wait_until_hydrated()
+
+        overflow = home.get_horizontal_overflow()
+        assert overflow["scrollWidth"] <= overflow["clientWidth"], (
+            f"Homepage scrolls horizontally at 320px: scrollWidth={overflow['scrollWidth']} > "
+            f"clientWidth={overflow['clientWidth']}; elements past the right edge: "
+            f"{overflow['offenders']}"
+        )
