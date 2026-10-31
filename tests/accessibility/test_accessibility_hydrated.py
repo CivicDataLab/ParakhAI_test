@@ -117,3 +117,19 @@ class TestHydratedHomepageFeatureTabs:
                 f"aria-selected/aria-pressed/aria-current: {selected or 'none'} "
                 f"(expected only '{label}')."
             )
+
+
+class TestHydratedHomepageLanguage:
+    @pytest.mark.xfail(
+        strict=True,
+        reason="App bug #33: Hindi/Odia/Assamese words in the hero sub-heading carry no lang attribute — see docs/app_bugs.md",
+    )
+    def test_non_english_passages_declare_their_language(self, page: Page):
+        """Text in another script is marked up with its own lang (WCAG 3.1.2, GIGW 3.0)."""
+        home = HomePage(page).go_to_home().wait_until_hydrated()
+
+        untagged = home.get_non_latin_text_without_own_language()
+        assert not untagged, (
+            "Indic-script text rendered under the page language (en) with no lang attribute "
+            f"of its own: {untagged}"
+        )
