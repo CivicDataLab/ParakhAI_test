@@ -172,7 +172,7 @@ class HomePage(BasePage):
         own `lang`, otherwise screen readers pronounce them with English rules.
         """
         return self.page.evaluate(
-            """() => {
+            r"""() => {
                 const indic = /[\u0900-\u0DFF]/;
                 const pageLang = (document.documentElement.lang || 'en').split('-')[0].toLowerCase();
                 const out = [];
@@ -230,7 +230,7 @@ class HomePage(BasePage):
         """Accessible name of the open sheet: aria-label, else the text of the
         element(s) referenced by aria-labelledby, else empty."""
         return self.page.locator(self.MOBILE_MENU_DIALOG).first.evaluate(
-            """el => {
+            r"""el => {
                 const label = (el.getAttribute('aria-label') || '').trim();
                 if (label) return label;
                 const ids = (el.getAttribute('aria-labelledby') || '').split(/\s+/).filter(Boolean);
@@ -242,7 +242,7 @@ class HomePage(BasePage):
     def get_mobile_menu_close_button_name(self) -> str:
         """Accessible name of the sheet's icon-only close button (empty if unnamed)."""
         return self.page.locator(self.MOBILE_MENU_CLOSE_BUTTON).first.evaluate(
-            """el => {
+            r"""el => {
                 const label = (el.getAttribute('aria-label') || '').trim();
                 if (label) return label;
                 const ids = (el.getAttribute('aria-labelledby') || '').split(/\s+/).filter(Boolean);
