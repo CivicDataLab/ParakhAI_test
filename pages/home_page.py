@@ -32,6 +32,8 @@ class HomePage(BasePage):
     FOOTER = HomeLocators.FOOTER
     SOCIAL_LINKS = HomeLocators.SOCIAL_LINKS
     CIVICDATALAB_LINK = HomeLocators.CIVICDATALAB_LINK
+    MOBILE_MENU_DIALOG = HomeLocators.MOBILE_MENU_DIALOG
+    MOBILE_MENU_CLOSE_BUTTON = HomeLocators.MOBILE_MENU_CLOSE_BUTTON
     HYDRATED_HERO_H1 = HomeLocators.HYDRATED_HERO_H1
     HYDRATED_FOOTER_LINK = HomeLocators.HYDRATED_FOOTER_LINK
     HYDRATED_ACTIVE_TAB = HomeLocators.HYDRATED_ACTIVE_TAB
@@ -217,6 +219,47 @@ class HomePage(BasePage):
 
     def click_hamburger(self) -> None:
         self.open_hamburger_menu()
+
+    def open_mobile_menu_and_wait(self) -> None:
+        """Open the hamburger sheet and wait until its dialog is visible."""
+        self.page.locator(self.HAMBURGER_MENU).first.wait_for(state="visible")
+        self.open_hamburger_menu()
+        self.page.locator(self.MOBILE_MENU_DIALOG).first.wait_for(state="visible")
+
+    def get_mobile_menu_dialog_name(self) -> str:
+        """Accessible name of the open sheet: aria-label, else the text of the
+        element(s) referenced by aria-labelledby, else empty."""
+        return self.page.locator(self.MOBILE_MENU_DIALOG).first.evaluate(
+            """el => {
+                const label = (el.getAttribute('aria-label') || '').trim();
+                if (label) return label;
+                const ids = (el.getAttribute('aria-labelledby') || '').split(/\s+/).filter(Boolean);
+                return ids.map(id => (document.getElementById(id)?.textContent || '').trim())
+                          .join(' ').trim();
+            }"""
+        )
+
+    def get_mobile_menu_close_button_name(self) -> str:
+        """Accessible name of the sheet's icon-only close button (empty if unnamed)."""
+        return self.page.locator(self.MOBILE_MENU_CLOSE_BUTTON).first.evaluate(
+            """el => {
+                const label = (el.getAttribute('aria-label') || '').trim();
+                if (label) return label;
+                const ids = (el.getAttribute('aria-labelledby') || '').split(/\s+/).filter(Boolean);
+                const byRef = ids.map(id => (document.getElementById(id)?.textContent || '').trim())
+                                 .join(' ').trim();
+                return byRef || (el.textContent || '').trim() || (el.getAttribute('title') || '').trim();
+            }"""
+        )
+
+    def close_mobile_menu_with_escape(self) -> None:
+        self.page.keyboard.press("Escape")
+        self.page.locator(self.MOBILE_MENU_DIALOG).first.wait_for(state="detached")
+
+    def is_hamburger_focused(self) -> bool:
+        return self.page.locator(self.HAMBURGER_MENU).first.evaluate(
+            "el => el === document.activeElement"
+        )
 
     def is_mobile_menu_open(self) -> bool:
         return self.is_visible(self.MOBILE_NAV_ITEMS, timeout=3_000)
