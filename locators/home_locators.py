@@ -101,6 +101,15 @@ class HomeLocators:
         "div.flex.flex-col.items-center:has(img)"
     )
 
+    # ── Hydration markers ─────────────────────────────────────────────────────
+    # MainNav / HeroSection / FeatureTabs / MainFooter are loaded with
+    # next/dynamic({ ssr: false }), so at the `load` event the page is only a
+    # skeleton (no <h1>, no footer links). These three nodes only exist once the
+    # client bundles have mounted every section a whole-page scan should cover.
+    HYDRATED_HERO_H1 = "main h1"
+    HYDRATED_FOOTER_LINK = "footer a[href]"
+    HYDRATED_ACTIVE_TAB = "button[class*='E8E4FF']"
+
     # ── Footer ────────────────────────────────────────────────────────────────
     FOOTER = "footer"
     SOCIAL_LINKS = (
