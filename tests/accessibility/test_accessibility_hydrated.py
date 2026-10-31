@@ -92,3 +92,28 @@ class TestHydratedHomepageAxe:
                 for n in v["nodes"]
             )
         )
+
+
+class TestHydratedHomepageFeatureTabs:
+    @pytest.mark.xfail(
+        strict=True,
+        reason="App bug #32: feature tabs are plain <button>s whose selected state is colour-only — see docs/app_bugs.md",
+    )
+    def test_selected_tab_is_exposed_to_assistive_tech(self, page: Page):
+        """Selecting a feature tab exposes exactly that tab as selected (WCAG 4.1.2, 1.4.1).
+
+        The sibling `test_feature_tabs_have_aria_states` skips on this page
+        because there is no [role='tab']; this one asserts against the real
+        markup (buttons) so it cannot skip its way to green.
+        """
+        home = HomePage(page).go_to_home().wait_until_hydrated()
+
+        for label in home.get_all_tab_names():
+            home.click_feature_tab(label)
+            flags = home.get_tab_selected_flags()
+            selected = [name for name, is_selected in flags.items() if is_selected]
+            assert selected == [label], (
+                f"After selecting the '{label}' tab, tabs exposed as selected via "
+                f"aria-selected/aria-pressed/aria-current: {selected or 'none'} "
+                f"(expected only '{label}')."
+            )
