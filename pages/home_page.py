@@ -149,6 +149,19 @@ class HomePage(BasePage):
         tabs = self.page.locator(self.TAB_BUTTON)
         return [tabs.nth(i).inner_text().strip() for i in range(tabs.count())]
 
+    def get_tab_selected_flags(self) -> dict[str, bool]:
+        """Map each feature-tab label to whether its *selected* state is exposed
+        programmatically (aria-selected / aria-pressed / aria-current), which is
+        what assistive technology reads. The lavender background is not enough."""
+        return self.page.locator(self.TAB_BUTTON).evaluate_all(
+            """els => Object.fromEntries(els.map(e => [
+                e.innerText.trim(),
+                e.getAttribute('aria-selected') === 'true'
+                  || e.getAttribute('aria-pressed') === 'true'
+                  || ['true', 'page', 'step', 'location'].includes(e.getAttribute('aria-current'))
+            ]))"""
+        )
+
     def is_feature_content_visible(self) -> bool:
         return self.is_visible(self.TAB_CONTENT)
 
