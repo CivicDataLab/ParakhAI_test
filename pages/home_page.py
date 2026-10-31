@@ -162,6 +162,30 @@ class HomePage(BasePage):
             ]))"""
         )
 
+    def get_non_latin_text_without_own_language(self) -> list[str]:
+        """Return rendered text nodes that contain Indic-script characters but whose
+        nearest `lang` attribute is still the page language (English).
+
+        WCAG 3.1.2 (Language of Parts): passages in another language need their
+        own `lang`, otherwise screen readers pronounce them with English rules.
+        """
+        return self.page.evaluate(
+            """() => {
+                const indic = /[\u0900-\u0DFF]/;
+                const pageLang = (document.documentElement.lang || 'en').split('-')[0].toLowerCase();
+                const out = [];
+                const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+                for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+                    const el = n.parentElement;
+                    if (!el || el.closest('script,style,noscript') || !indic.test(n.nodeValue)) continue;
+                    const own = el.closest('[lang]');
+                    const lang = own ? own.lang.split('-')[0].toLowerCase() : pageLang;
+                    if (lang === pageLang) out.push(n.nodeValue.trim());
+                }
+                return out;
+            }"""
+        )
+
     def is_feature_content_visible(self) -> bool:
         return self.is_visible(self.TAB_CONTENT)
 
