@@ -28,6 +28,10 @@ class HomeLocators:
         "[data-testid='mobile-menu-button']"
     )
     MOBILE_NAV_ITEMS = "nav a, [role='navigation'] a"
+    # The hamburger opens a Radix Sheet rendered as role="dialog".
+    MOBILE_MENU_DIALOG = "[role='dialog']"
+    # Icon-only (X) button inside the sheet: it holds an <svg> and no text.
+    MOBILE_MENU_CLOSE_BUTTON = "[role='dialog'] button:has(svg)"
 
     # ── Hero section ──────────────────────────────────────────────────────────
     # Include h2 as fallback — some builds promote h2 as the visual hero heading.
@@ -100,6 +104,15 @@ class HomeLocators:
         "section:has(button:has-text(\"Automation-assisted Evaluation Environment\")) "
         "div.flex.flex-col.items-center:has(img)"
     )
+
+    # ── Hydration markers ─────────────────────────────────────────────────────
+    # MainNav / HeroSection / FeatureTabs / MainFooter are loaded with
+    # next/dynamic({ ssr: false }), so at the `load` event the page is only a
+    # skeleton (no <h1>, no footer links). These three nodes only exist once the
+    # client bundles have mounted every section a whole-page scan should cover.
+    HYDRATED_HERO_H1 = "main h1"
+    HYDRATED_FOOTER_LINK = "footer a[href]"
+    HYDRATED_ACTIVE_TAB = "button[class*='E8E4FF']"
 
     # ── Footer ────────────────────────────────────────────────────────────────
     FOOTER = "footer"

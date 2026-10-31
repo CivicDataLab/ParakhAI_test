@@ -32,6 +32,11 @@ class HomePage(BasePage):
     FOOTER = HomeLocators.FOOTER
     SOCIAL_LINKS = HomeLocators.SOCIAL_LINKS
     CIVICDATALAB_LINK = HomeLocators.CIVICDATALAB_LINK
+    MOBILE_MENU_DIALOG = HomeLocators.MOBILE_MENU_DIALOG
+    MOBILE_MENU_CLOSE_BUTTON = HomeLocators.MOBILE_MENU_CLOSE_BUTTON
+    HYDRATED_HERO_H1 = HomeLocators.HYDRATED_HERO_H1
+    HYDRATED_FOOTER_LINK = HomeLocators.HYDRATED_FOOTER_LINK
+    HYDRATED_ACTIVE_TAB = HomeLocators.HYDRATED_ACTIVE_TAB
 
     def __init__(self, page: Page) -> None:
         super().__init__(page)
@@ -83,6 +88,23 @@ class HomePage(BasePage):
 
         return self
 
+    def wait_until_hydrated(self, timeout: int = 20_000) -> "HomePage":
+        """Wait until every client-rendered homepage section has mounted.
+
+        `go_to_home()` returns at the `load` event, when only the server-rendered
+        skeleton exists. Whole-page scans (axe, language, tab state) must run
+        after hero, feature tabs and footer are in the DOM, otherwise they
+        inspect a page no user ever sees. Raises a Playwright TimeoutError that
+        names the missing marker rather than letting the caller scan a skeleton.
+        """
+        for marker in (
+            self.HYDRATED_HERO_H1,
+            self.HYDRATED_ACTIVE_TAB,
+            self.HYDRATED_FOOTER_LINK,
+        ):
+            self.page.locator(marker).first.wait_for(state="visible", timeout=timeout)
+        return self
+
     def click_get_started(self) -> None:
         self.click(self.GET_STARTED_BUTTON)
 
@@ -129,6 +151,61 @@ class HomePage(BasePage):
         tabs = self.page.locator(self.TAB_BUTTON)
         return [tabs.nth(i).inner_text().strip() for i in range(tabs.count())]
 
+    def get_tab_selected_flags(self) -> dict[str, bool]:
+        """Map each feature-tab label to whether its *selected* state is exposed
+        programmatically (aria-selected / aria-pressed / aria-current), which is
+        what assistive technology reads. The lavender background is not enough."""
+        return self.page.locator(self.TAB_BUTTON).evaluate_all(
+            """els => Object.fromEntries(els.map(e => [
+                e.innerText.trim(),
+                e.getAttribute('aria-selected') === 'true'
+                  || e.getAttribute('aria-pressed') === 'true'
+                  || ['true', 'page', 'step', 'location'].includes(e.getAttribute('aria-current'))
+            ]))"""
+        )
+
+    def get_non_latin_text_without_own_language(self) -> list[str]:
+        """Return rendered text nodes that contain Indic-script characters but whose
+        nearest `lang` attribute is still the page language (English).
+
+        WCAG 3.1.2 (Language of Parts): passages in another language need their
+        own `lang`, otherwise screen readers pronounce them with English rules.
+        """
+        return self.page.evaluate(
+            r"""() => {
+                const indic = /[\u0900-\u0DFF]/;
+                const pageLang = (document.documentElement.lang || 'en').split('-')[0].toLowerCase();
+                const out = [];
+                const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+                for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+                    const el = n.parentElement;
+                    if (!el || el.closest('script,style,noscript') || !indic.test(n.nodeValue)) continue;
+                    const own = el.closest('[lang]');
+                    const lang = own ? own.lang.split('-')[0].toLowerCase() : pageLang;
+                    if (lang === pageLang) out.push(n.nodeValue.trim());
+                }
+                return out;
+            }"""
+        )
+
+    def get_horizontal_overflow(self) -> dict:
+        """Document scroll width vs viewport width, plus the first few elements that
+        stick out past the right edge (WCAG 1.4.10 Reflow)."""
+        return self.page.evaluate(
+            """() => ({
+                scrollWidth: document.documentElement.scrollWidth,
+                clientWidth: document.documentElement.clientWidth,
+                offenders: [...document.querySelectorAll('body *')]
+                    .filter(e => {
+                        const r = e.getBoundingClientRect();
+                        return r.width > 0 && r.right > window.innerWidth + 1
+                            && getComputedStyle(e).position !== 'fixed';
+                    })
+                    .slice(0, 5)
+                    .map(e => e.tagName.toLowerCase() + '.' + String(e.className).slice(0, 40)),
+            })"""
+        )
+
     def is_feature_content_visible(self) -> bool:
         return self.is_visible(self.TAB_CONTENT)
 
@@ -142,6 +219,56 @@ class HomePage(BasePage):
 
     def click_hamburger(self) -> None:
         self.open_hamburger_menu()
+
+    def open_mobile_menu_and_wait(self) -> None:
+        """Open the hamburger sheet and wait until its dialog is visible."""
+        self.page.locator(self.HAMBURGER_MENU).first.wait_for(state="visible")
+        self.open_hamburger_menu()
+        self.page.locator(self.MOBILE_MENU_DIALOG).first.wait_for(state="visible")
+
+    def get_mobile_menu_dialog_name(self) -> str:
+        """Accessible name of the open sheet: aria-label, else the text of the
+        element(s) referenced by aria-labelledby, else empty."""
+        return self.page.locator(self.MOBILE_MENU_DIALOG).first.evaluate(
+            r"""el => {
+                const label = (el.getAttribute('aria-label') || '').trim();
+                if (label) return label;
+                const ids = (el.getAttribute('aria-labelledby') || '').split(/\s+/).filter(Boolean);
+                return ids.map(id => (document.getElementById(id)?.textContent || '').trim())
+                          .join(' ').trim();
+            }"""
+        )
+
+    def get_mobile_menu_close_button_name(self) -> str:
+        """Accessible name of the sheet's icon-only close button (empty if unnamed)."""
+        return self.page.locator(self.MOBILE_MENU_CLOSE_BUTTON).first.evaluate(
+            r"""el => {
+                const label = (el.getAttribute('aria-label') || '').trim();
+                if (label) return label;
+                const ids = (el.getAttribute('aria-labelledby') || '').split(/\s+/).filter(Boolean);
+                const byRef = ids.map(id => (document.getElementById(id)?.textContent || '').trim())
+                                 .join(' ').trim();
+                return byRef || (el.textContent || '').trim() || (el.getAttribute('title') || '').trim();
+            }"""
+        )
+
+    def press_escape(self) -> None:
+        self.page.keyboard.press("Escape")
+
+    def is_mobile_menu_dialog_open(self, timeout: int = 3_000) -> bool:
+        """True while the sheet's dialog is still visible after `timeout` ms."""
+        try:
+            self.page.locator(self.MOBILE_MENU_DIALOG).first.wait_for(
+                state="hidden", timeout=timeout
+            )
+        except Exception:
+            return True
+        return False
+
+    def is_hamburger_focused(self) -> bool:
+        return self.page.locator(self.HAMBURGER_MENU).first.evaluate(
+            "el => el === document.activeElement"
+        )
 
     def is_mobile_menu_open(self) -> bool:
         return self.is_visible(self.MOBILE_NAV_ITEMS, timeout=3_000)
