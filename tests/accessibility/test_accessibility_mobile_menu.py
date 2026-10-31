@@ -56,3 +56,19 @@ class TestMobileMenuSheet:
         assert not home.is_mobile_menu_dialog_open(), (
             "The mobile menu dialog is still visible after pressing Escape"
         )
+
+    @pytest.mark.xfail(
+        strict=True,
+        reason="App bug #40: closing the mobile menu drops keyboard focus to <body> instead of the hamburger — see docs/app_bugs.md",
+    )
+    def test_focus_returns_to_hamburger_after_close(self, mobile_page: Page):
+        """After the sheet closes, keyboard focus is back on the button that opened it (WCAG 2.4.3)."""
+        home = HomePage(mobile_page).go_to_home()
+        home.open_mobile_menu_and_wait()
+        home.press_escape()
+        assert not home.is_mobile_menu_dialog_open(), "precondition: Escape must close the menu"
+
+        assert home.is_hamburger_focused(), (
+            "Keyboard focus was not returned to the hamburger button after the menu closed; "
+            "keyboard users restart from the top of the page."
+        )
