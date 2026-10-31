@@ -252,9 +252,18 @@ class HomePage(BasePage):
             }"""
         )
 
-    def close_mobile_menu_with_escape(self) -> None:
+    def press_escape(self) -> None:
         self.page.keyboard.press("Escape")
-        self.page.locator(self.MOBILE_MENU_DIALOG).first.wait_for(state="detached")
+
+    def is_mobile_menu_dialog_open(self, timeout: int = 3_000) -> bool:
+        """True while the sheet's dialog is still visible after `timeout` ms."""
+        try:
+            self.page.locator(self.MOBILE_MENU_DIALOG).first.wait_for(
+                state="hidden", timeout=timeout
+            )
+        except Exception:
+            return True
+        return False
 
     def is_hamburger_focused(self) -> bool:
         return self.page.locator(self.HAMBURGER_MENU).first.evaluate(

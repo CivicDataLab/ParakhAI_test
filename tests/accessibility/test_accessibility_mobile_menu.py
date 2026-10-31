@@ -45,3 +45,14 @@ class TestMobileMenuSheet:
             "The icon-only close button in the mobile menu has no aria-label, "
             "aria-labelledby, text or title — its only text node is an empty visually-hidden span."
         )
+
+    def test_escape_closes_menu(self, mobile_page: Page):
+        """Pressing Escape dismisses the open mobile menu (keyboard operability, WCAG 2.1.1)."""
+        home = HomePage(mobile_page).go_to_home()
+        home.open_mobile_menu_and_wait()
+
+        home.press_escape()
+
+        assert not home.is_mobile_menu_dialog_open(), (
+            "The mobile menu dialog is still visible after pressing Escape"
+        )
