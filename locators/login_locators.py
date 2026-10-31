@@ -59,3 +59,8 @@ class LoginLocators:
         "[class*='provider']:has-text('Keycloak'), "
         "[class*='social']:has-text('Keycloak')"
     )
+    # NextAuth's built-in sign-in page renders the provider logo as
+    # <img id="provider-logo"> (+ a dark-mode twin). The page has no lang-less
+    # variants of this markup, so the id is a stable anchor.
+    PROVIDER_LOGO_IMAGES = "form img[id^='provider-logo']"
+    PROVIDER_SIGNIN_PATH = "/api/auth/signin"
