@@ -186,6 +186,24 @@ class HomePage(BasePage):
             }"""
         )
 
+    def get_horizontal_overflow(self) -> dict:
+        """Document scroll width vs viewport width, plus the first few elements that
+        stick out past the right edge (WCAG 1.4.10 Reflow)."""
+        return self.page.evaluate(
+            """() => ({
+                scrollWidth: document.documentElement.scrollWidth,
+                clientWidth: document.documentElement.clientWidth,
+                offenders: [...document.querySelectorAll('body *')]
+                    .filter(e => {
+                        const r = e.getBoundingClientRect();
+                        return r.width > 0 && r.right > window.innerWidth + 1
+                            && getComputedStyle(e).position !== 'fixed';
+                    })
+                    .slice(0, 5)
+                    .map(e => e.tagName.toLowerCase() + '.' + String(e.className).slice(0, 40)),
+            })"""
+        )
+
     def is_feature_content_visible(self) -> bool:
         return self.is_visible(self.TAB_CONTENT)
 
