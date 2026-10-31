@@ -32,6 +32,9 @@ class HomePage(BasePage):
     FOOTER = HomeLocators.FOOTER
     SOCIAL_LINKS = HomeLocators.SOCIAL_LINKS
     CIVICDATALAB_LINK = HomeLocators.CIVICDATALAB_LINK
+    HYDRATED_HERO_H1 = HomeLocators.HYDRATED_HERO_H1
+    HYDRATED_FOOTER_LINK = HomeLocators.HYDRATED_FOOTER_LINK
+    HYDRATED_ACTIVE_TAB = HomeLocators.HYDRATED_ACTIVE_TAB
 
     def __init__(self, page: Page) -> None:
         super().__init__(page)
@@ -81,6 +84,23 @@ class HomePage(BasePage):
                 "Check site health before re-running these tests."
             )
 
+        return self
+
+    def wait_until_hydrated(self, timeout: int = 20_000) -> "HomePage":
+        """Wait until every client-rendered homepage section has mounted.
+
+        `go_to_home()` returns at the `load` event, when only the server-rendered
+        skeleton exists. Whole-page scans (axe, language, tab state) must run
+        after hero, feature tabs and footer are in the DOM, otherwise they
+        inspect a page no user ever sees. Raises a Playwright TimeoutError that
+        names the missing marker rather than letting the caller scan a skeleton.
+        """
+        for marker in (
+            self.HYDRATED_HERO_H1,
+            self.HYDRATED_ACTIVE_TAB,
+            self.HYDRATED_FOOTER_LINK,
+        ):
+            self.page.locator(marker).first.wait_for(state="visible", timeout=timeout)
         return self
 
     def click_get_started(self) -> None:
