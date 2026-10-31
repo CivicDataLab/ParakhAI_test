@@ -28,6 +28,10 @@ class HomeLocators:
         "[data-testid='mobile-menu-button']"
     )
     MOBILE_NAV_ITEMS = "nav a, [role='navigation'] a"
+    # The hamburger opens a Radix Sheet rendered as role="dialog".
+    MOBILE_MENU_DIALOG = "[role='dialog']"
+    # Icon-only (X) button inside the sheet: it holds an <svg> and no text.
+    MOBILE_MENU_CLOSE_BUTTON = "[role='dialog'] button:has(svg)"
 
     # ── Hero section ──────────────────────────────────────────────────────────
     # Include h2 as fallback — some builds promote h2 as the visual hero heading.
