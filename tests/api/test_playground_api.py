@@ -351,6 +351,8 @@ class TestPlaygroundEvaluationCreate:
         resp = ((run_result.get("data") or {}).get("runAudit")) or {}
         if resp and resp.get("audit"):
             status = resp["audit"].get("status")
-            assert status in TestModelConstants.AUDIT_STATUSES, (
+            # A rejected run (e.g. no evaluation module selected) leaves the audit DRAFT.
+            allowed = TestModelConstants.AUDIT_STATUSES + ([] if resp.get("success") else ["DRAFT"])
+            assert status in allowed, (
                 f"runAudit returned unexpected status: {status!r}"
             )
