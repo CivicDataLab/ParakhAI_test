@@ -17,7 +17,7 @@ tests/e2e/test_assignment_workflow.py and test_multi_user_assignment.py.
 
 import pytest
 
-from tests.data.test_data import TestGraphQL
+from tests.data.test_data import TestGraphQL, first_org_model_id
 
 pytestmark = [pytest.mark.api, pytest.mark.regression, pytest.mark.auth]
 
@@ -78,12 +78,10 @@ class TestAiModelDetailQuery:
             assert result["data"].get("aiModel") is None
 
     def test_ai_model_shape_with_valid_model(self, authenticated_graphql_client):
-        models_result = authenticated_graphql_client(TestGraphQL.QUERY_MY_MODELS)
-        models = ((models_result.get("data") or {}).get("myModels")) or []
-        if not models:
-            pytest.skip("No AI models available for this user")
+        model_id = first_org_model_id(authenticated_graphql_client)
+        if not model_id:
+            pytest.skip("No non-Opus AI models in the sandbox org")
 
-        model_id = models[0]["id"]
         result = authenticated_graphql_client(
             TestGraphQL.QUERY_AI_MODEL, variables={"modelId": str(model_id)}
         )
