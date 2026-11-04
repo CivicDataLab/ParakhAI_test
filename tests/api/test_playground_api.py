@@ -10,7 +10,7 @@ Coverage:
 
 import pytest
 
-from tests.data.test_data import TestGraphQL, TestModelConstants
+from tests.data.test_data import TestGraphQL, TestModelConstants, first_org_model_id
 
 pytestmark = [pytest.mark.api, pytest.mark.regression, pytest.mark.auth]
 
@@ -245,9 +245,7 @@ class TestPlaygroundEvaluationCreate:
 
     @staticmethod
     def _first_model_id(client) -> str | None:
-        result = client(TestGraphQL.QUERY_MY_MODELS)
-        models = ((result.get("data") or {}).get("myModels")) or []
-        return str(models[0]["id"]) if models else None
+        return first_org_model_id(client)
 
     def test_create_blank_audit_returns_draft_audit(
         self, authenticated_graphql_client, sandbox_org, cleanup_evaluation
