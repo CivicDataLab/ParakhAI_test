@@ -431,7 +431,10 @@ def _refresh_storage_state_if_stale(browser: Browser, state_path: str) -> None:
     pg = context.new_page()
     pg.set_default_timeout(Config.TIMEOUT)
     try:
-        _do_login(pg, user["email"], user["password"])
+        for _ in range(3):
+            _do_login(pg, user["email"], user["password"])
+            if not pg.locator(HomePage.NAV_LOGIN_BUTTON).first.is_visible():
+                break  # logged in: the Login button is gone
         context.storage_state(path=state_path)
     finally:
         context.close()
