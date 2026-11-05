@@ -649,7 +649,7 @@ class TestInputSanitisation:
         """A sort field outside the server allowlist must fail closed.
 
         Allowed sort fields for `audits` are name/status/model_snapshot__display_name/
-        passed_tests/evaluation_mode/audit_type/completed_at/created_at. Anything else
+        passed_tests/evaluation_mode/audit_type/completed_at/created_at/updated_at. Anything else
         must be rejected — not silently ignored (falling back to default ordering while
         looking successful) and not passed through to the ORM.
         """
@@ -681,7 +681,7 @@ class TestInputSanitisation:
         """A filter field outside the server allowlist must fail closed.
 
         Allowed filter fields for `audits` are name/model_snapshot__display_name/
-        audit_type/evaluation_mode/model_id/status/completed_at — notably `requested_by`
+        audit_type/evaluation_mode/model_id/status/completed_at/updated_at — notably `requested_by`
         (the owning user FK) is NOT allowed, so a client can't filter by arbitrary
         internal fields even though the underlying ORM call would otherwise accept them.
         """
