@@ -407,7 +407,6 @@ class EvaluationsLocators:
 
     # Evaluation matrix (mapped on prod 2026-11-05)
     MODAL_EVALUATION_DOMAIN_SELECT = "select[name='evaluationDomain']"
-    WIZARD_SUBMODULE_COMBOBOXES = "input[role='combobox'][placeholder*='sub-modules']"
     WIZARD_ADD_INPUT_PROMPT_BUTTON = "button:has-text('Add Input Prompt')"
     WIZARD_CUSTOM_TEST_INPUT = "textarea[name='testInput']"
     WIZARD_CUSTOM_REFERENCE_OUTPUT = "textarea[name='referenceOutput']"
