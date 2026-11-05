@@ -25,7 +25,8 @@ from tests.data.evaluation_matrix import Combo, combos_for
 from tests.data.test_data import TestGraphQL
 
 COMBOS = combos_for(os.getenv("EVAL_MATRIX", ""))
-BUDGET_S = int(os.getenv("EVAL_MATRIX_BUDGET_S", "600"))
+STALL_S = int(os.getenv("EVAL_MATRIX_STALL_S", "420"))  # fail when progress stops this long
+BUDGET_S = int(os.getenv("EVAL_MATRIX_BUDGET_S", "2700"))  # hard cap per run
 
 pytestmark = [
     pytest.mark.e2e,
@@ -34,7 +35,9 @@ pytestmark = [
     pytest.mark.auth,
 ]
 
-_AUDIT_Q = "query($id: ID!){ audit(auditId:$id){ id status totalTests passedTests failedTests } }"
+_AUDIT_Q = (
+    "query($id: ID!){ audit(auditId:$id){ id status progressPercentage totalTests passedTests failedTests } }"
+)
 _MODULE_WORD = {"hallucination": "hallucination", "bias": "bias", "privacy": "privacy"}
 
 
@@ -44,17 +47,25 @@ def _audit(client, audit_id: str) -> dict:
 
 
 def _wait_status(client, audit_id: str, want: tuple[str, ...], budget_s: int) -> dict:
-    deadline = time.monotonic() + budget_s
+    """Poll until `want`. A long library run keeps moving (progressPercentage),
+    so only a stall of STALL_S or the hard `budget_s` cap fails the test."""
+    start = time.monotonic()
+    last_progress, last_move = -1, start
     last = None
-    while time.monotonic() < deadline:
+    while time.monotonic() - start < budget_s:
         audit = _audit(client, audit_id)
         last = audit.get("status")
         if last in want:
             return audit
         if last in ("FAILED", "CANCELLED"):
             pytest.fail(f"audit {audit_id} ended {last} while waiting for {want}")
+        progress = audit.get("progressPercentage") or 0
+        if progress != last_progress:
+            last_progress, last_move = progress, time.monotonic()
+        elif time.monotonic() - last_move > STALL_S:
+            pytest.fail(f"audit {audit_id} stalled at {progress}% ({last}) for {STALL_S}s")
         time.sleep(15)
-    pytest.fail(f"audit {audit_id} still {last!r} after {budget_s}s (wanted {want})")
+    pytest.fail(f"audit {audit_id} still {last!r} at {last_progress}% after {budget_s}s (wanted {want})")
 
 
 def _create_and_configure(nep: NewEvaluationPage, combo: Combo) -> str:
@@ -101,7 +112,7 @@ def _drive_playground(nep: NewEvaluationPage) -> None:
     nep.click_finish_evaluation()
 
 
-@pytest.mark.timeout(BUDGET_S + 600)
+@pytest.mark.timeout(BUDGET_S + 900)
 @pytest.mark.parametrize("combo", COMBOS, ids=[c.id for c in COMBOS])
 def test_create_run_complete_and_report(
     combo: Combo,
