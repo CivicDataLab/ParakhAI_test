@@ -675,7 +675,7 @@ class TestEvaluationsPagination:
         if next_btn.count() == 0 or not next_btn.first.is_enabled():
             pytest.skip("No 'Next' pagination button available")
         next_btn.first.click()
-        page.wait_for_timeout(500)
+        page.wait_for_load_state("networkidle")
         # Applying a filter should reset offset to 0 (page 1)
         if ep.is_status_filter_available():
             ep.click_status_tab("Completed")
