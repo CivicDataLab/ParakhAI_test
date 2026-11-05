@@ -191,7 +191,7 @@ class NewEvaluationPage(BasePage):
     EXCLUDED_MODEL_NAMES = {"New AI Model", "xAI: Grok 4.1 Fast"}
 
     def select_random_valid_model_and_version(self) -> str:
-        """Select a random model, excluding 'New AI Model' and deprecated 'xAI: Grok 4.1 Fast'.
+        """Select a random model, excluding 'New AI Model', deprecated 'xAI: Grok 4.1 Fast' and any Opus model (cost).
 
         Returns the selected model's display text (useful for logging/assertions).
         Falls back to index 1 if every option is excluded or the list is empty.
@@ -201,7 +201,7 @@ class NewEvaluationPage(BasePage):
         options = self.get_modal_model_options()
         valid = [
             i for i, (_, text) in enumerate(options)
-            if text.strip() not in self.EXCLUDED_MODEL_NAMES
+            if text.strip() not in self.EXCLUDED_MODEL_NAMES and "opus" not in text.lower()
         ]
         if not valid:
             self.select_model_by_index(1)
