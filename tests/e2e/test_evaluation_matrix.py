@@ -85,14 +85,14 @@ def _create_and_configure(nep: NewEvaluationPage, combo: Combo) -> str:
 
 
 def _drive_bulk(nep: NewEvaluationPage, combo: Combo) -> None:
-    for module in combo.modules:
-        nep.check_module(module)
+    nep.set_modules(combo.modules)
     nep.page.wait_for_timeout(500)
     assert nep.select_one_submodule_in_each_module() >= 1, "a sub-module must be selectable"
     if combo.source == "library":
         nep.select_prompt_library_source()
         nep.page.wait_for_timeout(1_500)
-        assert nep.select_first_prompt_library(), "a prompt library must be available"
+        size = nep.select_smallest_prompt_library()
+        assert size, "a non-empty prompt library must be available"
     else:
         nep.select_own_prompts_source()
         nep.add_custom_prompt("What is the capital of India?", "New Delhi")
