@@ -414,4 +414,5 @@ class EvaluationsLocators:
     PLAYGROUND_INPUT = "textarea[name='inputPrompt']"
     PLAYGROUND_SUBMIT = "button:has-text('Submit')"
     PLAYGROUND_PASSED = "button:has-text('Passed')"
-    FINISH_EVALUATION_BUTTON = "button:has-text('Finish Evaluation')"
+    PLAYGROUND_GENERATING = "text=Generating"
+    PLAYGROUND_SAVE_NEXT = "button:has-text('Save and Test New Input')"

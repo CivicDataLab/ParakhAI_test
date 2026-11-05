@@ -582,13 +582,21 @@ class NewEvaluationPage(BasePage):
         field.wait_for(state="hidden", timeout=10_000)
 
     def submit_playground_test_case(self, prompt: str, timeout: int = 90_000) -> None:
-        """Playground: type a prompt, Submit, wait for the model output, mark it Passed."""
+        """Playground: type a prompt, Submit, wait for the model to finish,
+        mark it Passed and Save. Passed is clickable while the output still
+        says 'Generating', so wait for that to clear first; only
+        'Save and Test New Input' persists the case."""
         self.page.locator(EvaluationsLocators.PLAYGROUND_INPUT).fill(prompt)
         self.page.locator(EvaluationsLocators.PLAYGROUND_SUBMIT).first.click()
-        passed = self.page.locator(EvaluationsLocators.PLAYGROUND_PASSED).first
-        passed.wait_for(state="visible", timeout=timeout)
-        passed.click()
-        self.page.wait_for_timeout(1_500)
+        generating = self.page.locator(EvaluationsLocators.PLAYGROUND_GENERATING).first
+        try:
+            generating.wait_for(state="visible", timeout=5_000)
+        except Exception:  # noqa: BLE001 - fast model: it may already be gone
+            pass
+        generating.wait_for(state="hidden", timeout=timeout)
+        self.page.locator(EvaluationsLocators.PLAYGROUND_PASSED).first.click()
+        self.page.locator(EvaluationsLocators.PLAYGROUND_SAVE_NEXT).first.click()
+        self.page.wait_for_timeout(2_000)
 
     def click_finish_evaluation(self) -> None:
         self.page.locator(EvaluationsLocators.FINISH_EVALUATION_BUTTON).first.click()
