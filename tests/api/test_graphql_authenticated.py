@@ -260,6 +260,55 @@ class TestAuditsSortAndPagination:
             assert "totalItemsCount" in wrapper
 
 
+AUDITS_BY_UPDATED_AT = """
+    query($limit: Int, $filters: [FilterSpec!], $sortOptions: [SortSpec!]) {
+      audits(limit: $limit, filters: $filters, sortOptions: $sortOptions) {
+        data { id updatedAt }
+        totalItemsCount
+      }
+    }
+"""
+
+
+class TestAuditsUpdatedAt:
+    """`updated_at` is in the audits sort and filter allowlists (ParakhAI-Backend#130, #133)."""
+
+    def _audits(self, client, **variables):
+        result = client(AUDITS_BY_UPDATED_AT, variables={"limit": 20, **variables})
+        assert not result.get("errors"), f"audits query errored: {result.get('errors')}"
+        return result["data"]["audits"]
+
+    def test_audits_sorted_by_updated_at_asc_is_non_decreasing(self, authenticated_graphql_client):
+        # Ascending, because the default order (created_at desc) would fail it.
+        rows = self._audits(
+            authenticated_graphql_client,
+            sortOptions=[{"field": "updated_at", "direction": "asc"}],
+        )["data"]
+        values = [r["updatedAt"] for r in rows]
+        if len(values) < 2:
+            pytest.skip("Fewer than 2 audits — not enough data to prove ordering")
+        assert values == sorted(values), f"updatedAt is not ascending: {values}"
+
+    def test_audits_filtered_by_updated_at_narrows_the_result(self, authenticated_graphql_client):
+        everything = self._audits(
+            authenticated_graphql_client,
+            sortOptions=[{"field": "updated_at", "direction": "desc"}],
+        )
+        if everything["totalItemsCount"] < 11:
+            pytest.skip("Too few audits to pick a cutoff that narrows the result")
+        cutoff = everything["data"][9]["updatedAt"]
+
+        filtered = self._audits(
+            authenticated_graphql_client,
+            filters=[{"field": "updated_at", "condition": "gte", "value": cutoff}],
+        )
+        assert 0 < filtered["totalItemsCount"] < everything["totalItemsCount"], (
+            f"Filtering on updated_at >= {cutoff} returned {filtered['totalItemsCount']} "
+            f"of {everything['totalItemsCount']} audits; the filter was not applied"
+        )
+        assert all(r["updatedAt"] >= cutoff for r in filtered["data"])
+
+
 # ── Audit tests pagination (new — Jun 2026) ───────────────────────────────────
 
 
