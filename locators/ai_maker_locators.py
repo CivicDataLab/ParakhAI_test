@@ -40,6 +40,9 @@ class AIMakerLocators:
     STAT_CARD = "[class*='stat'], [class*='card'], [class*='Card']"
     STAT_CARD_VALUE = ".metric-card-value"
 
+    # ── Org selection page: org card logos (alt is "<org name> logo") ─────────
+    ORG_CARD_LOGO = "img[alt$=' logo']"
+
     # ── Org selection page: Add Organisation button (Jun 2026) ───────────────
     ADD_ORGANISATION_BUTTON = (
         "button:has-text('Add Organisation'), a:has-text('Add Organisation')"
