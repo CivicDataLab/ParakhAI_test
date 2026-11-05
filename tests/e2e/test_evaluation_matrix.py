@@ -123,7 +123,7 @@ def test_create_run_complete_and_report(
         audit = _wait_status(client, audit_id, ("PENDING_REVIEW", "COMPLETED"), BUDGET_S)
     else:
         _drive_playground(nep)
-        audit = _wait_status(client, audit_id, ("PENDING_REVIEW", "COMPLETED"), 120)
+        audit = _wait_status(client, audit_id, ("PENDING_REVIEW", "COMPLETED"), BUDGET_S)
 
     if audit["status"] == "PENDING_REVIEW":
         res = client(
