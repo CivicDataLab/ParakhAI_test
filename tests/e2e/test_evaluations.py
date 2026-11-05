@@ -465,6 +465,10 @@ class TestEvaluationDetail:
             "'Back to List' button not found on evaluation detail page"
         )
         ep.click_back_to_list()
+        try:
+            page.wait_for_url(lambda u: "/evaluations" in u and str(completed_eval_id) not in u, timeout=15_000)
+        except Exception:
+            pass
         assert "/evaluations" in page.url and str(completed_eval_id) not in page.url, (
             "'Back to List' must return to the evaluations list page"
         )
