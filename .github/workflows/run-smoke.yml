@@ -65,6 +65,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # pending_pr marker (conftest.py) reads PR merge state from the GitHub API
+  GH_PR_TOKEN: ${{ secrets.GH_PR_TOKEN || github.token }}
+
 jobs:
   smoke:
     name: Smoke Tests

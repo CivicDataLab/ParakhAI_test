@@ -55,6 +55,27 @@ def _open_cds_editor(page: Page) -> None:
         return
     pytest.skip("CDS editor requires auth — anonymous session was redirected to Keycloak")
 
+# Login-page indicators — same keyword idiom used in tests/e2e/test_auth.py and
+# test_homepage.py. Kept host-agnostic on purpose: every CivicDataLab product
+# migrated from `opub-kc.civicdatalab.in/auth/realms/DataSpace` to
+# `auth.civicdatalab.in/realms/DataSpace` (different host AND the `/auth` path
+# segment is gone — Keycloak now serves from the domain root). The previous
+# guard matched the literal strings "opub-kc" and "auth/realms", so after the
+# migration it stopped firing entirely and a session bounce surfaced as a
+# confusing assertion failure instead of a clean skip.
+_LOGIN_URL_KEYWORDS = ("login", "auth", "keycloak", "sso", "signin", "sign-in")
+
+
+def _is_login_redirect(url: str) -> bool:
+    """True when *url* looks like a Keycloak/SSO login page rather than the app.
+
+    Matches either Keycloak's realm path (`/realms/...`, present on both the old
+    `/auth/realms/...` and the new root-path `/realms/...` deployments) or any of
+    the generic login keywords, so it works against either server.
+    """
+    lowered = url.lower()
+    return "/realms/" in lowered or any(kw in lowered for kw in _LOGIN_URL_KEYWORDS)
+
 
 class TestAddModelRedirect:
     """Tests for the ParakhAI side of the Add Model cross-platform redirect."""
@@ -129,7 +150,7 @@ class TestCDSAddModelEditor:
         page.on("pageerror", lambda e: errors.append(str(e)))
         page.goto(Config.cds_url("/en/manage/ai-models"), wait_until="domcontentloaded", timeout=20000)
         page.wait_for_timeout(3000)
-        if "opub-kc" in page.url or "auth/realms" in page.url:
+        if _is_login_redirect(page.url):
             pytest.skip(
                 "CDS editor not reached — page (uses anonymous `page` fixture, no CDS "
                 f"auth) redirected to Keycloak login before the editor loaded: {page.url}"
@@ -155,7 +176,7 @@ class TestCDSAddModelEditor:
         page.on("pageerror", lambda e: console_errors.append(str(e)))
         page.goto(Config.cds_url("/en/manage/ai-models"), wait_until="domcontentloaded", timeout=20000)
         page.wait_for_timeout(3000)
-        if "opub-kc" in page.url or "auth/realms" in page.url:
+        if _is_login_redirect(page.url):
             pytest.skip(
                 "CDS editor not reached — page (uses anonymous `page` fixture, no CDS "
                 f"auth) redirected to Keycloak login before the editor loaded: {page.url}"

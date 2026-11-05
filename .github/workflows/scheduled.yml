@@ -58,6 +58,9 @@ env:
   # Slug of the dedicated sandbox org. When set, write-marked regression tests
   # are allowed to mutate this org. When unset, those tests skip.
   SANDBOX_ORG_SLUG: ${{ secrets.SANDBOX_ORG_SLUG }}
+  # pending_pr marker (conftest.py): ParakhAI-Backend is private, so its PR state
+  # needs a GH_PR_TOKEN secret (fine-grained PAT, Pull requests: read on that repo)
+  GH_PR_TOKEN: ${{ secrets.GH_PR_TOKEN || github.token }}
 
 jobs:
   nightly-full-suite:

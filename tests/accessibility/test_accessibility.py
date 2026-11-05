@@ -73,9 +73,13 @@ class TestAxeScans:
         """Login page must pass axe WCAG 2.1 AA scan with no critical/serious issues.
 
         Currently xfailed: see docs/app_bugs.md #5. The Keycloak login page
-        (opub-kc.civicdatalab.in/auth/realms/DataSpace/...) has serious
-        color-contrast and link-name violations. Owned by the Keycloak team,
-        not the Parakh frontend. Confirmed via Playwright MCP 2026-05-08.
+        (auth.civicdatalab.in/realms/DataSpace/... — was
+        opub-kc.civicdatalab.in/auth/realms/DataSpace/... before the
+        2026 Keycloak migration moved every CivicDataLab product to the new
+        host, where Keycloak serves from the domain root with no `/auth`
+        prefix) has serious color-contrast and link-name violations. Owned by
+        the Keycloak team, not the Parakh frontend. Confirmed via Playwright
+        MCP 2026-05-08.
         """
         _require_axe()
         home = HomePage(page)

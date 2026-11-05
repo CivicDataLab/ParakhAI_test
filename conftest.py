@@ -47,3 +47,38 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
             logger.warning("Could not generate Markdown report: %s", exc)
     else:
         logger.debug("JSON report not found at %s — skipping Markdown generation", json_path)
+
+
+# --- pending_pr: tests written for an open product PR run only once it merges ---
+import functools as _functools
+import os
+import json as _json
+import urllib.request as _urlreq
+
+
+@_functools.lru_cache(maxsize=None)
+def _pending_pr_state(ref):
+    """Return None if `ref` ("Repo#N" or "owner/Repo#N") is merged, else a skip reason."""
+    repo, num = ref.split("#")
+    if "/" not in repo:
+        repo = f"CivicDataLab/{repo}"
+    req = _urlreq.Request(f"https://api.github.com/repos/{repo}/pulls/{num}",
+                          headers={"Accept": "application/vnd.github+json"})
+    token = os.getenv("GH_PR_TOKEN") or os.getenv("GITHUB_TOKEN")
+    if token:
+        req.add_header("Authorization", f"Bearer {token}")
+    try:
+        with _urlreq.urlopen(req, timeout=10) as resp:
+            merged = _json.load(resp).get("merged_at")
+    except Exception as e:  # 404 on a private repo without GH_PR_TOKEN lands here too
+        return f"pending_pr {ref}: could not read PR state ({e})"
+    return None if merged else f"pending_pr {ref}: not merged yet"
+
+
+def pytest_collection_modifyitems(config, items):
+    for item in items:
+        marker = item.get_closest_marker("pending_pr")
+        if marker:
+            reason = _pending_pr_state(marker.args[0])
+            if reason:
+                item.add_marker(pytest.mark.skip(reason=reason))
