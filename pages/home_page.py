@@ -226,19 +226,6 @@ class HomePage(BasePage):
         self.open_hamburger_menu()
         self.page.locator(self.MOBILE_MENU_DIALOG).first.wait_for(state="visible")
 
-    def get_mobile_menu_dialog_name(self) -> str:
-        """Accessible name of the open sheet: aria-label, else the text of the
-        element(s) referenced by aria-labelledby, else empty."""
-        return self.page.locator(self.MOBILE_MENU_DIALOG).first.evaluate(
-            r"""el => {
-                const label = (el.getAttribute('aria-label') || '').trim();
-                if (label) return label;
-                const ids = (el.getAttribute('aria-labelledby') || '').split(/\s+/).filter(Boolean);
-                return ids.map(id => (document.getElementById(id)?.textContent || '').trim())
-                          .join(' ').trim();
-            }"""
-        )
-
     def get_mobile_menu_close_button_name(self) -> str:
         """Accessible name of the sheet's icon-only close button (empty if unnamed)."""
         return self.page.locator(self.MOBILE_MENU_CLOSE_BUTTON).first.evaluate(
