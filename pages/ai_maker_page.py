@@ -56,6 +56,18 @@ class AIMakerPage(BasePage):
         self.wait_for_app_ready()
         return self
 
+    def org_card_logos(self) -> list[dict]:
+        """src and load state of each org card logo on the landing page, once they finish loading."""
+        logos = self.page.locator(AIMakerLocators.ORG_CARD_LOGO)
+        logos.first.wait_for(state="attached")
+        self.page.wait_for_function(
+            "sel => [...document.querySelectorAll(sel)].every(i => i.complete)",
+            arg=AIMakerLocators.ORG_CARD_LOGO,
+        )
+        return logos.evaluate_all(
+            "imgs => imgs.map(i => ({alt: i.alt, src: i.getAttribute('src'), width: i.naturalWidth}))"
+        )
+
     def go_to_models(self) -> None:
         self.click(self.SIDEBAR_MODELS)
         self.wait_for_app_ready()
