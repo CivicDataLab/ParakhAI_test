@@ -278,6 +278,12 @@ class NewEvaluationPage(BasePage):
         sel = value_map.get(eval_type.lower(), value_map["technical"])
         self.page.locator(sel).first.check()
 
+    def select_domain_in_modal(self, domain: str) -> None:
+        """Pick the step-2 'Evaluation Domain' (healthcare | agriculture | general)."""
+        self.page.locator(EvaluationsLocators.MODAL_EVALUATION_DOMAIN_SELECT).first.select_option(
+            domain.upper()
+        )
+
     # DOM `value`s are the backend enum (TECHNICAL_AUDIT/DOMAIN_AUDIT/
     # CULTURAL_AUDIT); map back to the human-readable label the UI shows
     # and tests assert against. See locators/evaluations_locators.py.
@@ -370,6 +376,7 @@ class NewEvaluationPage(BasePage):
         eval_type: str = "technical",
         objective: str = "Automated test evaluation objective",
         name: str | None = None,
+        domain: str | None = None,
     ) -> NewEvaluationPage:
         """Complete both modal steps and land on the single-page wizard.
 
@@ -389,6 +396,8 @@ class NewEvaluationPage(BasePage):
         self.select_evaluation_method(method)
         self.click_modal_next()
         self.select_evaluator_type_in_modal(eval_type)
+        if domain:
+            self.select_domain_in_modal(domain)
         self.fill_modal_objective(objective)
         self.click_modal_start()
         return self
@@ -544,6 +553,46 @@ class NewEvaluationPage(BasePage):
         self.page.wait_for_timeout(1_500)
         self.select_first_prompt_library()
         return self.is_run_evaluation_button_enabled()
+
+    def select_one_submodule_in_each_module(self) -> int:
+        """Bulk with several modules shows one sub-module combobox per module;
+        pick the first option in each. Returns how many were set."""
+        boxes = self.page.locator(EvaluationsLocators.WIZARD_SUBMODULE_COMBOBOXES)
+        done = 0
+        for i in range(boxes.count()):
+            boxes.nth(i).click(timeout=10_000)
+            self.page.wait_for_timeout(600)
+            opt = self.page.locator(EvaluationsLocators.WIZARD_SUBMODULE_OPTION).first
+            if opt.count():
+                opt.click()
+                done += 1
+            self.page.keyboard.press("Escape")
+            self.page.wait_for_timeout(300)
+        return done
+
+    def add_custom_prompt(self, test_input: str, reference_output: str = "") -> None:
+        """'Add your own prompts' source: open the Add Input Prompt dialog,
+        fill it and save (the dialog's Next button is the save action)."""
+        self.page.locator(EvaluationsLocators.WIZARD_ADD_INPUT_PROMPT_BUTTON).first.click()
+        field = self.page.locator(EvaluationsLocators.WIZARD_CUSTOM_TEST_INPUT)
+        field.fill(test_input)
+        if reference_output:
+            self.page.locator(EvaluationsLocators.WIZARD_CUSTOM_REFERENCE_OUTPUT).fill(reference_output)
+        self.page.get_by_role("dialog").get_by_role("button", name="Next").click()
+        field.wait_for(state="hidden", timeout=10_000)
+
+    def submit_playground_test_case(self, prompt: str, timeout: int = 90_000) -> None:
+        """Playground: type a prompt, Submit, wait for the model output, mark it Passed."""
+        self.page.locator(EvaluationsLocators.PLAYGROUND_INPUT).fill(prompt)
+        self.page.locator(EvaluationsLocators.PLAYGROUND_SUBMIT).first.click()
+        passed = self.page.locator(EvaluationsLocators.PLAYGROUND_PASSED).first
+        passed.wait_for(state="visible", timeout=timeout)
+        passed.click()
+        self.page.wait_for_timeout(1_500)
+
+    def click_finish_evaluation(self) -> None:
+        self.page.locator(EvaluationsLocators.FINISH_EVALUATION_BUTTON).first.click()
+        self.page.wait_for_timeout(2_000)
 
     def is_run_evaluation_library_error_visible(self) -> bool:
         """Return True if 'Please select a prompt library…' error is shown."""
