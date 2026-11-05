@@ -20,9 +20,8 @@ def page(authenticated_page_fast):
     return authenticated_page_fast
 
 KNOWN_LIBRARIES = [
-    (PromptLibrariesLocators.LIBRARY_KCC_ENGLISH, "Kisan Call Centre"),
-    (PromptLibrariesLocators.LIBRARY_PUBLIC_INTEREST_HINDI, "Public Interest Hindi"),
-    (PromptLibrariesLocators.LIBRARY_KCC_HINDI, "Kisan Call Centre"),
+    (PromptLibrariesLocators.LIBRARY_KCC_ENGLISH, "KCC"),
+    (PromptLibrariesLocators.LIBRARY_KCC_HINDI, "KCC"),
 ]
 
 
