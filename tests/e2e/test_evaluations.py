@@ -669,7 +669,7 @@ class TestEvaluationsPagination:
     @pytest.mark.xfail(
         reason="Applying a status filter on page 2 keeps offset=10; API returns "
         "'offset (10) is out of range (0-2)' and the list shows a Retry error "
-        "(seen in CI 2026-11-05)",
+        "(ParakhAI-frontend#477)",
         strict=False,
     )
     def test_status_filter_resets_to_first_page(self, page: Page):
