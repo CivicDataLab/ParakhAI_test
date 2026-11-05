@@ -598,8 +598,14 @@ class NewEvaluationPage(BasePage):
         self.page.locator(EvaluationsLocators.PLAYGROUND_SAVE_NEXT).first.click()
         self.page.wait_for_timeout(2_000)
 
-    def click_finish_evaluation(self) -> None:
+    def click_finish_evaluation(self, recommendation: str = "Automated playground evaluation.") -> None:
+        """Finish opens an 'Evaluation Recommendation' dialog: the recommendation
+        is required and a second 'Finish Evaluation' inside the dialog confirms."""
         self.page.locator(EvaluationsLocators.FINISH_EVALUATION_BUTTON).first.click()
+        dialog = self.page.get_by_role("dialog")
+        dialog.get_by_role("textbox").fill(recommendation)
+        dialog.get_by_role("button", name="Finish Evaluation").click()
+        dialog.wait_for(state="hidden", timeout=30_000)
         self.page.wait_for_timeout(2_000)
 
     def is_run_evaluation_library_error_visible(self) -> bool:
