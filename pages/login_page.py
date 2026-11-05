@@ -21,6 +21,7 @@ class LoginPage(BasePage):
     ERROR_MESSAGE = LoginLocators.ERROR_MESSAGE
     FORM = LoginLocators.FORM
     KEYCLOAK_PROVIDER_BUTTON = LoginLocators.KEYCLOAK_PROVIDER_BUTTON
+    PROVIDER_LOGO_IMAGES = LoginLocators.PROVIDER_LOGO_IMAGES
 
     def __init__(self, page: Page) -> None:
         super().__init__(page)
@@ -54,6 +55,18 @@ class LoginPage(BasePage):
             self.page.wait_for_load_state("domcontentloaded")
             return True
         return False
+
+    def go_to_provider_signin(self) -> None:
+        """Open NextAuth's provider-selection page directly (what every anonymous
+        deep link to a protected route lands on)."""
+        self.navigate_to_path(LoginLocators.PROVIDER_SIGNIN_PATH)
+        self.page.locator(self.KEYCLOAK_PROVIDER_BUTTON).first.wait_for(state="visible")
+
+    def get_provider_logo_alt_values(self) -> list[str | None]:
+        """`alt` attribute of every provider logo image (None = attribute missing)."""
+        return self.page.locator(self.PROVIDER_LOGO_IMAGES).evaluate_all(
+            "els => els.map(e => e.getAttribute('alt'))"
+        )
 
     def login(self, email: str, password: str) -> None:
         """Fill credentials and submit the login form."""
