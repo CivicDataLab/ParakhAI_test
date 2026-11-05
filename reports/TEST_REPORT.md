@@ -1,33 +1,46 @@
 # Parakh Test Framework — Test Report
 
-**Generated:** 2026-11-05 19:55 UTC  
-**Environment:** `staging` — https://parakh.civicdataspace.in  
+**Generated:** 2026-11-05 19:57 UTC  
+**Environment:** `production` — https://parakh.civicdataspace.in  
 **Browser:** `chromium`  
-**Overall result:** ✅ PASSED
+**Overall result:** ❌ FAILED
 
 ## Summary
 
 | Metric | Value |
 | ------ | ----- |
-| Total tests | 3 |
-| Passed | 3 ✅ |
-| Failed | 0 ❌ |
+| Total tests | 1 |
+| Passed | 0 ✅ |
+| Failed | 1 ❌ |
 | Skipped | 0 ⏭️ |
 | xfailed | 0 🔶 |
 | xpassed | 0 🔷 |
 | Errors | 0 💥 |
-| Pass rate | 100.0% |
-| Duration | 1m 24s |
+| Pass rate | 0.0% |
+| Duration | 47.78s |
 
 ## Results by Suite
 
-### LOAD (3 tests — ✅ 3 / ❌ 0 / ⏭️ 0 / 🔶 0 / 🔷 0)
+### E2E (1 tests — ✅ 0 / ❌ 1 / ⏭️ 0 / 🔶 0 / 🔷 0)
 
 | Test | Result | Duration |
 | ---- | ------ | -------- |
-| `test_wizard_cold_init_within_budget[chromium]` | ✅ passed | 18.23s |
-| `test_3_rapid_wizard_sessions_no_degradation[chromium]` | ✅ passed | 25.12s |
-| `test_wizard_init_time_stability_metric[chromium]` | ✅ passed | 40.65s |
+| `test_create_run_complete_and_report[chromium-bulk-technical-general-hallucination+bias+privacy-library]` | ❌ failed | 47.72s |
+
+## Failure Details
+
+### ❌ `tests/e2e/test_evaluation_matrix.py::test_create_run_complete_and_report[chromium-bulk-technical-general-hallucination+bias+privacy-library]`
+
+```
+tests/e2e/test_evaluation_matrix.py:134: in test_create_run_complete_and_report
+    audit = _wait_status(client, audit_id, ("PENDING_REVIEW", "COMPLETED"), BUDGET_S)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/e2e/test_evaluation_matrix.py:61: in _wait_status
+    pytest.fail(f"audit {audit_id} ended {last} while waiting for {want}")
+E   Failed: audit 941 ended FAILED while waiting for ('PENDING_REVIEW', 'COMPLETED')
+```
+
+**Screenshot:** `/Users/home/CivicDataSpace/ParakhAI_test/screenshots/20261106_012700_FAIL_FAST_test_create_run_complete_and_report[chromium-bulk-technical-general-hallucination+bias+privacy-library].png`
 
 ---
 
