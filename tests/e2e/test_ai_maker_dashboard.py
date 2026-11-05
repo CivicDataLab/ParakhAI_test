@@ -216,6 +216,29 @@ class TestModelCardsonHome:
 # ── Add Organisation / Add A New Model buttons (Jun 2026) ─────────────────────
 
 
+class TestOrgCardLogos:
+    """Org logos are stored as absolute S3/CloudFront URLs and must be used as-is
+    (ParakhAI-frontend#470). The old code prefixed the DataSpace API host, which
+    turned an absolute URL into a broken one."""
+
+    def test_org_card_logos_load_from_their_own_url(self, page: Page, authenticated_graphql_client):
+        orgs = authenticated_graphql_client(
+            "query { myOrganizations { name logoUrl } }"
+        )["data"]["myOrganizations"]
+        uploaded = {f"{o['name']} logo": o["logoUrl"] for o in orgs if (o.get("logoUrl") or "").startswith("http")}
+        if not uploaded:
+            pytest.skip("No organisation of this account has an absolute logo URL")
+
+        shown = {}  # alt -> srcs; the page header also has a "CivicDataLab logo"
+        for logo in AIMakerPage(page).go_to_landing().org_card_logos():
+            shown.setdefault(logo["alt"], []).append(logo["src"])
+        wrong = {alt: shown.get(alt) for alt, url in uploaded.items() if url not in shown.get(alt, [])}
+        assert not wrong, (
+            f"{len(wrong)} of {len(uploaded)} org logos do not use their stored URL as-is "
+            f"(a glued-on host, or the fallback after a failed load): {dict(list(wrong.items())[:3])}"
+        )
+
+
 class TestAIMakerButtons:
     """New action buttons trigger AlertDialogs for external CivicDataSpace redirects."""
 
