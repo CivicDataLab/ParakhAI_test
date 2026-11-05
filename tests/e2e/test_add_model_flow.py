@@ -106,7 +106,6 @@ class TestCDSAddModelEditor:
     def check_cds_reachable(self):
         skip_if_cds_unreachable()
 
-    @pytest.mark.xfail(reason="CDS-001: JS SyntaxError 'appendChild missing )' fires on every load — known bug")
     def test_cds001_no_js_syntax_error_on_editor_page_load(self, page: Page):
         """CDS-001: The model editor must not throw a JS SyntaxError on load.
 
@@ -127,7 +126,6 @@ class TestCDSAddModelEditor:
             "CDS-001: JS SyntaxError(s) on editor page load:\n" + "\n".join(syntax_errors)
         )
 
-    @pytest.mark.xfail(reason="CDS-001: JS SyntaxError 'appendChild missing )' fires on every load — known bug")
     def test_cds001_editor_has_no_console_errors_on_load(self, page: Page):
         """CDS-001: Editor page should load without any JS console errors.
 
