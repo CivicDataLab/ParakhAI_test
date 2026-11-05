@@ -1,6 +1,6 @@
 # Parakh Test Framework — Test Report
 
-**Generated:** 2026-11-05 16:59 UTC  
+**Generated:** 2026-11-05 18:19 UTC  
 **Environment:** `staging` — https://parakh.civicdataspace.in  
 **Browser:** `chromium`  
 **Overall result:** ✅ PASSED
@@ -9,23 +9,25 @@
 
 | Metric | Value |
 | ------ | ----- |
-| Total tests | 1 |
-| Passed | 1 ✅ |
+| Total tests | 3 |
+| Passed | 3 ✅ |
 | Failed | 0 ❌ |
 | Skipped | 0 ⏭️ |
 | xfailed | 0 🔶 |
 | xpassed | 0 🔷 |
 | Errors | 0 💥 |
 | Pass rate | 100.0% |
-| Duration | 26.56s |
+| Duration | 0.42s |
 
 ## Results by Suite
 
-### E2E (1 tests — ✅ 1 / ❌ 0 / ⏭️ 0 / 🔶 0 / 🔷 0)
+### API (3 tests — ✅ 3 / ❌ 0 / ⏭️ 0 / 🔶 0 / 🔷 0)
 
 | Test | Result | Duration |
 | ---- | ------ | -------- |
-| `test_status_filter_resets_to_first_page[chromium]` | ✅ passed | 26.53s |
+| `test_unauthenticated_post_mutation_is_rejected[createBlankAudit]` | ✅ passed | 0.33s |
+| `test_unauthenticated_post_mutation_is_rejected[updateAudit]` | ✅ passed | 0.03s |
+| `test_unauthenticated_post_mutation_is_rejected[runAudit]` | ✅ passed | 0.03s |
 
 ---
 

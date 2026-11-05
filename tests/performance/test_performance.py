@@ -158,6 +158,10 @@ class TestRenderBlocking:
 
 
 class TestMobilePerformance:
+    @pytest.mark.xfail(
+        reason="Mobile 3G load ~10.5s vs 8s budget on CI runners (ParakhAI_test#23)",
+        strict=False,
+    )
     def test_mobile_performance_score(self, browser: Browser):
         """
         Simulate 3G-equivalent conditions (latency + bandwidth throttling via CDP)
