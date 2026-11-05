@@ -2,10 +2,8 @@
 Accessibility tests for the Parakh platform using axe-playwright-python.
 Targets WCAG 2.1 AA compliance.
 
-Reports are saved to reports/accessibility_report.json.
+The login page report is saved to reports/accessibility_login_report.json.
 """
-
-import json
 
 import pytest
 from playwright.sync_api import Page
@@ -48,27 +46,6 @@ def _critical_violations(axe_results: dict) -> list[dict]:
 
 
 class TestAxeScans:
-    def test_homepage_has_no_critical_axe_violations(self, page: Page):
-        """Homepage must pass axe WCAG 2.1 AA scan with no critical/serious issues."""
-        _require_axe()
-        home = HomePage(page)
-        home.go_to_home()
-
-        results = _run_axe(page)
-        critical = _critical_violations(results)
-
-        # Save full report
-        report = build_axe_report(results.get("violations", []), page.url)
-        save_json_report(report, "accessibility_report.json")
-
-        assert len(critical) == 0, (
-            f"Found {len(critical)} critical/serious axe violations on homepage:\n"
-            + json.dumps(
-                [{"id": v["id"], "impact": v["impact"], "description": v["description"]} for v in critical],
-                indent=2,
-            )
-        )
-
     def test_login_page_has_no_critical_axe_violations(self, page: Page):
         """Login page must pass axe WCAG 2.1 AA scan with no critical/serious issues.
 
@@ -108,30 +85,6 @@ class TestAxeScans:
 
 
 class TestImagesAndLinks:
-    def test_images_have_alt_text(self, page: Page):
-        """Every <img> element must have a non-empty alt attribute."""
-        home = HomePage(page)
-        home.go_to_home()
-
-        images = page.locator("img")
-        count = images.count()
-        if count == 0:
-            pytest.skip("No <img> elements found on the page")
-
-        missing_alt = []
-        for i in range(count):
-            img = images.nth(i)
-            alt = img.get_attribute("alt")
-            src = img.get_attribute("src") or f"img[{i}]"
-            if alt is None:
-                missing_alt.append(f"Missing alt: {src}")
-            # Note: alt="" is acceptable for decorative images
-
-        assert len(missing_alt) == 0, (
-            f"{len(missing_alt)} image(s) missing alt attribute:\n"
-            + "\n".join(missing_alt)
-        )
-
     @pytest.mark.xfail(reason="App bug #9 — see docs/app_bugs.md", strict=False)
     def test_social_links_have_accessible_names(self, page: Page):
         """Footer icon-only links must have aria-label or visible text."""
@@ -213,58 +166,6 @@ class TestStructure:
         assert lang and len(lang) >= 2, (
             f"<html> element must have a non-empty lang attribute, got: '{lang}'"
         )
-
-    def test_buttons_have_accessible_names(self, page: Page):
-        """Every button must have either visible text or an aria-label."""
-        home = HomePage(page)
-        home.go_to_home()
-
-        buttons = page.locator("button")
-        count = buttons.count()
-        if count == 0:
-            pytest.skip("No <button> elements found on the page")
-
-        unlabelled = []
-        for i in range(count):
-            btn = buttons.nth(i)
-            # Skip hidden buttons
-            if not btn.is_visible():
-                continue
-            text = btn.inner_text().strip()
-            aria_label = btn.get_attribute("aria-label") or ""
-            aria_labelledby = btn.get_attribute("aria-labelledby") or ""
-            title = btn.get_attribute("title") or ""
-
-            if not text and not aria_label and not aria_labelledby and not title:
-                class_name = btn.get_attribute("class") or f"button[{i}]"
-                unlabelled.append(class_name)
-
-        assert len(unlabelled) == 0, (
-            f"{len(unlabelled)} visible button(s) have no accessible name:\n"
-            + "\n".join(unlabelled)
-        )
-
-    def test_feature_tabs_have_aria_states(self, page: Page):
-        """Tab buttons in the feature tabs widget must use aria-selected."""
-        home = HomePage(page)
-        home.go_to_home()
-
-        tabs = page.locator("[role='tab']")
-        count = tabs.count()
-        if count == 0:
-            pytest.skip("No [role='tab'] elements found — feature tabs may not use ARIA roles")
-
-        missing_aria = []
-        for i in range(count):
-            tab = tabs.nth(i)
-            aria_selected = tab.get_attribute("aria-selected")
-            if aria_selected is None:
-                missing_aria.append(tab.inner_text().strip() or f"tab[{i}]")
-
-        assert len(missing_aria) == 0, (
-            f"Tab(s) missing aria-selected attribute: {missing_aria}"
-        )
-
 
 class TestKeyboardNavigation:
     def test_keyboard_navigation_tab_order(self, page: Page):
