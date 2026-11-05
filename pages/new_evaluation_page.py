@@ -540,6 +540,26 @@ class NewEvaluationPage(BasePage):
         self.page.wait_for_timeout(1_000)
         return True
 
+    def select_smallest_prompt_library(self) -> int | None:
+        """Pick the library with the fewest (non-zero) test cases on the current
+        table page and return that count. Big libraries take ~50 min to run."""
+        radio_sel = EvaluationsLocators.WIZARD_PROMPT_LIBRARY_RADIO
+        rows = self.page.locator(f"tr:has({radio_sel})")
+        best: tuple[int, int] | None = None
+        for i in range(rows.count()):
+            digits = [
+                int(c.replace(",", "").strip())
+                for c in rows.nth(i).locator("td").all_inner_texts()
+                if c.replace(",", "").strip().isdigit()
+            ]
+            if digits and digits[0] > 0 and (best is None or digits[0] < best[0]):
+                best = (digits[0], i)
+        if best is None:
+            return None
+        rows.nth(best[1]).locator(radio_sel).first.click(timeout=10_000)
+        self.page.wait_for_timeout(1_000)
+        return best[0]
+
     def configure_bulk_workspace_minimal(self, module: str = "hallucination") -> bool:
         """Configure the minimum required to enable Run Evaluation: check a
         module, pick a sub-module, choose the prompt-library source, and
@@ -798,9 +818,30 @@ class NewEvaluationPage(BasePage):
             # Fallback: the label itself may act as a toggle (custom checkbox)
             self.click(label_sel)
 
+    _MODULE_LABELS = {
+        "hallucination": "Hallucination and Misinformation",
+        "bias": "Bias and Fairness",
+        "privacy": "Privacy and Safety",
+    }
+
     def uncheck_module(self, module: str) -> None:
-        """Uncheck an evaluation module checkbox (same logic as check_module)."""
-        self.check_module(module)  # toggle — callers must know current state
+        """Uncheck a module checkbox if it is currently checked (plain click:
+        force-clicks double-toggle these custom checkboxes)."""
+        label = self._MODULE_LABELS[module.lower()]
+        cb = self.page.locator(f"input[type='checkbox']:near(:text('{label}'))").first
+        if cb.count() and cb.is_checked():
+            cb.click()
+            self.page.wait_for_timeout(300)
+
+    def set_modules(self, modules) -> None:
+        """Select exactly `modules`. Hallucination is pre-checked on load, so
+        check the wanted ones first and then clear the rest."""
+        wanted = [m.lower() for m in modules]
+        for m in wanted:
+            self.check_module(m)
+        for m in self._MODULE_LABELS:
+            if m not in wanted:
+                self.uncheck_module(m)
 
     def module_subcategory_dropdown_visible(self) -> bool:
         """Return True if a sub-category dropdown is visible (module is checked)."""
