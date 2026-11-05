@@ -156,7 +156,11 @@ def test_create_run_complete_and_report(
         for m in combo.modules:
             assert _MODULE_WORD[m] in modules, f"Modules field {modules!r} must list {m}"
 
+    assert detail.is_generate_report_button_visible(), "a fresh COMPLETED audit offers Generate Report"
+    detail.click_generate_report()
+    download_btn = page.locator(EvaluationsLocators.DOWNLOAD_REPORT_BUTTON).first
+    download_btn.wait_for(state="visible", timeout=120_000)
     with page.expect_download(timeout=60_000) as dl:
-        page.locator(EvaluationsLocators.DOWNLOAD_REPORT_BUTTON).first.click()
+        download_btn.click()
     path = dl.value.path()
     assert path and os.path.getsize(path) > 500, "downloaded report must not be empty"
