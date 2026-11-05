@@ -404,3 +404,14 @@ class EvaluationsLocators:
 
     # Report download
     DOWNLOAD_REPORT_BUTTON = "button:has-text('Download Report'), a:has-text('Download Report')"
+
+    # Evaluation matrix (mapped on prod 2026-11-05)
+    MODAL_EVALUATION_DOMAIN_SELECT = "select[name='evaluationDomain']"
+    WIZARD_SUBMODULE_COMBOBOXES = "input[role='combobox'][placeholder*='sub-modules']"
+    WIZARD_ADD_INPUT_PROMPT_BUTTON = "button:has-text('Add Input Prompt')"
+    WIZARD_CUSTOM_TEST_INPUT = "textarea[name='testInput']"
+    WIZARD_CUSTOM_REFERENCE_OUTPUT = "textarea[name='referenceOutput']"
+    PLAYGROUND_INPUT = "textarea[name='inputPrompt']"
+    PLAYGROUND_SUBMIT = "button:has-text('Submit')"
+    PLAYGROUND_PASSED = "button:has-text('Passed')"
+    FINISH_EVALUATION_BUTTON = "button:has-text('Finish Evaluation')"
