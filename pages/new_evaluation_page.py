@@ -577,17 +577,15 @@ class NewEvaluationPage(BasePage):
     def select_one_submodule_in_each_module(self) -> int:
         """Bulk with several modules shows one sub-module combobox per module;
         pick the first option in each. Returns how many were set."""
-        triggers = self.page.locator(EvaluationsLocators.WIZARD_SUBMODULE_COMBOBOX_TRIGGER)
+        boxes = self.page.locator("input[role='combobox']")
         done = 0
-        for i in range(triggers.count()):
-            triggers.nth(i).click(timeout=10_000)
-            self.page.wait_for_timeout(800)
-            opt = self.page.locator(EvaluationsLocators.WIZARD_SUBMODULE_OPTION).first
-            if opt.count():
-                opt.click()
-                done += 1
-            self.page.keyboard.press("Escape")
-            self.page.wait_for_timeout(300)
+        for i in range(boxes.count()):
+            boxes.nth(i).click(timeout=10_000)
+            self.page.wait_for_timeout(500)
+            boxes.nth(i).press("Enter")
+            self.page.mouse.click(5, 5)
+            self.page.wait_for_timeout(500)
+            done += 1
         return done
 
     def add_custom_prompt(self, test_input: str, reference_output: str = "") -> None:
