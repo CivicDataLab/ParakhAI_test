@@ -171,6 +171,30 @@ class NewEvaluationPage(BasePage):
         ).all()
         return [o.inner_text().strip() for o in opts]
 
+    def is_modal_evaluation_domain_dropdown_visible(self) -> bool:
+        """Return True if step 2's 'Evaluation Domain' select is rendered.
+
+        It only appears when the selected model has a domain and the backend
+        returns at least one audit domain option for it — absent for models
+        without one, which is a legitimate case, not a bug.
+        """
+        return self.is_visible(
+            EvaluationsLocators.MODAL_EVALUATION_DOMAIN_DROPDOWN, timeout=3_000
+        )
+
+    def get_modal_evaluation_domain_options(self) -> list[str]:
+        """Return the visible text of every option in step 2's 'Evaluation
+        Domain' select (excluding option index 0 if it's a disabled
+        placeholder with no value)."""
+        opts = self.page.locator(
+            f"{EvaluationsLocators.MODAL_EVALUATION_DOMAIN_DROPDOWN} option"
+        ).all()
+        return [
+            o.inner_text().strip()
+            for o in opts
+            if (o.get_attribute("value") or "").strip() != ""
+        ]
+
     def select_model_by_index(self, index: int = 1) -> None:
         """Select a model by option index. All options are real registered models —
         the 'New AI Model' ghost placeholder that used to occupy index 0 is gone
