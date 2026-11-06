@@ -278,7 +278,6 @@ After each run, reports are written to `reports/`:
 | `reports/e2e_combined.json` | Merged shard JSON (CI test-summary job) |
 | `reports/e2e_summary.md` | Merged Markdown posted to GitHub Step Summary |
 | `reports/a11y_report.html` | Accessibility HTML report |
-| `reports/accessibility_report.json` | Structured axe violations JSON |
 | `reports/accessibility_*_report.json` | Authenticated-route axe results |
 | `reports/performance_metrics.json` | Public-page timing metrics |
 | `reports/performance_metrics_auth.json` | Authenticated-route timing metrics |

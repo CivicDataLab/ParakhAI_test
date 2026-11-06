@@ -453,7 +453,6 @@ jobs:
           path: |
             reports/a11y_report.html
             reports/accessibility.json
-            reports/accessibility_report.json
             reports/accessibility_login_report.json
           retention-days: 30
 
