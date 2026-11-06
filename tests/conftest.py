@@ -85,10 +85,9 @@ def page(browser_context: BrowserContext, request) -> Page:
 
     yield pg
 
-    if Config.SCREENSHOT_ON_FAILURE and getattr(request.node, "rep_call", None) is not None:
-        if request.node.rep_call.failed:
-            path = take_screenshot(pg, f"FAIL_{request.node.name}")
-            request.node.user_properties.append(("screenshot", str(path)))
+    if Config.SCREENSHOT_ON_FAILURE and _test_failed(request.node):
+        path = take_screenshot(pg, f"FAIL_{request.node.name}")
+        request.node.user_properties.append(("screenshot", str(path)))
 
     pg.close()
 
@@ -211,10 +210,9 @@ def _make_auth_page(
 
     yield pg
 
-    if Config.SCREENSHOT_ON_FAILURE and getattr(request.node, "rep_call", None) is not None:
-        if request.node.rep_call.failed:
-            path = take_screenshot(pg, f"FAIL_{label}_{request.node.name}")
-            request.node.user_properties.append(("screenshot", str(path)))
+    if Config.SCREENSHOT_ON_FAILURE and _test_failed(request.node):
+        path = take_screenshot(pg, f"FAIL_{label}_{request.node.name}")
+        request.node.user_properties.append(("screenshot", str(path)))
 
     pg.close()
 
@@ -261,10 +259,9 @@ def authenticated_page_u2(browser: Browser, request) -> Page:
 
     yield pg
 
-    if Config.SCREENSHOT_ON_FAILURE and getattr(request.node, "rep_call", None) is not None:
-        if request.node.rep_call.failed:
-            path = take_screenshot(pg, f"FAIL_AUTH_U2_{request.node.name}")
-            request.node.user_properties.append(("screenshot", str(path)))
+    if Config.SCREENSHOT_ON_FAILURE and _test_failed(request.node):
+        path = take_screenshot(pg, f"FAIL_AUTH_U2_{request.node.name}")
+        request.node.user_properties.append(("screenshot", str(path)))
 
     pg.close()
     context.close()
@@ -434,7 +431,10 @@ def _refresh_storage_state_if_stale(browser: Browser, state_path: str) -> None:
     pg = context.new_page()
     pg.set_default_timeout(Config.TIMEOUT)
     try:
-        _do_login(pg, user["email"], user["password"])
+        for _ in range(3):
+            _do_login(pg, user["email"], user["password"])
+            if not pg.locator(HomePage.NAV_LOGIN_BUTTON).first.is_visible():
+                break  # logged in: the Login button is gone
         context.storage_state(path=state_path)
     finally:
         context.close()
@@ -467,10 +467,9 @@ def authenticated_page_fast(
 
     yield pg
 
-    if Config.SCREENSHOT_ON_FAILURE and getattr(request.node, "rep_call", None) is not None:
-        if request.node.rep_call.failed:
-            path = take_screenshot(pg, f"FAIL_FAST_{request.node.name}")
-            request.node.user_properties.append(("screenshot", str(path)))
+    if Config.SCREENSHOT_ON_FAILURE and _test_failed(request.node):
+        path = take_screenshot(pg, f"FAIL_FAST_{request.node.name}")
+        request.node.user_properties.append(("screenshot", str(path)))
 
     context.close()
 
@@ -761,6 +760,11 @@ def cleanup_assignment(authenticated_graphql_client):
             )
         except Exception as exc:  # noqa: BLE001
             print(f"LEAKED_ASSIGNMENT:{assignment_id} ({exc})")
+
+
+def _test_failed(node) -> bool:
+    """True if the test body OR a fixture setup failed (setup errors have no rep_call)."""
+    return any(getattr(getattr(node, f"rep_{w}", None), "failed", False) for w in ("setup", "call"))
 
 
 # ── pytest hooks ──────────────────────────────────────────────────────────────

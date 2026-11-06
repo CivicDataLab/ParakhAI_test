@@ -443,9 +443,6 @@ class TestDialogAccessibility:
         )
 
     @pytest.mark.auth
-    @pytest.mark.xfail(
-        reason="UX-011: Select fields in New Evaluation dialog have no accessible label — known bug"
-    )
     def test_ux011_new_evaluation_dialog_selects_have_labels(
         self, authenticated_page_fast: Page
     ):

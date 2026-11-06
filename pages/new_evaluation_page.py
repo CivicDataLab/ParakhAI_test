@@ -191,7 +191,7 @@ class NewEvaluationPage(BasePage):
     EXCLUDED_MODEL_NAMES = {"New AI Model", "xAI: Grok 4.1 Fast"}
 
     def select_random_valid_model_and_version(self) -> str:
-        """Select a random model, excluding 'New AI Model' and deprecated 'xAI: Grok 4.1 Fast'.
+        """Select a random model, excluding 'New AI Model', deprecated 'xAI: Grok 4.1 Fast' and any Opus model (cost).
 
         Returns the selected model's display text (useful for logging/assertions).
         Falls back to index 1 if every option is excluded or the list is empty.
@@ -201,7 +201,7 @@ class NewEvaluationPage(BasePage):
         options = self.get_modal_model_options()
         valid = [
             i for i, (_, text) in enumerate(options)
-            if text.strip() not in self.EXCLUDED_MODEL_NAMES
+            if text.strip() not in self.EXCLUDED_MODEL_NAMES and "opus" not in text.lower()
         ]
         if not valid:
             self.select_model_by_index(1)
@@ -277,6 +277,12 @@ class NewEvaluationPage(BasePage):
         }
         sel = value_map.get(eval_type.lower(), value_map["technical"])
         self.page.locator(sel).first.check()
+
+    def select_domain_in_modal(self, domain: str) -> None:
+        """Pick the step-2 'Evaluation Domain' (healthcare | agriculture | general)."""
+        self.page.locator(EvaluationsLocators.MODAL_EVALUATION_DOMAIN_SELECT).first.select_option(
+            domain.upper()
+        )
 
     # DOM `value`s are the backend enum (TECHNICAL_AUDIT/DOMAIN_AUDIT/
     # CULTURAL_AUDIT); map back to the human-readable label the UI shows
@@ -370,6 +376,7 @@ class NewEvaluationPage(BasePage):
         eval_type: str = "technical",
         objective: str = "Automated test evaluation objective",
         name: str | None = None,
+        domain: str | None = None,
     ) -> NewEvaluationPage:
         """Complete both modal steps and land on the single-page wizard.
 
@@ -389,6 +396,8 @@ class NewEvaluationPage(BasePage):
         self.select_evaluation_method(method)
         self.click_modal_next()
         self.select_evaluator_type_in_modal(eval_type)
+        if domain:
+            self.select_domain_in_modal(domain)
         self.fill_modal_objective(objective)
         self.click_modal_start()
         return self
@@ -531,6 +540,26 @@ class NewEvaluationPage(BasePage):
         self.page.wait_for_timeout(1_000)
         return True
 
+    def select_smallest_prompt_library(self) -> int | None:
+        """Pick the library with the fewest (non-zero) test cases on the current
+        table page and return that count. Big libraries take ~50 min to run."""
+        radio_sel = EvaluationsLocators.WIZARD_PROMPT_LIBRARY_RADIO
+        rows = self.page.locator(f"tr:has({radio_sel})")
+        best: tuple[int, int] | None = None
+        for i in range(rows.count()):
+            digits = [
+                int(c.replace(",", "").strip())
+                for c in rows.nth(i).locator("td").all_inner_texts()
+                if c.replace(",", "").strip().isdigit()
+            ]
+            if digits and digits[0] > 0 and (best is None or digits[0] < best[0]):
+                best = (digits[0], i)
+        if best is None:
+            return None
+        rows.nth(best[1]).locator(radio_sel).first.click(timeout=10_000)
+        self.page.wait_for_timeout(1_000)
+        return best[0]
+
     def configure_bulk_workspace_minimal(self, module: str = "hallucination") -> bool:
         """Configure the minimum required to enable Run Evaluation: check a
         module, pick a sub-module, choose the prompt-library source, and
@@ -544,6 +573,58 @@ class NewEvaluationPage(BasePage):
         self.page.wait_for_timeout(1_500)
         self.select_first_prompt_library()
         return self.is_run_evaluation_button_enabled()
+
+    def select_one_submodule_in_each_module(self) -> int:
+        """Bulk with several modules shows one sub-module combobox per module;
+        pick the first option in each. Returns how many were set."""
+        boxes = self.page.locator("input[role='combobox']")
+        done = 0
+        for i in range(boxes.count()):
+            boxes.nth(i).click(timeout=10_000)
+            self.page.wait_for_timeout(500)
+            boxes.nth(i).press("Enter")
+            self.page.mouse.click(5, 5)
+            self.page.wait_for_timeout(500)
+            done += 1
+        return done
+
+    def add_custom_prompt(self, test_input: str, reference_output: str = "") -> None:
+        """'Add your own prompts' source: open the Add Input Prompt dialog,
+        fill it and save (the dialog's Next button is the save action)."""
+        self.page.locator(EvaluationsLocators.WIZARD_ADD_INPUT_PROMPT_BUTTON).first.click()
+        field = self.page.locator(EvaluationsLocators.WIZARD_CUSTOM_TEST_INPUT)
+        field.fill(test_input)
+        if reference_output:
+            self.page.locator(EvaluationsLocators.WIZARD_CUSTOM_REFERENCE_OUTPUT).fill(reference_output)
+        self.page.get_by_role("dialog").get_by_role("button", name="Next").click()
+        field.wait_for(state="hidden", timeout=10_000)
+
+    def submit_playground_test_case(self, prompt: str, timeout: int = 90_000) -> None:
+        """Playground: type a prompt, Submit, wait for the model to finish,
+        mark it Passed and Save. Passed is clickable while the output still
+        says 'Generating', so wait for that to clear first; only
+        'Save and Test New Input' persists the case."""
+        self.page.locator(EvaluationsLocators.PLAYGROUND_INPUT).fill(prompt)
+        self.page.locator(EvaluationsLocators.PLAYGROUND_SUBMIT).first.click()
+        generating = self.page.locator(EvaluationsLocators.PLAYGROUND_GENERATING).first
+        try:
+            generating.wait_for(state="visible", timeout=5_000)
+        except Exception:  # noqa: BLE001 - fast model: it may already be gone
+            pass
+        generating.wait_for(state="hidden", timeout=timeout)
+        self.page.locator(EvaluationsLocators.PLAYGROUND_PASSED).first.click()
+        self.page.locator(EvaluationsLocators.PLAYGROUND_SAVE_NEXT).first.click()
+        self.page.wait_for_timeout(2_000)
+
+    def click_finish_evaluation(self, recommendation: str = "Automated playground evaluation.") -> None:
+        """Finish opens an 'Evaluation Recommendation' dialog: the recommendation
+        is required and a second 'Finish Evaluation' inside the dialog confirms."""
+        self.page.locator(EvaluationsLocators.FINISH_EVALUATION_BUTTON).first.click()
+        dialog = self.page.get_by_role("dialog")
+        dialog.get_by_role("textbox").fill(recommendation)
+        dialog.get_by_role("button", name="Finish Evaluation").click()
+        dialog.wait_for(state="hidden", timeout=30_000)
+        self.page.wait_for_timeout(2_000)
 
     def is_run_evaluation_library_error_visible(self) -> bool:
         """Return True if 'Please select a prompt library…' error is shown."""
@@ -735,9 +816,30 @@ class NewEvaluationPage(BasePage):
             # Fallback: the label itself may act as a toggle (custom checkbox)
             self.click(label_sel)
 
+    _MODULE_LABELS = {
+        "hallucination": "Hallucination and Misinformation",
+        "bias": "Bias and Fairness",
+        "privacy": "Privacy and Safety",
+    }
+
     def uncheck_module(self, module: str) -> None:
-        """Uncheck an evaluation module checkbox (same logic as check_module)."""
-        self.check_module(module)  # toggle — callers must know current state
+        """Uncheck a module checkbox if it is currently checked (plain click:
+        force-clicks double-toggle these custom checkboxes)."""
+        label = self._MODULE_LABELS[module.lower()]
+        cb = self.page.locator(f"input[type='checkbox']:near(:text('{label}'))").first
+        if cb.count() and cb.is_checked():
+            cb.click()
+            self.page.wait_for_timeout(300)
+
+    def set_modules(self, modules) -> None:
+        """Select exactly `modules`. Hallucination is pre-checked on load, so
+        check the wanted ones first and then clear the rest."""
+        wanted = [m.lower() for m in modules]
+        for m in wanted:
+            self.check_module(m)
+        for m in self._MODULE_LABELS:
+            if m not in wanted:
+                self.uncheck_module(m)
 
     def module_subcategory_dropdown_visible(self) -> bool:
         """Return True if a sub-category dropdown is visible (module is checked)."""

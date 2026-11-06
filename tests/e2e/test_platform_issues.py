@@ -306,11 +306,10 @@ class TestPlatformIssuesExtended:
             "Breaks document outline and WCAG 2.4.6."
         )
 
-    @pytest.mark.xfail(reason="UX-005: Missing H1 on AI Maker overview page — known bug")
     def test_ux005_ai_maker_overview_page_has_h1(self, authenticated_page_fast: Page):
         """UX-005: AI Maker org overview page must have exactly one <h1>."""
         authenticated_page_fast.goto(Config.url("/dashboard/ai-maker/1"))
-        authenticated_page_fast.wait_for_timeout(2000)
+        authenticated_page_fast.locator("h1").first.wait_for(state="attached", timeout=15_000)
         h1_count = authenticated_page_fast.locator("h1").count()
         assert h1_count == 1, (
             f"UX-005: AI Maker overview page has {h1_count} <h1> elements (expected 1)."

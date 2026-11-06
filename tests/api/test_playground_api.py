@@ -10,7 +10,7 @@ Coverage:
 
 import pytest
 
-from tests.data.test_data import TestGraphQL, TestModelConstants
+from tests.data.test_data import TestGraphQL, TestModelConstants, first_org_model_id
 
 pytestmark = [pytest.mark.api, pytest.mark.regression, pytest.mark.auth]
 
@@ -245,9 +245,7 @@ class TestPlaygroundEvaluationCreate:
 
     @staticmethod
     def _first_model_id(client) -> str | None:
-        result = client(TestGraphQL.QUERY_MY_MODELS)
-        models = ((result.get("data") or {}).get("myModels")) or []
-        return str(models[0]["id"]) if models else None
+        return first_org_model_id(client)
 
     def test_create_blank_audit_returns_draft_audit(
         self, authenticated_graphql_client, sandbox_org, cleanup_evaluation
@@ -353,6 +351,8 @@ class TestPlaygroundEvaluationCreate:
         resp = ((run_result.get("data") or {}).get("runAudit")) or {}
         if resp and resp.get("audit"):
             status = resp["audit"].get("status")
-            assert status in TestModelConstants.AUDIT_STATUSES, (
+            # A rejected run (e.g. no evaluation module selected) leaves the audit DRAFT.
+            allowed = TestModelConstants.AUDIT_STATUSES + ([] if resp.get("success") else ["DRAFT"])
+            assert status in allowed, (
                 f"runAudit returned unexpected status: {status!r}"
             )

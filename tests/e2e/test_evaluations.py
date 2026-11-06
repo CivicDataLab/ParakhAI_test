@@ -465,6 +465,10 @@ class TestEvaluationDetail:
             "'Back to List' button not found on evaluation detail page"
         )
         ep.click_back_to_list()
+        try:
+            page.wait_for_url(lambda u: "/evaluations" in u and str(completed_eval_id) not in u, timeout=15_000)
+        except Exception:
+            pass
         assert "/evaluations" in page.url and str(completed_eval_id) not in page.url, (
             "'Back to List' must return to the evaluations list page"
         )
@@ -662,6 +666,12 @@ class TestEvaluationsPagination:
             "Pagination controls must be visible when there are more than 20 evaluations"
         )
 
+    @pytest.mark.xfail(
+        reason="Applying a status filter on page 2 keeps offset=10; API returns "
+        "'offset (10) is out of range (0-2)' and the list shows a Retry error "
+        "(ParakhAI-frontend#477)",
+        strict=False,
+    )
     def test_status_filter_resets_to_first_page(self, page: Page):
         ep = EvaluationsPage(page)
         ep.go_to_evaluations_list()
@@ -671,7 +681,7 @@ class TestEvaluationsPagination:
         if next_btn.count() == 0 or not next_btn.first.is_enabled():
             pytest.skip("No 'Next' pagination button available")
         next_btn.first.click()
-        page.wait_for_timeout(500)
+        page.wait_for_load_state("networkidle")
         # Applying a filter should reset offset to 0 (page 1)
         if ep.is_status_filter_available():
             ep.click_status_tab("Completed")

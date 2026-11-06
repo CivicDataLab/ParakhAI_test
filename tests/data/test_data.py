@@ -486,3 +486,14 @@ class TestModelConstants:
         "CLASSIFICATION", "NER", "BIAS", "TOXICITY", "GENERAL",
     ]
     RISK_LEVELS = ["HIGH_RISK", "MEDIUM_RISK", "LOW_RISK", "NO_RISK"]
+
+
+def first_org_model_id(client) -> str | None:
+    """First model in the sandbox org (org header set by the client), never an Opus one."""
+    result = client(
+        "query($l:Int){ aiModels(limit:$l){ id name provider } }", variables={"l": 50}
+    )
+    for m in ((result.get("data") or {}).get("aiModels")) or []:
+        if "opus" not in f"{m.get('name')} {m.get('provider')}".lower():
+            return str(m["id"])
+    return None

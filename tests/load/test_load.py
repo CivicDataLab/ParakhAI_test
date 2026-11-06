@@ -574,9 +574,13 @@ class TestWizardInitializationLatency:
         if not ep.is_new_eval_modal_visible():
             return {"elapsed_s": time.monotonic() - start, "success": False, "error": "modal not visible"}
 
-        ep.click_modal_start()
+        from pages.new_evaluation_page import NewEvaluationPage
 
-        if not ep.is_wizard_visible():
+        # The modal now needs model, method, evaluator and domain before Start.
+        nep = NewEvaluationPage(page)
+        nep.start_evaluation_from_modal(domain="general")
+
+        if not nep.wait_for_wizard_loaded():
             return {"elapsed_s": time.monotonic() - start, "success": False, "error": "wizard not visible"}
 
         elapsed = time.monotonic() - start

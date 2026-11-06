@@ -20,6 +20,7 @@ Both platforms share Keycloak, so TEST_EMAIL_1/TEST_PASSWORD_1 applies to both.
 import pytest
 import requests as _requests
 from playwright.sync_api import Page
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 from locators.add_model_flow_locators import AddModelFlowLocators
 from pages.add_model_flow_page import AddModelFlowPage
@@ -42,6 +43,17 @@ def skip_if_cds_unreachable() -> None:
     if not _cds_reachable():
         pytest.skip(f"CivicDataSpace ({CDS_BASE}) unreachable — skipping CDS tests")
 
+
+def _open_cds_editor(page: Page) -> None:
+    """Open the CDS editor. The anonymous session is bounced to Keycloak by a client-side
+    redirect a few seconds after load; querying the DOM mid-redirect hangs the Playwright
+    call until the worker is killed. Wait the redirect out and skip: the editor needs auth."""
+    page.goto(Config.cds_url("/en/manage/ai-models/new"), wait_until="domcontentloaded", timeout=25000)
+    try:
+        page.wait_for_url(lambda u: "/login" not in u and "manage/ai-models/new" not in u, timeout=10_000)
+    except PlaywrightTimeoutError:
+        return
+    pytest.skip("CDS editor requires auth — anonymous session was redirected to Keycloak")
 
 # Login-page indicators — same keyword idiom used in tests/e2e/test_auth.py and
 # test_homepage.py. Kept host-agnostic on purpose: every CivicDataLab product
@@ -128,7 +140,6 @@ class TestCDSAddModelEditor:
     def check_cds_reachable(self):
         skip_if_cds_unreachable()
 
-    @pytest.mark.xfail(reason="CDS-001: JS SyntaxError 'appendChild missing )' fires on every load — known bug")
     def test_cds001_no_js_syntax_error_on_editor_page_load(self, page: Page):
         """CDS-001: The model editor must not throw a JS SyntaxError on load.
 
@@ -149,7 +160,6 @@ class TestCDSAddModelEditor:
             "CDS-001: JS SyntaxError(s) on editor page load:\n" + "\n".join(syntax_errors)
         )
 
-    @pytest.mark.xfail(reason="CDS-001: JS SyntaxError 'appendChild missing )' fires on every load — known bug")
     def test_cds001_editor_has_no_console_errors_on_load(self, page: Page):
         """CDS-001: Editor page should load without any JS console errors.
 
@@ -229,7 +239,7 @@ class TestCDSAddModelEditor:
         MCP found the autosave indicator fires on draft record existence, not field
         completeness — misleads users into thinking the model is ready to publish.
         """
-        page.goto(Config.cds_url("/en/manage/ai-models/new"), wait_until="domcontentloaded", timeout=25000)
+        _open_cds_editor(page)
         page.wait_for_timeout(3000)
         autosave = page.locator(AddModelFlowLocators.CDS_AUTOSAVE_INDICATOR)
         if autosave.count() == 0:
@@ -251,7 +261,7 @@ class TestCDSAddModelEditor:
         MCP found that clicking Next with an empty Title successfully advances to Step 2
         with no validation error shown.
         """
-        page.goto(Config.cds_url("/en/manage/ai-models/new"), wait_until="domcontentloaded", timeout=25000)
+        _open_cds_editor(page)
         page.wait_for_timeout(3000)
         title_input = page.locator(AddModelFlowLocators.CDS_STEP1_TITLE_INPUT)
         if title_input.count() == 0:
@@ -283,7 +293,7 @@ class TestCDSAddModelEditor:
         """
         console_errors = []
         page.on("console", lambda msg: console_errors.append(msg.text) if msg.type == "error" else None)
-        page.goto(Config.cds_url("/en/manage/ai-models/new"), wait_until="domcontentloaded", timeout=25000)
+        _open_cds_editor(page)
         page.wait_for_timeout(3000)
         bullet_btn = page.locator(AddModelFlowLocators.CDS_QUILL_BULLET_BTN)
         if bullet_btn.count() == 0:
@@ -297,7 +307,7 @@ class TestCDSAddModelEditor:
     @pytest.mark.xfail(reason="CDS-005: Quill bullet button silently fails — known bug")
     def test_cds005_quill_bullet_button_activates(self, page: Page):
         """CDS-005: Clicking the Quill bullet list button must apply bullet formatting."""
-        page.goto(Config.cds_url("/en/manage/ai-models/new"), wait_until="domcontentloaded", timeout=25000)
+        _open_cds_editor(page)
         page.wait_for_timeout(3000)
         bullet_btn = page.locator(AddModelFlowLocators.CDS_QUILL_BULLET_BTN)
         if bullet_btn.count() == 0:
@@ -316,7 +326,7 @@ class TestCDSAddModelEditor:
 
         MCP found autocomplete='on' (or no attribute) — allows browsers to store API keys.
         """
-        page.goto(Config.cds_url("/en/manage/ai-models/new"), wait_until="domcontentloaded", timeout=25000)
+        _open_cds_editor(page)
         page.wait_for_timeout(3000)
         add_access_btn = page.locator(AddModelFlowLocators.CDS_ADD_ACCESS_METHOD_BTN)
         if add_access_btn.count() == 0:
