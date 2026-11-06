@@ -50,6 +50,11 @@ class ModelsLocators:
     START_EVALUATION_LINK = "text=Start Evaluation"
     # Platform UI uses 'Invite Evaluators' (was 'Auditors' in earlier copy).
     INVITE_AUDITORS_LINK = "text=/Invite (Auditors|Evaluators)/i"
+    # The invitation dialog AuditorInvitation.tsx opens per-version. Its
+    # Dialog.Content title is 'Invite Evaluator' or 'Invite Evaluator for
+    # Version <n>' — match the stable prefix.
+    # Added for test-sync/ParakhAI-frontend-pr443 (a11y label fix).
+    INVITE_AUDITOR_DIALOG = "[role='dialog']:has-text('Invite Evaluator')"
     # Playwright's `text=` engine treats commas as part of the literal string,
     # so multi-selector fallbacks must use CSS-only forms (`:has-text()`).
     DATE_UPDATED_COL = "text=DATE UPDATED"
