@@ -7,7 +7,8 @@ class AddModelFlowLocators:
     REDIRECT_CONFIRM_BTN = (
         "[role='dialog'] button:has-text('Go'), "
         "[role='dialog'] button:has-text('CivicDataSpace'), "
-        "[role='dialog'] button:has-text('Proceed')"
+        "[role='dialog'] button:has-text('Proceed'), "
+        "[role='alertdialog'] button:has-text('Yes, continue')"
     )
     REDIRECT_CANCEL_BTN = "[role='dialog'] button:has-text('Cancel')"
 
