@@ -6,7 +6,7 @@ Issues covered:
   CDS-001    JS SyntaxError (appendChild) on every editor page load
   CDS-002    Ghost model created before any form input
   CDS-003    "All Changes Saved" indicator shows with empty required fields
-  CDS-004    ?tab=registered URL param from ParakhAI redirect silently ignored
+  CDS-004    ParakhAI redirect appended ?tab=registered (fixed ParakhAI-side in ParakhAI-frontend#479)
   CDS-005    Quill bullet format not registered — console error + button fails
   SEC-004    API key field missing autocomplete="off"
 
@@ -182,28 +182,6 @@ class TestCDSAddModelEditor:
                 f"auth) redirected to Keycloak login before the editor loaded: {page.url}"
             )
         assert not console_errors, f"Console errors on CDS editor load: {console_errors}"
-
-    @pytest.mark.xfail(reason="CDS-004: ?tab=registered param silently ignored on CivicDataSpace AI Models — known bug")
-    def test_cds004_registered_tab_param_is_handled(self, page: Page):
-        """CDS-004: Navigating to /ai-models?tab=registered must show a 'Registered' tab.
-
-        The ParakhAI redirect appends ?tab=registered but CivicDataSpace has no such tab.
-        """
-        page.goto(
-            Config.cds_url("/en/manage/ai-models?tab=registered"),
-            wait_until="domcontentloaded",
-            timeout=20000,
-        )
-        page.wait_for_timeout(2000)
-        assert not page.url.endswith("404"), "CDS AI Models page returned 404"
-        tab_area = page.locator("[role='tablist'], [role='tab']")
-        if tab_area.count() == 0:
-            pytest.skip("No tab elements found — page structure may have changed")
-        tab_texts = tab_area.all_text_contents()
-        assert any("registered" in t.lower() for t in tab_texts), (
-            f"CDS-004: ?tab=registered is silently ignored — no 'Registered' tab found. "
-            f"Tab texts: {tab_texts}"
-        )
 
     @pytest.mark.xfail(reason="CDS-002: Ghost model created before form input — known bug")
     def test_cds002_add_model_does_not_create_db_record_before_form(self, page: Page):
