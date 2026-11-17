@@ -103,7 +103,7 @@ class TestAddModelRedirect:
             "may occur without user intent."
         )
 
-    @pytest.mark.xfail(reason="CDS-004: redirect URL includes ?tab=registered which CivicDataSpace silently ignores — known bug")
+    @pytest.mark.pending_pr("ParakhAI-frontend#479")
     def test_cds004_redirect_url_has_no_invalid_tab_param(self, authenticated_page_fast: Page):
         """CDS-004: The redirect to CivicDataSpace should not include ?tab=registered.
 
