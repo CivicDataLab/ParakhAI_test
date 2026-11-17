@@ -17,6 +17,8 @@ Tests auto-skip when CDS_URL is unreachable (CivicDataSpace not running).
 Both platforms share Keycloak, so TEST_EMAIL_1/TEST_PASSWORD_1 applies to both.
 """
 
+from urllib.parse import unquote
+
 import pytest
 import requests as _requests
 from playwright.sync_api import Page
@@ -127,7 +129,8 @@ class TestAddModelRedirect:
         popup.wait_for_load_state("domcontentloaded")
         url = popup.url
         popup.close()
-        assert "tab=registered" not in url, (
+        # CDS may bounce through /login?callbackUrl=<encoded target>, so decode before matching
+        assert "tab=registered" not in unquote(url), (
             f"CDS-004: Redirect URL contains '?tab=registered' which CivicDataSpace silently "
             f"ignores (no such tab exists). URL: {url}"
         )
