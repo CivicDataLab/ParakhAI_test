@@ -125,6 +125,11 @@ class EvaluationsLocators:
     # while it is empty.
     MODAL_OBJECTIVE_TEXTAREA = "[role='dialog'] textarea"
     MODAL_STEP2_HEADING = "[role='dialog'] :text('I am evaluating as')"
+    # Step-2 "Evaluation Domain" select — only rendered when the selected
+    # model has a domain AND the backend returns non-empty audit domain
+    # options for it (ModelSelectionModal.tsx `requiresEvaluationDomain`).
+    # Added for test-sync/ParakhAI-frontend-pr441 (dropdown alphabetical sort).
+    MODAL_EVALUATION_DOMAIN_DROPDOWN = "select[name='evaluationDomain']"
 
     # Modal dropdown option lists — at least one <option> or listbox item must be present
     # NOTE: If dropdowns are custom (React-Select / Radix), add data-testid="model-option"
