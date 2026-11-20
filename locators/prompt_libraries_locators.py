@@ -14,7 +14,7 @@ class PromptLibrariesLocators:
     ADD_LIBRARY_BUTTON = "button:has-text('Add Prompt Dataset')"
     REDIRECT_DIALOG = "[role='alertdialog']:has-text('Redirect to CivicDataSpace')"
     REDIRECT_CONTINUE = "[role='alertdialog'] button:has-text('Yes, continue')"
-    REDIRECT_CANCEL = "[role='alertdialog'] button:text-is('No')"
+    REDIRECT_CANCEL = "[role='alertdialog'] >> role=button[name=\"No\"s]"
 
     # ── Library cards ──────────────────────────────────────────────────────────
     LIBRARY_CARD = "[class*='card'], [class*='Card']"
