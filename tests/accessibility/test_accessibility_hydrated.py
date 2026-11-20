@@ -59,7 +59,7 @@ class TestHydratedHomepageAxe:
     # Rules that have their own dedicated test (or ledger row) and are therefore
     # excluded here so one known defect cannot mask a different new one:
     #   link-name       -> docs/app_bugs.md #9 (footer social icons)
-    #   color-contrast  -> docs/app_bugs.md #31 (active feature tab)
+    #   color-contrast  -> docs/app_bugs.md #35 (active feature tab)
     _TRACKED_ELSEWHERE = {"link-name", "color-contrast"}
 
     def test_no_untracked_serious_axe_violations(self, page: Page):
@@ -77,7 +77,7 @@ class TestHydratedHomepageAxe:
 
     @pytest.mark.xfail(
         strict=True,
-        reason="App bug #31: active feature tab text #6849EE on #E8E4FF is 4.49:1 (< 4.5:1) — see docs/app_bugs.md",
+        reason="App bug #35: active feature tab text #6849EE on #E8E4FF is 4.49:1 (< 4.5:1) — see docs/app_bugs.md",
     )
     def test_color_contrast_meets_aa(self, page: Page):
         """Every rendered homepage text node meets the 4.5:1 AA contrast ratio (WCAG 1.4.3)."""
@@ -97,7 +97,7 @@ class TestHydratedHomepageAxe:
 class TestHydratedHomepageFeatureTabs:
     @pytest.mark.xfail(
         strict=True,
-        reason="App bug #32: feature tabs are plain <button>s whose selected state is colour-only — see docs/app_bugs.md",
+        reason="App bug #36: feature tabs are plain <button>s whose selected state is colour-only — see docs/app_bugs.md",
     )
     def test_selected_tab_is_exposed_to_assistive_tech(self, page: Page):
         """Selecting a feature tab exposes exactly that tab as selected (WCAG 4.1.2, 1.4.1).
@@ -122,7 +122,7 @@ class TestHydratedHomepageFeatureTabs:
 class TestHydratedHomepageLanguage:
     @pytest.mark.xfail(
         strict=True,
-        reason="App bug #33: Hindi/Odia/Assamese words in the hero sub-heading carry no lang attribute — see docs/app_bugs.md",
+        reason="App bug #37: Hindi/Odia/Assamese words in the hero sub-heading carry no lang attribute — see docs/app_bugs.md",
     )
     def test_non_english_passages_declare_their_language(self, page: Page):
         """Text in another script is marked up with its own lang (WCAG 3.1.2, GIGW 3.0)."""

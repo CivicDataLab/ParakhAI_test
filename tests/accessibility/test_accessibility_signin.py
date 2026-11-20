@@ -18,7 +18,7 @@ pytestmark = [pytest.mark.accessibility]
 class TestProviderSigninPage:
     @pytest.mark.xfail(
         strict=True,
-        reason="App bug #34: NextAuth sign-in page provider logo <img> has no alt attribute — see docs/app_bugs.md",
+        reason="App bug #38: NextAuth sign-in page provider logo <img> has no alt attribute — see docs/app_bugs.md",
     )
     def test_provider_logo_has_alt_attribute(self, page: Page):
         """The provider logo image carries an alt attribute — alt="" is fine since the

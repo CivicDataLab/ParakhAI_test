@@ -37,7 +37,7 @@ def _get_graphql(api_client: requests.Session) -> requests.Response:
 class TestApiHostHeaders:
     @pytest.mark.xfail(
         strict=True,
-        reason="App bug #36: API host Server header discloses 'nginx/1.24.0 (Ubuntu)' — see docs/app_bugs.md",
+        reason="App bug #40: API host Server header discloses 'nginx/1.24.0 (Ubuntu)' — see docs/app_bugs.md",
     )
     def test_server_header_does_not_disclose_version(self, api_client: requests.Session):
         """The API host's Server header carries no nginx version or OS string."""
@@ -49,7 +49,7 @@ class TestApiHostHeaders:
 
     @pytest.mark.xfail(
         strict=True,
-        reason="App bug #37: API host sends conflicting duplicate X-Frame-Options / Referrer-Policy headers — see docs/app_bugs.md",
+        reason="App bug #41: API host sends conflicting duplicate X-Frame-Options / Referrer-Policy headers — see docs/app_bugs.md",
     )
     def test_security_headers_are_not_duplicated_with_conflicting_values(
         self, api_client: requests.Session
