@@ -1,10 +1,10 @@
 """
-promptDatasets org scoping + SDK filters (ParakhAI-Backend#145).
+Prompt dataset listing (ParakhAI-Backend#145).
 
-#145 sends the request's `organization` header to DataSpace, which returns the
-org's own datasets (drafts included) plus, with includePublic, every PUBLISHED
-prompt dataset of other orgs. Filters: status (PromptDatasetStatus enum),
-includePublic, limit, offset.
+#145 sends the request's `organization` header to DataSpace (the org's own
+datasets plus public datasets of other orgs), lists PUBLISHED datasets only,
+and adds `promptDatasetsPage(search, limit, offset, ...) { totalCount items }`
+for server-side paging. The `promptDatasets` contract is unchanged.
 
 Gated on the schema, not on the PR's merge state: #145 merges to main (prod)
 while dev runs behind main, so "merged" doesn't mean the API under test has it.
@@ -12,63 +12,63 @@ while dev runs behind main, so "merged" doesn't mean the API under test has it.
 
 import pytest
 
-from utils.config import Config
-
 pytestmark = [pytest.mark.api, pytest.mark.regression, pytest.mark.auth]
 
-QUERY = """
-query ($status: PromptDatasetStatus, $includePublic: Boolean!, $limit: Int!, $offset: Int!) {
-  promptDatasets(status: $status, includePublic: $includePublic, limit: $limit, offset: $offset) {
-    id status isPublic organization resources { schema { fieldName format } }
+PAGE = """
+query ($search: String, $limit: Int!, $offset: Int!) {
+  promptDatasetsPage(search: $search, limit: $limit, offset: $offset) {
+    totalCount items { id title status }
   }
 }
 """
-
-ORG_ID = str(getattr(Config, "CIVICDATALAB_ORG_ID", 1))
+LIST = "{ promptDatasets(limit: 200) { id status organization } }"
 
 
 @pytest.fixture(autouse=True, scope="module")
 def _requires_pr145(authenticated_graphql_client):
-    r = authenticated_graphql_client('{ __type(name: "Query") { fields { name args { name } } } }')
-    args = {a["name"] for f in r["data"]["__type"]["fields"] if f["name"] == "promptDatasets" for a in f["args"]}
-    if "includePublic" not in args:
-        pytest.skip(f"ParakhAI-Backend#145 not deployed at {Config.graphql_endpoint()} (promptDatasets args: {sorted(args)})")
+    r = authenticated_graphql_client('{ __type(name: "Query") { fields { name } } }')
+    if "promptDatasetsPage" not in {f["name"] for f in r["data"]["__type"]["fields"]}:
+        pytest.skip("ParakhAI-Backend#145 not deployed here (no promptDatasetsPage)")
 
 
-def _list(client, **variables):
-    variables = {"includePublic": True, "limit": 200, "offset": 0, **variables}
-    result = client(QUERY, variables=variables, method="POST")
-    assert not result.get("errors"), f"promptDatasets errored: {result.get('errors')}"
-    return result["data"]["promptDatasets"]
+def _gql(client, query, **variables):
+    result = client(query, variables=variables or None, method="POST")
+    assert not result.get("errors"), f"GraphQL errors: {result.get('errors')}"
+    return result["data"]
 
 
-def _org_id(ds):
-    return str((ds.get("organization") or {}).get("id"))
+def _page(client, limit=10, offset=0, search=None):
+    return _gql(client, PAGE, limit=limit, offset=offset, search=search)["promptDatasetsPage"]
 
 
-def test_new_filters_are_accepted(authenticated_graphql_client):
-    datasets = _list(authenticated_graphql_client, status="PUBLISHED", limit=5)
-    assert datasets, "Expected at least one PUBLISHED prompt dataset"
-    assert len(datasets) <= 5, f"limit=5 returned {len(datasets)}"
-    assert {d["status"] for d in datasets} == {"PUBLISHED"}, [d["status"] for d in datasets]
+def test_page_returns_published_items_with_total(authenticated_graphql_client):
+    page = _page(authenticated_graphql_client, limit=5)
+    assert page["totalCount"] >= len(page["items"]) > 0, page
+    assert len(page["items"]) <= 5
+    assert {d["status"] for d in page["items"]} == {"PUBLISHED"}
+
+
+def test_pages_do_not_overlap(authenticated_graphql_client):
+    first = _page(authenticated_graphql_client, limit=5)
+    if first["totalCount"] <= 5:
+        pytest.skip(f"Only {first['totalCount']} datasets, no second page")
+    second = _page(authenticated_graphql_client, limit=5, offset=5)
+    assert second["totalCount"] == first["totalCount"]
+    overlap = {d["id"] for d in first["items"]} & {d["id"] for d in second["items"]}
+    assert second["items"] and not overlap, f"offset=5 repeated {overlap}"
+
+
+def test_search_narrows_by_title(authenticated_graphql_client):
+    total = _page(authenticated_graphql_client)["totalCount"]
+    hits = _page(authenticated_graphql_client, limit=100, search="kcc")
+    assert 0 < hits["totalCount"] < total, f"search 'kcc': {hits['totalCount']} of {total}"
+    wrong = [d["title"] for d in hits["items"] if "kcc" not in d["title"].lower()]
+    assert not wrong, f"Titles not matching 'kcc': {wrong}"
 
 
 @pytest.mark.security
-def test_other_orgs_contribute_only_published_datasets(authenticated_graphql_client):
-    """Drafts and archived datasets of other orgs must never reach this org."""
-    foreign = [d for d in _list(authenticated_graphql_client) if _org_id(d) != ORG_ID]
-    if not foreign:
-        pytest.skip("No other org has a published prompt dataset on this environment")
-    leaked = [(d["id"], _org_id(d), d["status"]) for d in foreign if d["status"] != "PUBLISHED"]
-    assert not leaked, f"Unpublished datasets of other orgs returned: {leaked}"
-
-
-@pytest.mark.security
-def test_include_public_false_returns_only_own_org(authenticated_graphql_client):
-    with_public = _list(authenticated_graphql_client)
-    own_only = _list(authenticated_graphql_client, includePublic=False)
-    others = sorted({_org_id(d) for d in own_only} - {ORG_ID})
-    assert not others, f"includePublic=false returned datasets of orgs {others}"
-    if not any(_org_id(d) != ORG_ID for d in with_public):
-        pytest.skip("No foreign published datasets, so includePublic cannot narrow the list")
-    assert len(own_only) < len(with_public)
+def test_list_never_returns_unpublished_datasets(authenticated_graphql_client):
+    """Drafts must not be listed. Before #145, org-less drafts reached every org."""
+    rows = _gql(authenticated_graphql_client, LIST)["promptDatasets"]
+    leaked = [(d["id"], (d["organization"] or {}).get("id"), d["status"]) for d in rows if d["status"] != "PUBLISHED"]
+    assert not leaked, f"Unpublished datasets listed: {leaked}"
