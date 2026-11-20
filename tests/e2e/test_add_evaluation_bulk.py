@@ -12,6 +12,7 @@ Every test creates a real draft on the platform, so the whole module is
 auditId is registered with the `cleanup_evaluation` teardown.
 """
 
+import re
 import time
 
 import pytest
@@ -378,4 +379,24 @@ class TestBulkRunToCompletion:
             )
         assert (audit.get("totalTests") or 0) > 0, (
             "A completed/reviewable bulk evaluation must have produced test cases"
+        )
+
+
+# ── Prompt library name link (ParakhAI-frontend#487, fixes #467) ─────────────
+
+
+@pytest.mark.pending_pr("ParakhAI-frontend#487")
+class TestPromptLibraryNameLink:
+    """The library name opens its CivicDataSpace dataset page. Before #487 it
+    linked to "undefined/datasets/<id>", which resolved under the wizard URL and 404'd."""
+
+    def test_library_name_links_to_cds_dataset(
+        self, page: Page, sandbox_org, cleanup_evaluation
+    ):
+        nep = _create_bulk_draft(page, cleanup_evaluation, objective=f"QA library link {_STAMP}")
+        nep.select_prompt_library_source()
+        href = nep.get_first_prompt_library_href()
+        assert href, "Prompt library rows must render a name link"
+        assert re.fullmatch(r"https://([a-z0-9-]+\.)*civicdataspace\.in/datasets/[^/?#]+", href), (
+            f"Library name must link to a CivicDataSpace dataset page, got {href!r}"
         )
