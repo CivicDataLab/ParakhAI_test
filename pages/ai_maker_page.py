@@ -56,10 +56,13 @@ class AIMakerPage(BasePage):
         self.wait_for_app_ready()
         return self
 
-    def org_card_logos(self) -> list[dict]:
-        """src and load state of each org card logo on the landing page, once they finish loading."""
+    def org_card_logos(self, expected_alt: str) -> list[dict]:
+        """src and load state of each org card logo on the landing page, once they finish loading.
+
+        Waits for `expected_alt` because the header's "CivicDataLab logo" matches the same
+        selector and renders before the org cards do."""
         logos = self.page.locator(AIMakerLocators.ORG_CARD_LOGO)
-        logos.first.wait_for(state="attached")
+        self.page.locator(f'img[alt="{expected_alt}"]').first.wait_for(state="attached")
         self.page.wait_for_function(
             "sel => [...document.querySelectorAll(sel)].every(i => i.complete)",
             arg=AIMakerLocators.ORG_CARD_LOGO,
