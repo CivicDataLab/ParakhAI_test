@@ -22,7 +22,7 @@ _SITEMAP_ROOTS = {"urlset", "sitemapindex"}
 class TestSitemap:
     @pytest.mark.xfail(
         strict=True,
-        reason="App bug #35: /sitemap.xml answers 200 with the HTML app shell instead of a sitemap or a 404 — see docs/app_bugs.md",
+        reason="App bug #39: /sitemap.xml answers 200 with the HTML app shell instead of a sitemap or a 404 — see docs/app_bugs.md",
     )
     def test_sitemap_is_xml_or_not_found(self, api_client: requests.Session):
         """/sitemap.xml is either a real sitemap document or a 404 — never a 200 HTML page."""

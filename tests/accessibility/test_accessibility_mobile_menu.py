@@ -18,7 +18,7 @@ pytestmark = [pytest.mark.accessibility, pytest.mark.mobile]
 class TestMobileMenuSheet:
     @pytest.mark.xfail(
         strict=True,
-        reason="App bug #39: mobile menu close (X) button has no accessible name — see docs/app_bugs.md",
+        reason="App bug #43: mobile menu close (X) button has no accessible name — see docs/app_bugs.md",
     )
     def test_close_button_has_accessible_name(self, mobile_page: Page):
         """The icon-only close button in the open sheet is named (WCAG 4.1.2, axe `button-name`, critical)."""
@@ -44,7 +44,7 @@ class TestMobileMenuSheet:
 
     @pytest.mark.xfail(
         strict=True,
-        reason="App bug #40: closing the mobile menu drops keyboard focus to <body> instead of the hamburger — see docs/app_bugs.md",
+        reason="App bug #44: closing the mobile menu drops keyboard focus to <body> instead of the hamburger — see docs/app_bugs.md",
     )
     def test_focus_returns_to_hamburger_after_close(self, mobile_page: Page):
         """After the sheet closes, keyboard focus is back on the button that opened it (WCAG 2.4.3)."""
