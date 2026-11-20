@@ -158,6 +158,7 @@ class EvaluationsLocators:
     # target — the dataset title is a plain <a> that navigates to CivicDataSpace
     # in a new tab, NOT a selection control. Always click the radio, not the link.
     WIZARD_PROMPT_LIBRARY_RADIO = "input[type='radio'][name='promptLibrary']"
+    WIZARD_PROMPT_LIBRARY_NAME_LINK = "tr:has(input[type='radio'][name='promptLibrary']) a[target='_blank']"
     # Error under the Run Evaluation button when no prompt library is selected
     RUN_EVALUATION_LIBRARY_ERROR = "text=Please select a prompt library"
 
