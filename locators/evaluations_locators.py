@@ -159,6 +159,10 @@ class EvaluationsLocators:
     # in a new tab, NOT a selection control. Always click the radio, not the link.
     WIZARD_PROMPT_LIBRARY_RADIO = "input[type='radio'][name='promptLibrary']"
     WIZARD_PROMPT_LIBRARY_NAME_LINK = "tr:has(input[type='radio'][name='promptLibrary']) a[target='_blank']"
+    # Server-side paging + search over the library table (ParakhAI-frontend#484)
+    WIZARD_LIBRARY_PAGER = "text=/Page\\s*\\d+\\s*of\\s*\\d+/i"
+    WIZARD_LIBRARY_NEXT_PAGE = "button[aria-label*='next' i]"
+    WIZARD_LIBRARY_SEARCH = "input[placeholder*='earch' i]"
     # Error under the Run Evaluation button when no prompt library is selected
     RUN_EVALUATION_LIBRARY_ERROR = "text=Please select a prompt library"
 

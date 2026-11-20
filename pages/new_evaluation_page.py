@@ -549,6 +549,29 @@ class NewEvaluationPage(BasePage):
             return None
         return link.get_attribute("href")
 
+    def get_prompt_library_names(self) -> list[str]:
+        """Names of the library rows on the current table page."""
+        self.page.locator(EvaluationsLocators.WIZARD_PROMPT_LIBRARY_RADIO).first.wait_for(timeout=20_000)
+        return self.page.locator(EvaluationsLocators.WIZARD_PROMPT_LIBRARY_NAME_LINK).all_inner_texts()
+
+    def get_library_pager_text(self) -> str:
+        """'Page X of Y', or '' when the table fits on one page (no pager shown)."""
+        pager = self.page.locator(EvaluationsLocators.WIZARD_LIBRARY_PAGER)
+        return pager.first.inner_text() if pager.count() else ""
+
+    def go_to_next_library_page(self) -> None:
+        before = self.get_library_pager_text()
+        self.page.locator(EvaluationsLocators.WIZARD_LIBRARY_NEXT_PAGE).first.click()
+        for _ in range(30):  # pager text changes once the next page has loaded
+            if self.get_library_pager_text() != before:
+                break
+            self.page.wait_for_timeout(500)
+        self.page.wait_for_timeout(1_500)
+
+    def search_prompt_libraries(self, text: str) -> None:
+        self.page.locator(EvaluationsLocators.WIZARD_LIBRARY_SEARCH).first.fill(text)
+        self.page.wait_for_timeout(2_500)  # 300 ms debounce + server round trip
+
     def select_smallest_prompt_library(self) -> int | None:
         """Pick the library with the fewest (non-zero) test cases on the current
         table page and return that count. Big libraries take ~50 min to run."""
