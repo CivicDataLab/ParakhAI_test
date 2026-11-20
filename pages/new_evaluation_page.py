@@ -540,6 +540,15 @@ class NewEvaluationPage(BasePage):
         self.page.wait_for_timeout(1_000)
         return True
 
+    def get_first_prompt_library_href(self) -> str | None:
+        """href of the first library row's name link (opens CivicDataSpace)."""
+        link = self.page.locator(EvaluationsLocators.WIZARD_PROMPT_LIBRARY_NAME_LINK).first
+        try:
+            link.wait_for(state="visible", timeout=15_000)
+        except Exception:
+            return None
+        return link.get_attribute("href")
+
     def select_smallest_prompt_library(self) -> int | None:
         """Pick the library with the fewest (non-zero) test cases on the current
         table page and return that count. Big libraries take ~50 min to run."""
