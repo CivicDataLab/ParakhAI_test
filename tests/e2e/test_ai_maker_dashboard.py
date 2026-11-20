@@ -230,7 +230,7 @@ class TestOrgCardLogos:
             pytest.skip("No organisation of this account has an absolute logo URL")
 
         shown = {}  # alt -> srcs; the page header also has a "CivicDataLab logo"
-        for logo in AIMakerPage(page).go_to_landing().org_card_logos():
+        for logo in AIMakerPage(page).go_to_landing().org_card_logos(expected_alt=next(iter(uploaded))):
             shown.setdefault(logo["alt"], []).append(logo["src"])
         wrong = {alt: shown.get(alt) for alt, url in uploaded.items() if url not in shown.get(alt, [])}
         assert not wrong, (
