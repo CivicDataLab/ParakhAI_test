@@ -4,7 +4,7 @@ promptDatasets org scoping + SDK filters (ParakhAI-Backend#145).
 #145 sends the request's `organization` header to DataSpace, which returns the
 org's own datasets (drafts included) plus, with includePublic, every PUBLISHED
 prompt dataset of other orgs. Filters: status (PromptDatasetStatus enum),
-includePublic, limit, offset. resources.schema is a JSON leaf.
+includePublic, limit, offset.
 
 Gated on the schema, not on the PR's merge state: #145 merges to main (prod)
 while dev runs behind main, so "merged" doesn't mean the API under test has it.
@@ -19,7 +19,7 @@ pytestmark = [pytest.mark.api, pytest.mark.regression, pytest.mark.auth]
 QUERY = """
 query ($status: PromptDatasetStatus, $includePublic: Boolean!, $limit: Int!, $offset: Int!) {
   promptDatasets(status: $status, includePublic: $includePublic, limit: $limit, offset: $offset) {
-    id status isPublic organization resources { schema }
+    id status isPublic organization resources { schema { fieldName format } }
   }
 }
 """
@@ -46,14 +46,11 @@ def _org_id(ds):
     return str((ds.get("organization") or {}).get("id"))
 
 
-def test_new_filters_and_json_schema_are_accepted(authenticated_graphql_client):
+def test_new_filters_are_accepted(authenticated_graphql_client):
     datasets = _list(authenticated_graphql_client, status="PUBLISHED", limit=5)
     assert datasets, "Expected at least one PUBLISHED prompt dataset"
     assert len(datasets) <= 5, f"limit=5 returned {len(datasets)}"
     assert {d["status"] for d in datasets} == {"PUBLISHED"}, [d["status"] for d in datasets]
-    for d in datasets:
-        for r in d["resources"]:
-            assert isinstance(r["schema"], list), f"schema must be a JSON list, got {r['schema']!r}"
 
 
 @pytest.mark.security
