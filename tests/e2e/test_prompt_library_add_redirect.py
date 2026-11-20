@@ -1,5 +1,5 @@
 """
-"Add A New Prompt Library" (ParakhAI-frontend#481): the button opens a confirm
+"Add Prompt Dataset" (ParakhAI-frontend#484): the button opens a confirm
 dialog; "Yes, continue" opens the org's CivicDataSpace dataset listing in a new
 tab (prompt libraries are created there as PROMPT datasets); "No" closes it.
 """
@@ -16,7 +16,7 @@ pytestmark = [
     pytest.mark.e2e,
     pytest.mark.regression,
     pytest.mark.auth,
-    pytest.mark.pending_pr("ParakhAI-frontend#481"),
+    pytest.mark.pending_pr("ParakhAI-frontend#484"),
 ]
 
 
