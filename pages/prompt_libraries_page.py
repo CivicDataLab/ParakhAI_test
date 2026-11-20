@@ -68,3 +68,19 @@ class PromptLibrariesPage(BasePage):
 
     def is_add_filters_visible(self) -> bool:
         return self.is_visible(self.ADD_FILTERS_BUTTON)
+
+    def open_add_library_dialog(self) -> None:
+        self.click(PromptLibrariesLocators.ADD_LIBRARY_BUTTON)
+        self.wait_for_element(PromptLibrariesLocators.REDIRECT_DIALOG)
+
+    def is_redirect_dialog_open(self) -> bool:
+        return self.is_visible(PromptLibrariesLocators.REDIRECT_DIALOG, timeout=2_000)
+
+    def cancel_redirect(self) -> None:
+        self.click(PromptLibrariesLocators.REDIRECT_CANCEL)
+
+    def continue_redirect(self) -> Page:
+        """Confirm the dialog and return the CivicDataSpace tab it opens."""
+        with self.page.context.expect_page(timeout=10_000) as new_tab:
+            self.click(PromptLibrariesLocators.REDIRECT_CONTINUE)
+        return new_tab.value
