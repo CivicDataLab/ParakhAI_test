@@ -69,10 +69,19 @@ def _pending_pr_state(ref):
         req.add_header("Authorization", f"Bearer {token}")
     try:
         with _urlreq.urlopen(req, timeout=10) as resp:
-            merged = _json.load(resp).get("merged_at")
+            pr = _json.load(resp)
+        if not pr.get("merged_at"):
+            return f"pending_pr {ref}: not merged yet"
+        # Merged isn't deployed: dev and main drift apart, and a PR merged to main
+        # never reaches dev until a back-merge. Open the gate only once the merge
+        # commit is on the branch that deploys the environment under test.
+        branch = "dev" if "://dev." in Config.BASE_URL else "main"
+        req.full_url = f"https://api.github.com/repos/{repo}/compare/{branch}...{pr['merge_commit_sha']}"
+        with _urlreq.urlopen(req, timeout=10) as resp:
+            status = _json.load(resp).get("status")
     except Exception as e:  # 404 on a private repo without GH_PR_TOKEN lands here too
         return f"pending_pr {ref}: could not read PR state ({e})"
-    return None if merged else f"pending_pr {ref}: not merged yet"
+    return None if status in ("behind", "identical") else f"pending_pr {ref}: merged, not on {branch} yet"
 
 
 def pytest_collection_modifyitems(config, items):
