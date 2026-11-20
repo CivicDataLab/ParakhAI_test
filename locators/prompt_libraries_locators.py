@@ -10,6 +10,12 @@ class PromptLibrariesLocators:
     SEARCH_INPUT = "input[placeholder*='Search'], input[placeholder*='name']"
     ADD_FILTERS_BUTTON = "text=Add Filters"
 
+    # "Add A New Prompt Library" → confirm dialog → CivicDataSpace (ParakhAI-frontend#481)
+    ADD_LIBRARY_BUTTON = "button:has-text('Add A New Prompt Library')"
+    REDIRECT_DIALOG = "[role='alertdialog']:has-text('Redirect to CivicDataSpace')"
+    REDIRECT_CONTINUE = "[role='alertdialog'] button:has-text('Yes, continue')"
+    REDIRECT_CANCEL = "[role='alertdialog'] button:text-is('No')"
+
     # ── Library cards ──────────────────────────────────────────────────────────
     LIBRARY_CARD = "[class*='card'], [class*='Card']"
     LIBRARY_CARD_TITLE = "[class*='card'] [class*='title'], [class*='card'] a, [class*='card'] h3"
