@@ -73,8 +73,12 @@ class PromptLibrariesPage(BasePage):
         self.click(PromptLibrariesLocators.ADD_LIBRARY_BUTTON)
         self.wait_for_element(PromptLibrariesLocators.REDIRECT_DIALOG)
 
-    def is_redirect_dialog_open(self) -> bool:
-        return self.is_visible(PromptLibrariesLocators.REDIRECT_DIALOG, timeout=2_000)
+    def is_redirect_dialog_closed(self, timeout: int = 5_000) -> bool:
+        try:
+            self.wait_for_element(PromptLibrariesLocators.REDIRECT_DIALOG, state="hidden", timeout=timeout)
+            return True
+        except Exception:
+            return False
 
     def cancel_redirect(self) -> None:
         self.click(PromptLibrariesLocators.REDIRECT_CANCEL)

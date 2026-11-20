@@ -29,7 +29,7 @@ def test_cancel_closes_dialog_without_redirect(pl: PromptLibrariesPage):
     pages_before = len(pl.page.context.pages)
     pl.open_add_library_dialog()
     pl.cancel_redirect()
-    assert not pl.is_redirect_dialog_open(), "'No' must close the redirect dialog"
+    assert pl.is_redirect_dialog_closed(), "'No' must close the redirect dialog"
     assert len(pl.page.context.pages) == pages_before, "'No' must not open a new tab"
     assert "/prompt-libraries" in pl.page.url
 
