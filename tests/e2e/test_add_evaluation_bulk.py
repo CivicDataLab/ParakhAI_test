@@ -400,3 +400,39 @@ class TestPromptLibraryNameLink:
         assert re.fullmatch(r"https://([a-z0-9-]+\.)*civicdataspace\.in/datasets/[^/?#]+", href), (
             f"Library name must link to a CivicDataSpace dataset page, got {href!r}"
         )
+
+
+@pytest.mark.pending_pr("ParakhAI-frontend#484")
+class TestPromptLibraryPagingAndSearch:
+    """#484 pages and searches the wizard's library table on the server
+    (promptDatasetsPage, 10 rows per page) instead of one client-side page of 50."""
+
+    def test_next_page_shows_different_libraries(
+        self, page: Page, sandbox_org, cleanup_evaluation
+    ):
+        nep = _create_bulk_draft(page, cleanup_evaluation, objective=f"QA library paging {_STAMP}")
+        nep.select_prompt_library_source()
+        first = nep.get_prompt_library_names()
+        assert 0 < len(first) <= 10, f"Page 1 must show 1-10 libraries, got {len(first)}"
+        pager = nep.get_library_pager_text().strip().lower()
+        if not pager or pager.endswith("of 1"):
+            pytest.skip("Only one page of libraries for this domain")
+        nep.go_to_next_library_page()
+        second = nep.get_prompt_library_names()
+        assert second and not set(first) & set(second), f"Page 2 repeats page 1: {set(first) & set(second)}"
+
+    def test_search_narrows_libraries_by_name(
+        self, page: Page, sandbox_org, cleanup_evaluation
+    ):
+        nep = _create_bulk_draft(page, cleanup_evaluation, objective=f"QA library search {_STAMP}")
+        nep.select_prompt_library_source()
+        name = nep.get_prompt_library_names()[0]
+        nep.search_prompt_libraries(name)
+        found = nep.get_prompt_library_names()
+        assert name in found and all(name.lower() in n.lower() for n in found), (
+            f"Searching {name!r} must return only matching libraries, got {found}"
+        )
+        nep.search_prompt_libraries("zzz_no_such_library")
+        assert not nep.page.locator(EvaluationsLocators.WIZARD_PROMPT_LIBRARY_RADIO).count(), (
+            "A search matching no library must empty the table"
+        )
