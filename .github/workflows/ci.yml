@@ -241,6 +241,10 @@ jobs:
   lint:
     name: Lint (ruff)
     runs-on: ubuntu-latest
+    timeout-minutes: 240
+    permissions:
+      contents: read
+      actions: read
     steps:
       - uses: actions/checkout@v6
 
@@ -255,6 +259,25 @@ jobs:
 
       - name: Run ruff linter
         run: ruff check locators/ pages/ utils/ tests/ --output-format=github
+
+      # Every test job needs lint, so waiting here queues whole runs against
+      # the shared dev backend. 2026-11-21: 4-6 PR runs overlapping produced
+      # load flakes (auditor model detail, evaluator stats, bulk draft, Flow03/05)
+      # that passed on main in isolation. Not a `concurrency:` group: GitHub
+      # keeps one pending run per group and cancels the rest, so 3+ PRs would
+      # get cancelled runs instead of queued ones.
+      - name: Wait for older CI runs to release dev
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          while :; do
+            older=$(gh run list -R "$GITHUB_REPOSITORY" --workflow ci.yml --limit 50 \
+              --json databaseId,status \
+              --jq "[.[] | select(.databaseId < $GITHUB_RUN_ID and (.status == \"in_progress\" or .status == \"queued\"))] | length")
+            [ "$older" = 0 ] && break
+            echo "$older older CI run(s) still active against dev; waiting 60s"
+            sleep 60
+          done
 
   # ────────────────────────────────────────────── API tests
   # Most tests hit the GraphQL/REST layer directly, but auth-token
