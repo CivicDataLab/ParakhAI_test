@@ -84,6 +84,18 @@ class EvaluationDetailLocators:
 
     # Report download — two-step flow (changed upstream Jun 2026):
     # user must click "Generate Report" first; "Download Report" appears after generation.
+    #
+    # STALE since ParakhAI-frontend#488 (merged 2026-11-24): the standalone
+    # "Generate Report" / "Download Report" buttons were replaced by one
+    # "Download" button that opens a Menu with two items ("Report (PDF)" /
+    # "Generate report (PDF)" and "Evaluation data (ZIP)"). Neither locator
+    # below matches any element on the new page — the trigger button's own
+    # text is just "Download". Kept so old references fail visibly instead
+    # of silently matching nothing; see DOWNLOAD_MENU_* below for the
+    # current selectors. Tests still using these two constants (grep for
+    # `is_generate_report_button_visible` / `is_download_button_visible` /
+    # `DOWNLOAD_REPORT_BUTTON`) need a human-run confirm + update — not done
+    # here for lack of credentials in this environment, see PR body.
     GENERATE_REPORT_BUTTON = (
         "button:has-text('Generate Report'), "
         "a:has-text('Generate Report')"
@@ -92,3 +104,14 @@ class EvaluationDetailLocators:
         "button:has-text('Download Report'), "
         "a:has-text('Download Report')"
     )
+
+    # ── Download menu (ParakhAI-frontend#488) ─────────────────────────────────
+    # One "Download" button (disclosure) opens an opub-ui Menu; items render
+    # with role="menuitem" — same pattern as the user/profile menu's
+    # Sign-out item (locators/dashboard_locators.py SIGN_OUT_BUTTON).
+    DOWNLOAD_MENU_TRIGGER = "button:has-text('Download')"
+    DOWNLOAD_MENU_ITEM_REPORT = (
+        "[role='menuitem']:has-text('Report (PDF)'), "
+        "[role='menuitem']:has-text('Generate report (PDF)')"
+    )
+    DOWNLOAD_MENU_ITEM_EXPORT = "[role='menuitem']:has-text('Evaluation data (ZIP)')"

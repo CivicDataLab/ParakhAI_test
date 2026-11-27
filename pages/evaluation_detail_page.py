@@ -28,6 +28,9 @@ class EvaluationDetailPage(BasePage):
     SAMPLE_ISSUES_HEADING = EvaluationDetailLocators.SAMPLE_ISSUES_HEADING
     ISSUE_EXPAND_TRIGGER = EvaluationDetailLocators.ISSUE_EXPAND_TRIGGER
     DOWNLOAD_REPORT_BUTTON = EvaluationDetailLocators.DOWNLOAD_REPORT_BUTTON
+    DOWNLOAD_MENU_TRIGGER = EvaluationDetailLocators.DOWNLOAD_MENU_TRIGGER
+    DOWNLOAD_MENU_ITEM_REPORT = EvaluationDetailLocators.DOWNLOAD_MENU_ITEM_REPORT
+    DOWNLOAD_MENU_ITEM_EXPORT = EvaluationDetailLocators.DOWNLOAD_MENU_ITEM_EXPORT
     TAB_OVERVIEW = EvaluationDetailLocators.TAB_OVERVIEW
     TAB_TEST_CASES = EvaluationDetailLocators.TAB_TEST_CASES
     TAB_RESULTS = EvaluationDetailLocators.TAB_RESULTS
@@ -92,6 +95,27 @@ class EvaluationDetailPage(BasePage):
 
     def is_download_button_visible(self) -> bool:
         return self.is_visible(self.DOWNLOAD_REPORT_BUTTON)
+
+    # ── Download menu (ParakhAI-frontend#488) ───────────────────────────────
+    # Replaces the old standalone Generate/Download Report buttons above with
+    # one "Download" button that opens a menu. Same open-then-click pattern as
+    # DashboardPage.sign_out() for the user menu.
+
+    def is_download_menu_trigger_visible(self) -> bool:
+        return self.is_visible(self.DOWNLOAD_MENU_TRIGGER, timeout=5_000)
+
+    def open_download_menu(self) -> None:
+        self.click(self.DOWNLOAD_MENU_TRIGGER)
+        self.page.wait_for_timeout(500)
+
+    def is_download_menu_item_report_visible(self) -> bool:
+        return self.is_visible(self.DOWNLOAD_MENU_ITEM_REPORT, timeout=3_000)
+
+    def is_download_menu_item_export_visible(self) -> bool:
+        return self.is_visible(self.DOWNLOAD_MENU_ITEM_EXPORT, timeout=3_000)
+
+    def click_download_menu_item_export(self) -> None:
+        self.click(self.DOWNLOAD_MENU_ITEM_EXPORT)
 
     def expand_first_issue(self) -> None:
         triggers = self.page.locator(self.ISSUE_EXPAND_TRIGGER)
